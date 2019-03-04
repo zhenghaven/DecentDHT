@@ -1,0 +1,9 @@
+enclave
+{
+	from "decent_dht.edl" import *;
+
+	trusted
+	{
+		public int ecall_decent_dht_loopup([user_check] void* connection);
+	};
+};

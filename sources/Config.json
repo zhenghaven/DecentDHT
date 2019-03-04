@@ -1,0 +1,15 @@
+{
+	"DecentServer" : 
+	{
+		"Address" : "127.0.0.1", 
+		"Port" : 57755, 
+		"LoadedWhiteList" : false
+	}, 
+	"DecentDHT" : 
+	{
+		"Address" : "127.0.0.1", 
+		"Port" : 57756, 
+		"LoadedWhiteList" : true, 
+		"Hash" : "DecentDHT"
+	}
+}
