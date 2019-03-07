@@ -6,7 +6,7 @@
 #include <DecentApi/CommonApp/Net/TCPConnection.h>
 #include <DecentApi/CommonApp/Tools/ConfigManager.h>
 
-#include "../Common/AppNames.h"
+#include "../../Common/Dht/AppNames.h"
 
 using namespace Decent::Tools;
 using namespace Decent::Net;
@@ -55,13 +55,6 @@ void ConnectionManager::SetConfigManager(const ConfigManager & mgrRef)
 std::unique_ptr<Connection> ConnectionManager::GetConnection2DecentDht(const SmartMessages& hsMsg, uint32_t* outIpAddr, uint16_t* outPort)
 {
 	const ConfigItem& pasMgmItem = gsk_configMgrPtr->GetItem(AppNames::sk_decentDHT);
-
-	return InternalGetConnection(pasMgmItem, hsMsg, outIpAddr, outPort);
-}
-
-std::unique_ptr<Connection> ConnectionManager::GetConnection2DecentDhtStore(const SmartMessages& hsMsg, uint32_t* outIpAddr, uint16_t* outPort)
-{
-	const ConfigItem& pasMgmItem = gsk_configMgrPtr->GetItem(AppNames::sk_decentDHTStorage);
 
 	return InternalGetConnection(pasMgmItem, hsMsg, outIpAddr, outPort);
 }
