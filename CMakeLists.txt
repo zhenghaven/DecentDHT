@@ -180,9 +180,6 @@ message(STATUS "")
 #   Add submodules
 #==========================================================
 
-#Intel SGX SDK
-include(${CMAKE_CURRENT_LIST_DIR}/libs/decent-ra-api/cmake/FindSgxSdk.cmake)
-
 ##Header only libraries
 set(TCLAP_INCLUDE_DIR ${CMAKE_CURRENT_LIST_DIR}/libs/tclap/include)
 
@@ -190,6 +187,9 @@ set(TCLAP_INCLUDE_DIR ${CMAKE_CURRENT_LIST_DIR}/libs/tclap/include)
 # set(DECENT_API_DECENT_SERVER ON CACHE BOOL "Add decent server module." FORCE)
 set(DECENT_API_DECENT_APP ON CACHE BOOL "Add decent app module." FORCE)
 add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/libs/decent-ra-api)
+
+#Intel SGX SDK
+include(${CMAKE_CURRENT_LIST_DIR}/libs/decent-ra-api/cmake/FindSgxSdk.cmake)
 
 #==========================================================
 #   Add files
