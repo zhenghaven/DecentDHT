@@ -6,21 +6,21 @@ namespace Decent
 {
 	namespace Dht
 	{
-		class DhtLookup : public Decent::Net::SmartMessages
+		class FromDht : public Decent::Net::SmartMessages
 		{
 		public:
-			static constexpr char const sk_ValueCat[] = "DhtLookup";
+			static constexpr char const sk_ValueCat[] = "FromDht";
 
 		public:
-			DhtLookup() :
+			FromDht() :
 				SmartMessages()
 			{}
 
-			DhtLookup(const Json::Value& msg) :
+			FromDht(const Json::Value& msg) :
 				SmartMessages(msg, sk_ValueCat)
 			{}
 
-			~DhtLookup()
+			~FromDht()
 			{}
 
 			virtual std::string GetMessageCategoryStr() const override { return sk_ValueCat; }

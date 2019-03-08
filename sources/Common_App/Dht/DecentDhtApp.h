@@ -13,7 +13,7 @@ namespace Decent
 
 			virtual ~DecentDhtApp() {}
 
-			virtual bool ProcessMsgForDhtLookup(Decent::Net::Connection& connection);
+			virtual bool ProcessMsgFromDht(Decent::Net::Connection& connection);
 
 			virtual bool ProcessSmartMessage(const std::string& category, const Json::Value& jsonMsg, Decent::Net::Connection& connection) override;
 
