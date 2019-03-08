@@ -7,7 +7,7 @@
 #include <string>
 #include <vector>
 
-#include "NodeConnector.h"
+#include "Node.h"
 
 namespace Decent
 {
@@ -21,7 +21,7 @@ namespace Decent
 		{
 			ConstIdType m_startId;
 			ConstIdType m_endId;
-			std::unique_ptr<NodeConnector> m_nodeCnt;
+			std::unique_ptr<Node<ConstIdType> > m_nodeCnt;
 
 			template<typename IdType>
 			FingerTableRecord(const IdType& start, const IdType& end) :
