@@ -18,11 +18,9 @@
 #include <DecentApi/Common/Common.h>
 #include <DecentApi/Common/Ra/WhiteList/HardCoded.h>
 
-#include "../Common/AppNames.h"
+#include "../Common/Dht/AppNames.h"
 #include "../Common_App/Tools.h"
-#include "../Common_App/ConnectionManager.h"
-
-#include "DecentDhtApp.h"
+#include "../Common_App/Dht/DecentDhtApp.h"
 
 using namespace Decent;
 using namespace Decent::Tools;
@@ -59,7 +57,6 @@ int main(int argc, char ** argv)
 		return -1;
 	}
 	ConfigManager configManager(configJsonStr);
-	ConnectionManager::SetConfigManager(configManager);
 
 	const ConfigItem& decentServerItem = configManager.GetItem(Ra::WhiteList::sk_nameDecentServer);
 	const ConfigItem& selfItem = configManager.GetItem(AppNames::sk_decentDHT);

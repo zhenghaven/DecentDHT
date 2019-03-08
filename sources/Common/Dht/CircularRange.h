@@ -6,53 +6,31 @@
 */
 #pragma once
 
-#include <stdexcept>
-
 #include <cstdint>
 
-/**
-* \struct CircRangeInternalLR
-* \brief Internal functions used by CircularRange. Do not directly call functions here unless you know what you are doing.
-*/
-template<typename T>
-struct CircRangeInternalLR
-{
-	static constexpr bool LeftRange(const T a, const T v) noexcept
-	{
-		return a <= v;
-	}
-
-	static constexpr bool RightRange(const T v, const T b) noexcept
-	{
-		return v <= b;
-	}
-
-	CircRangeInternalLR() = delete;
-};
-
-template<typename T>
-struct CircRangeInternal
-{
-	static constexpr bool Range(const T v, const T start, const T end) noexcept
-	{
-		return CircRangeInternalLR<T>::LeftRange(start, v) && CircRangeInternalLR<T>::RightRange(v, end);
-	}
-
-	CircRangeInternal() = delete;
-};
+#include <stdexcept>
 
 /**
 * \class CircularRange
 * \brief A clockwise circular range.
 */
-template<typename T, T circleStart, T circleEnd> //, bool isStartClosed, bool isEndClosed
+template<typename T, T circleStart, T circleEnd>
 class CircularRange
 {
 private:
+
+	/**
+	 * \brief	A helper function to check if a value is within a range.
+	 */
+	static constexpr bool Range(const T v, const T start, const T end)
+	{
+		return start <= v && v <= end;
+	}
+
 	/**
 	* \brief A helper function to check if the testing range is inside the circle.
 	*/
-	static constexpr bool CheckTestingRangeNN(const T start, const T end) noexcept
+	static constexpr bool CheckTestingRangeNN(const T start, const T end)
 	{
 		return (circleStart <= start && circleStart <= end) && (start <= circleEnd && end <= circleEnd);
 	}
@@ -60,10 +38,9 @@ private:
 	/**
 	* \brief A helper function to determine the inclusion of a circular range.
 	*/
-	static constexpr bool CircularRangeNN(const T v, const T start, const T end) noexcept
+	static constexpr bool CircularRangeNN(const T v, const T start, const T end)
 	{
-		return CircRangeInternal<T>::Range(v, start, circleEnd) ||
-			CircRangeInternal<T>::Range(v, circleStart, end);
+		return Range(v, start, circleEnd) || Range(v, circleStart, end);
 	}
 
 	/**
@@ -76,14 +53,15 @@ private:
 
 public:
 	CircularRange() = delete;
-	~CircularRange() noexcept {}
+	CircularRange(const CircularRange&) = delete;
+	CircularRange(CircularRange&&) = delete;
 
 	/**
 	* \brief Check if value v is on the circle.
 	*/
-	static constexpr bool IsOnCircle(const T v) noexcept
+	static constexpr bool IsOnCircle(const T v)
 	{
-		return CircRangeInternal<T>::Range(v, circleStart, circleEnd);
+		return Range(v, circleStart, circleEnd);
 	}
 
 	/**
@@ -115,7 +93,7 @@ public:
 		//Invalid case: 'start' or 'end' is out of circle range, or v is not on the circle.
 		return (!CheckTestingRangeNN(start, end) || !IsOnCircle(v)) ? (throw std::logic_error("Testing range is outside of the circle!")) : //Make sure the testing range is valid.
 			(start == end ? comCircleSEE && (v != start) : //CASE 1: A complete circle
-				(start < end ? CircRangeInternal<T>::Range(v, start, end) : //CASE 2: A simple range
+				(start < end ? Range(v, start, end) : //CASE 2: A simple range
 					(CircularRangeNN(v, start, end)) //CASE 3: A circular range
 				));
 	}
