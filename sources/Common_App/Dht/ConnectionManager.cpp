@@ -7,6 +7,7 @@
 #include <DecentApi/CommonApp/Tools/ConfigManager.h>
 
 #include "../../Common/Dht/AppNames.h"
+#include "Messages.h"
 
 using namespace Decent::Tools;
 using namespace Decent::Net;
@@ -14,23 +15,12 @@ using namespace Decent::Dht;
 
 namespace
 {
-	static const ConfigManager* gsk_configMgrPtr = nullptr;
 
-	static inline std::unique_ptr<Connection> InternalGetConnection(const ConfigItem& configItem, const SmartMessages& hsMsg, uint32_t* outIpAddr, uint16_t* outPort)
+	static inline std::unique_ptr<Connection> InternalGetConnection(const SmartMessages& hsMsg, uint64_t address)
 	{
-		uint32_t ip = boost::asio::ip::address_v4::from_string(configItem.GetAddr()).to_uint();
-		if (outIpAddr)
-		{
-			*outIpAddr = ip;
-		}
-		if (outPort)
-		{
-			*outPort = configItem.GetPort();
-		}
-
 		try
 		{
-			std::unique_ptr<Connection> connection = std::make_unique<TCPConnection>(ip, configItem.GetPort());
+			std::unique_ptr<Connection> connection = std::make_unique<TCPConnection>(address);
 
 			if (connection)
 			{
@@ -47,19 +37,26 @@ namespace
 	}
 }
 
-void ConnectionManager::SetConfigManager(const ConfigManager & mgrRef)
-{
-	gsk_configMgrPtr = &mgrRef;
-}
 
-std::unique_ptr<Connection> ConnectionManager::GetConnection2DecentDht(const SmartMessages& hsMsg, uint32_t* outIpAddr, uint16_t* outPort)
+std::unique_ptr<Connection> ConnectionManager::GetConnection2DecentDht(const SmartMessages& hsMsg, uint64_t address)
 {
-	const ConfigItem& pasMgmItem = gsk_configMgrPtr->GetItem(AppNames::sk_decentDHT);
-
-	return InternalGetConnection(pasMgmItem, hsMsg, outIpAddr, outPort);
+	return InternalGetConnection(hsMsg, address);
 }
 
 extern "C" void ocall_decent_dht_cnt_mgr_close_cnt(void* cnt_ptr)
 {
 	delete static_cast<Connection*>(cnt_ptr);
 }
+
+extern "C" void ocall_decent_dht_cnt_mgr_get_dht(void** out_cnt_ptr, uint64_t address)
+{
+	if (!out_cnt_ptr)
+	{
+		return;
+	}
+	std::unique_ptr<Connection> cnt = ConnectionManager::GetConnection2DecentDht(FromDht(), address);
+
+	*out_cnt_ptr = cnt.release();
+}
+
+

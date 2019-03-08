@@ -22,9 +22,7 @@ namespace Decent
 	{
 		namespace ConnectionManager
 		{
-			void SetConfigManager(const Decent::Tools::ConfigManager& mgrRef);
-
-			std::unique_ptr<Decent::Net::Connection> GetConnection2DecentDht(const Decent::Net::SmartMessages& hsMsg, uint32_t* outIpAddr = nullptr, uint16_t* outPort = nullptr);
+			std::unique_ptr<Decent::Net::Connection> GetConnection2DecentDht(const Decent::Net::SmartMessages& hsMsg, uint64_t address);
 		}
 	}
 }
