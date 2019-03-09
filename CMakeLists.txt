@@ -11,7 +11,8 @@ set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 set(HUNTER_BOOST_RUNTIME_STATIC ON CACHE BOOL "Switch for using boost runtime static linking." FORCE)
 
 if(APPLE)
-	message(FATAL_ERROR "Mac OS is not supported for now.")
+	message(WARNING "Mac OS is not supported by Intel SGX for now. Trying to build in simulation mode...")
+	set(CMAKE_BUILD_TYPE DebugSimulation)
 endif()
 #==========================================================
 #   Setup Hunter
