@@ -43,11 +43,6 @@ std::unique_ptr<Connection> ConnectionManager::GetConnection2DecentDht(const Sma
 	return InternalGetConnection(hsMsg, address);
 }
 
-extern "C" void ocall_decent_dht_cnt_mgr_close_cnt(void* cnt_ptr)
-{
-	delete static_cast<Connection*>(cnt_ptr);
-}
-
 extern "C" void ocall_decent_dht_cnt_mgr_get_dht(void** out_cnt_ptr, uint64_t address)
 {
 	if (!out_cnt_ptr)

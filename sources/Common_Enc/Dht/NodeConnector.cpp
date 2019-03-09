@@ -4,10 +4,9 @@
 #include <DecentApi/Common/make_unique.h>
 #include <DecentApi/Common/Ra/TlsConfig.h>
 #include <DecentApi/Common/Net/TlsCommLayer.h>
+#include <DecentApi/CommonEnclave/SGX/EcallConnector.h>
 
 #include <sgx_error.h>
-
-#include "../Connector.h"
 
 #include "../../Common/Dht/AppNames.h"
 #include "../../Common/Dht/FuncNums.h"
@@ -48,7 +47,7 @@ NodeConnector::~NodeConnector()
 
 NodeConnector::NodeBaseType * NodeConnector::LookupTypeFunc(const MbedTlsObj::BigNumber & key, EncFunc::Dht::NumType type)
 {
-	EnclaveConnector connection(&ocall_decent_dht_cnt_mgr_get_dht, m_address);
+	Net::EcallConnector connection(&ocall_decent_dht_cnt_mgr_get_dht, m_address);
 
 	std::shared_ptr<Ra::TlsConfig> tlsCfg = std::make_shared<Ra::TlsConfig>(AppNames::sk_decentDHT, gs_state, false);
 	Decent::Net::TlsCommLayer tls(connection.m_ptr, tlsCfg, true);
@@ -91,7 +90,7 @@ NodeConnector::NodeBaseType * Decent::Dht::NodeConnector::GetImmediateSuccessor(
 	LOGI("Getting Immediate Successor...");
 	using namespace EncFunc::Dht;
 
-	EnclaveConnector connection(&ocall_decent_dht_cnt_mgr_get_dht, m_address);
+	Net::EcallConnector connection(&ocall_decent_dht_cnt_mgr_get_dht, m_address);
 
 	std::shared_ptr<Ra::TlsConfig> tlsCfg = std::make_shared<Ra::TlsConfig>(AppNames::sk_decentDHT, gs_state, false);
 	Decent::Net::TlsCommLayer tls(connection.m_ptr, tlsCfg, true);
@@ -122,7 +121,7 @@ const BigNumber & NodeConnector::GetNodeId()
 	LOGI("Getting Node ID...");
 	using namespace EncFunc::Dht;
 
-	EnclaveConnector connection(&ocall_decent_dht_cnt_mgr_get_dht, m_address);
+	Net::EcallConnector connection(&ocall_decent_dht_cnt_mgr_get_dht, m_address);
 
 	std::shared_ptr<Ra::TlsConfig> tlsCfg = std::make_shared<Ra::TlsConfig>(AppNames::sk_decentDHT, gs_state, false);
 	Decent::Net::TlsCommLayer tls(connection.m_ptr, tlsCfg, true);

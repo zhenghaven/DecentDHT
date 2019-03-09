@@ -17,7 +17,6 @@ enclave
 	
 	untrusted
 	{
-		void ocall_decent_dht_cnt_mgr_close_cnt([user_check] void* cnt_ptr);
 		void ocall_decent_dht_cnt_mgr_get_dht([out] void** out_cnt_ptr, uint64_t address);
 	};
 };
