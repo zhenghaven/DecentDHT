@@ -14,20 +14,19 @@ namespace Decent
 {
 	namespace Dht
 	{
-		typedef sgx_status_t(*CntBuilderType)(void**);
-
-		struct Connector
+		struct EnclaveConnector
 		{
-			Connector(CntBuilderType cntBuilder) :
+			template<class Tp, class... Args>
+			EnclaveConnector(Tp cntBuilder, Args&&... args) :
 				m_ptr(nullptr)
 			{
-				if ((*cntBuilder)(&m_ptr) != SGX_SUCCESS)
+				if ((*cntBuilder)(&m_ptr, std::forward<Args>(args)...) != SGX_SUCCESS)
 				{
 					m_ptr = nullptr;
 				}
 			}
 
-			~Connector()
+			~EnclaveConnector()
 			{
 				ocall_decent_dht_cnt_mgr_close_cnt(m_ptr);
 			}

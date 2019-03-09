@@ -1,68 +1,50 @@
 #pragma once
 
 #include "../../Common/Dht/Node.h"
-#include "../Connector.h"
-#include <DecentApi/Common/Ra/TlsConfig.h>
-#include <DecentApi/Common/Net/TlsCommLayer.h>
-#include <sgx_error.h>
-#include "../../Common/Dht/AppNames.h"
 #include "../../Common/Dht/FuncNums.h"
-#include <DecentApi/DecentAppEnclave/AppStatesSingleton.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-	sgx_status_t ocall_decent_dht_cnt_mgr_get_dht(void** out_cnt_ptr, uint64_t address);
-
-#ifdef __cplusplus
-}
-#endif /* __cplusplus */
+#include <memory>
 
 namespace Decent
 {
+	namespace MbedTlsObj
+	{
+		class BigNumber;
+	}
+
 	namespace Dht
 	{
-		template<typename ConstIdType>
-		class NodeConnector : public Node
+		class NodeConnector : public Node<MbedTlsObj::BigNumber, uint64_t>
 		{
+		public:
+			typedef Node<MbedTlsObj::BigNumber, uint64_t> NodeBaseType;
+
 		public:
 			NodeConnector() = delete;
 
-			NodeConnector(uint64_t address) :
-				m_address(address)
-			{}
+			NodeConnector(uint64_t address);
 
-			virtual ~NodeConnector() 
-			{}
+			NodeConnector(uint64_t address, const MbedTlsObj::BigNumber& Id);
 
-			virtual uint64_t FindSuccessor(ConstIdType key) const override
-			{
-				Ra::AppStates state = Ra::GetAppStateSingleton();
+			NodeConnector(uint64_t address, MbedTlsObj::BigNumber&& Id);
 
-				void* connection;
-				ocall_decent_dht_cnt_mgr_get_dht(&connection, m_address);
-				
-				std::shared_ptr<Decent::Ra::TlsConfig> tlsCfg = std::make_shared<Decent::Ra::TlsConfig>(AppNames::sk_decentDHT, state, false);
-				Decent::Net::TlsCommLayer tls(connection, tlsCfg, true);
+			virtual ~NodeConnector();
 
-				tls.SendMsg(connection, EncFunc::GetMsgString(EncFunc::Dht::k_lookup));
-				tls.SendMsg(connection, key);
+			virtual NodeBaseType* LookupTypeFunc(const MbedTlsObj::BigNumber& key, EncFunc::Dht::NumType type);
 
-				std::string msgbuffer;
+			virtual NodeBaseType* FindSuccessor(const MbedTlsObj::BigNumber& key) override;
 
-				tls.ReceiveMsg(connection, msgbuffer);
+			virtual NodeBaseType* FindPredecessor(const MbedTlsObj::BigNumber& key) override;
 
-				uint64_t result = *reinterpret_cast<const uint64_t*>(msgbuffer.data());
+			virtual NodeBaseType* GetImmediateSuccessor() override;
 
-				ocall_decent_dht_cnt_mgr_close_cnt(&connection);
+			virtual const MbedTlsObj::BigNumber& GetNodeId() override;
 
-				return result;
-			}
+			virtual const uint64_t& GetAddress() override { return m_address; }
 
 		private:
 			uint64_t m_address;
-
+			std::unique_ptr<MbedTlsObj::BigNumber> m_Id;
 		};
 	}
 }

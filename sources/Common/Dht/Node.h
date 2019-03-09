@@ -15,15 +15,15 @@ namespace Decent
 			virtual ~Node()
 			{}
 
-			virtual const Node* FindSuccessor(const IdType key) const = 0;
+			virtual Node* FindSuccessor(const IdType& key) = 0;
 
-			virtual const Node* FindPredecessor(const IdType key) const = 0;
+			virtual Node* FindPredecessor(const IdType& key) = 0;
 
-			virtual const Node* GetImmediateSuccessor() const = 0;
+			virtual Node* GetImmediateSuccessor() = 0;
 
-			virtual const IdType& GetNodeId() const = 0;
+			virtual const IdType& GetNodeId() = 0;
 
-			virtual const AddrType& GetAddress() const = 0;
+			virtual const AddrType& GetAddress() = 0;
 
 		};
 	}

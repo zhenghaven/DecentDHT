@@ -51,7 +51,7 @@ namespace Decent
 			 *
 			 * \return	The found successor.
 			 */
-			virtual const Node* FindSuccessor(ConstIdType key) const override
+			virtual Node* FindSuccessor(const IdType& key) override
 			{
 				if (m_cirRange.IsWithinNC(key, m_predId, m_id))
 				{
@@ -67,14 +67,14 @@ namespace Decent
 			 *
 			 * \return	The found predecessor.
 			 */
-			virtual const Node* FindPredecessor(ConstIdType key) const override
+			virtual Node* FindPredecessor(const IdType& key) override
 			{
 				const IdType& immediateSucId = GetImmediateSuccessor()->GetNodeId();
 				if (m_cirRange.IsWithinNC(key, m_id, immediateSucId))
 				{
 					return this;
 				}
-				const Node* nextHop = m_fingerTable.GetClosetPrecFinger(key);
+				Node* nextHop = m_fingerTable.GetClosetPrecFinger(key);
 				return nextHop->FindPredecessor(key);
 			}
 
@@ -83,18 +83,18 @@ namespace Decent
 			 *
 			 * \return	The pointer to the immediate successor.
 			 */
-			virtual const Node* GetImmediateSuccessor() const override
+			virtual Node* GetImmediateSuccessor() override
 			{
-				const Node* res = m_fingerTable.GetImmediateSuccessor();
+				Node* res = m_fingerTable.GetImmediateSuccessor();
 				return res ? res : this;
 			}
 
-			virtual const IdType& GetNodeId() const override
+			virtual const IdType& GetNodeId() override
 			{
 				return m_id;
 			}
 
-			virtual const AddrType& GetAddress() const override
+			virtual const AddrType& GetAddress() override
 			{
 				return m_addr;
 			}

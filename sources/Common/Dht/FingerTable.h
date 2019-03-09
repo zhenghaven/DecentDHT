@@ -98,11 +98,11 @@ namespace Decent
 			 *
 			 * \return	The pointer to the closet predcessor node.
 			 */
-			const NodeBaseType* GetClosetPrecFinger(IdType id) const
+			NodeBaseType* GetClosetPrecFinger(IdType id) const
 			{
 				for (auto rit = m_tableRecords.crbegin(); rit != m_tableRecords.crend(); ++rit)
 				{
-					const NodeBaseType* node = rit->m_nodeCnt.get();
+					NodeBaseType* node = rit->m_nodeCnt.get();
 					const IdType& nodeId = node ? node->GetNodeId() : m_nodeId;
 
 					if (m_cirRange.IsWithinNN(nodeId, m_nodeId, id))
@@ -118,7 +118,7 @@ namespace Decent
 			 *
 			 * \return	The pointer to the immediate successor.
 			 */
-			const NodeBaseType* GetImmediateSuccessor() const
+			NodeBaseType* GetImmediateSuccessor() const
 			{
 				return m_tableRecords[0].m_nodeCnt.get();
 			}
