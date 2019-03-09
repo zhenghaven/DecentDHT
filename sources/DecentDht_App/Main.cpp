@@ -17,11 +17,13 @@
 
 #include <DecentApi/Common/Common.h>
 #include <DecentApi/Common/Ra/WhiteList/HardCoded.h>
+#include <DecentApi/Common/MbedTls/BigNumber.h>
 
 #include "../Common/Dht/AppNames.h"
 #include "../Common_App/Tools.h"
 #include "../Common_App/Dht/DecentDhtApp.h"
-
+#include "../Common/Dht/CircularRange.h"
+#include "../Common/Dht/LocalNode.h"
 using namespace Decent;
 using namespace Decent::Tools;
 using namespace Decent::Dht;
@@ -37,6 +39,21 @@ using namespace Decent::Ra::Message;
  */
 int main(int argc, char ** argv)
 {
+	std::array<std::unique_ptr<MbedTlsObj::BigNumber>, 256 + 1 > pow2iArray;
+	for (size_t i = 0; i < pow2iArray.size(); ++i)
+	{
+		pow2iArray[i] = std::make_unique<MbedTlsObj::BigNumber>(MbedTlsObj::sk_empty);
+		pow2iArray[i]->SetBit(i, true);
+	}
+
+
+	{
+		static_assert(sizeof(FilledArray<32>::value) == 32, "The size of the filled array is unexpected. Probably the compiler doesn't support the implmentation.");
+		MbedTlsObj::BigNumber smallest(0LL, MbedTlsObj::sk_struct);
+		MbedTlsObj::BigNumber largest(FilledArray<32>::value, MbedTlsObj::sk_struct);
+		MbedTlsObj::BigNumber nodeId(100LL, MbedTlsObj::sk_struct);
+		LocalNode<MbedTlsObj::BigNumber, const MbedTlsObj::BigNumber, 32, uint64_t> locNode(nodeId, 0LL, smallest, largest, pow2iArray);
+	}
 	std::cout << "================ Decent DHT ================" << std::endl;
 
 	TCLAP::CmdLine cmd("Decent DHT", ' ', "ver", true);

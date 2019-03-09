@@ -6,9 +6,9 @@
 
 using namespace Decent::Dht;
 
-constexpr char const DhtLookup::sk_ValueCat[];
+constexpr char const FromDht::sk_ValueCat[];
 
-Json::Value& DhtLookup::GetJsonMsg(Json::Value& outJson) const
+Json::Value& FromDht::GetJsonMsg(Json::Value& outJson) const
 {
 	Json::Value& root = SmartMessages::GetJsonMsg(outJson);
 

@@ -6,7 +6,7 @@ namespace Decent
 {
 	namespace Dht
 	{
-		template<typename ConstIdType>
+		template<typename ConstIdType, typename AddrType>
 		class Node
 		{
 		public:
@@ -15,7 +15,15 @@ namespace Decent
 			virtual ~Node()
 			{}
 
-			virtual uint64_t FindSuccessor(ConstIdType key) const = 0;
+			virtual const Node* FindSuccessor(ConstIdType key) const = 0;
+
+			virtual const Node* FindPredecessor(ConstIdType key) const = 0;
+
+			virtual const Node* GetImmediateSuccessor() const = 0;
+
+			virtual ConstIdType& GetNodeId() const = 0;
+
+			virtual const AddrType& GetAddress() const = 0;
 
 		};
 	}

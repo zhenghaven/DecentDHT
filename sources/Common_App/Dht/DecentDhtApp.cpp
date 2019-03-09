@@ -21,7 +21,7 @@ bool DecentDhtApp::ProcessMsgFromDht(Decent::Net::Connection & connection)
 
 bool DecentDhtApp::ProcessSmartMessage(const std::string & category, const Json::Value & jsonMsg, Decent::Net::Connection & connection)
 {
-	if (category == DhtLookup::sk_ValueCat)
+	if (category == FromDht::sk_ValueCat)
 	{
 		return ProcessMsgFromDht(connection);
 	}

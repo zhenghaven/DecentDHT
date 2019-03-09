@@ -13,7 +13,7 @@
 #include <rapidjson/document.h>
 #include <cppcodec/base64_default_rfc4648.hpp>
 
-#include "../Common/AppNames.h"
+#include "../Common/Dht/AppNames.h"
 
 using namespace Decent::Dht;
 using namespace Decent::Ra;

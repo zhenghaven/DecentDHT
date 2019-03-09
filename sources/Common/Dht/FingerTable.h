@@ -1,61 +1,103 @@
-//
-// Created by Aaron Chu on 3/7/19.
-//
 #pragma once
 
 #include <memory>
 #include <string>
 #include <vector>
 
+#include <DecentApi/Common/Common.h>
+
 #include "Node.h"
+#include "CircularRange.h"
 
 namespace Decent
 {
 	namespace Dht
 	{
+		//template<typename ConstIdType>
+		//class Node;
+
+		constexpr size_t BITS_PER_BYTE = 8;
+
 		/**
 		* \brief Defines each row of the finger table.
 		*/
-		template<typename ConstIdType>
+		template<typename IdType, typename AddrType>
 		struct FingerTableRecord
 		{
-			ConstIdType m_startId;
-			ConstIdType m_endId;
-			std::unique_ptr<Node<ConstIdType> > m_nodeCnt;
+			IdType m_startId;
+			IdType m_endId;
+			std::unique_ptr<Node<IdType, AddrType> > m_nodeCnt;
 
-			template<typename IdType>
+			FingerTableRecord() = delete;
+
 			FingerTableRecord(const IdType& start, const IdType& end) :
 				m_startId(start),
 				m_endId(end),
 				m_nodeCnt()
 			{}
 
+			FingerTableRecord(FingerTableRecord&& rhs) :
+				m_startId(std::forward<IdType>(rhs.m_startId)),
+				m_endId(std::forward<IdType>(rhs.m_endId)),
+				m_nodeCnt(std::move(rhs.m_nodeCnt))
+			{}
+
 			~FingerTableRecord() {}
 		};
 
+		template<typename IdType, size_t KeySizeByte, typename AddrType>
 		class FingerTable
 		{
+		public: //Static members:
+
+
 		public:
 			/**
 			 * \brief Construct the FingerTable. This will also initialize the finger table as if the owner is the only node in the network.
 			 * \param ownerNodeId the id of node hosting the finger table.
 			 * \param ownerNode the pointer to the node hosting the finger table.
 			 */
-			FingerTable(NodeIdType ownerNodeId, Node* ownerNode);
+			FingerTable(const IdType& ownerNodeId, const CircularRange<const IdType, IdType>& circleRange, const std::array<std::unique_ptr<IdType>, KeySizeByte * BITS_PER_BYTE + 1>& pow2iArray) :
+				m_nodeId(ownerNodeId),
+				m_cirRange(circleRange),
+				m_tableRecords()
+			{
+				if (!m_cirRange.IsOnCircle(m_nodeId))
+				{
+				    throw std::runtime_error("Node ID used to contruct finger table is out of range!");
+				}
+				
+				const IdType& pow2m = *pow2iArray[KeySizeByte * BITS_PER_BYTE];
+				
+				IdType prevEndId = (m_nodeId + static_cast<int64_t>(1)) % pow2m;
+				for (size_t i = 0; i < KeySizeByte * BITS_PER_BYTE; ++i)
+				{
+					IdType nextEndId = (m_nodeId + *pow2iArray[i + 1]) % pow2m;
+					m_tableRecords.push_back(FingerTableRecord<IdType, AddrType>(prevEndId, nextEndId));
+					prevEndId = std::move(nextEndId);
+				}
+
+				//for (size_t i = 0; i < KeySizeByte * BITS_PER_BYTE; ++i)
+				//{
+				//	LOGI("%s | %s ", m_tableRecords[i].m_startId.ToBigEndianHexStr().c_str(), m_tableRecords[i].m_endId.ToBigEndianHexStr().c_str());
+				//}
+			}
 
 			/**
 			* \brief Destructor.
 			*/
-			~FingerTable();
+			virtual ~FingerTable()
+			{}
 
-		//	/**
-		//	* \brief Called when this node is joining the existing network. The finger table will be re-initialized according to the existing node.
-		//	* \param exNode Pointer to an existing node.
-		//	* \param outPred [out] return the immediate predecessor.
-		//	* \param outSucc [out] return the immediate successor.
-		//	* \param debugOutStr [out] return the character string that contains the trace of the lookup operation.
-		//	*/
-		//	void JoinTo(Node* exNode, Node*& outPred, Node*& outSucc, std::string& debugOutStr);
+			/**
+			* \brief Called when this node is joining the existing network. The finger table will be re-initialized according to the existing node.
+			* \param exNode Pointer to an existing node.
+			* \param outPred [out] return the immediate predecessor.
+			* \param outSucc [out] return the immediate successor.
+			*/
+			//void JoinTo(Node<IdType>* exNode, Node*& outPred, Node*& outSucc);
+
+
 
 		//	/**
 		//	* \brief Called when this node is joining the existing network and after its finger table is re-initialized.
@@ -122,9 +164,9 @@ namespace Decent
 		//	void PrintStyledString(std::basic_ostream<char, std::char_traits<char> >& stream) const;
 
 		private:
-			NodeIdType m_nodeId;
-			Node* m_node;
-			std::vector<FingerTableRecord> m_fingerTable;
+			const IdType& m_nodeId;
+			const CircularRange<const IdType, IdType>& m_cirRange;
+			std::vector<FingerTableRecord<IdType, AddrType> > m_tableRecords;
 		};
 
 	}
