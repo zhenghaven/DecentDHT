@@ -53,6 +53,8 @@ int main(int argc, char ** argv)
 		MbedTlsObj::BigNumber largest(FilledArray<32>::value, MbedTlsObj::sk_struct);
 		MbedTlsObj::BigNumber nodeId(100LL, MbedTlsObj::sk_struct);
 		LocalNode<MbedTlsObj::BigNumber, const MbedTlsObj::BigNumber, 32, uint64_t> locNode(nodeId, 0LL, smallest, largest, pow2iArray);
+
+		locNode.FindSuccessor(MbedTlsObj::BigNumber(103LL, MbedTlsObj::sk_struct));
 	}
 	std::cout << "================ Decent DHT ================" << std::endl;
 

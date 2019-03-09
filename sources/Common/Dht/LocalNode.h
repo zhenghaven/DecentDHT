@@ -18,9 +18,10 @@ namespace Decent
 	namespace Dht
 	{
 		template<typename IdType, typename ConstIdType, size_t KeySizeByte, typename AddrType>
-		class LocalNode : public Node<ConstIdType, AddrType>
+		class LocalNode : public Node<IdType, AddrType>
 		{
 		public: //static member:
+			typedef Node<IdType, AddrType> NodeBaseType;
 
 
 		public:
@@ -68,7 +69,13 @@ namespace Decent
 			 */
 			virtual const Node* FindPredecessor(ConstIdType key) const override
 			{
-				return nullptr;
+				const IdType& immediateSucId = GetImmediateSuccessor()->GetNodeId();
+				if (m_cirRange.IsWithinNC(key, m_id, immediateSucId))
+				{
+					return this;
+				}
+				const Node* nextHop = m_fingerTable.GetClosetPrecFinger(key);
+				return nextHop->FindPredecessor(key);
 			}
 
 			/**
@@ -78,10 +85,11 @@ namespace Decent
 			 */
 			virtual const Node* GetImmediateSuccessor() const override
 			{
-				return nullptr;
+				const Node* res = m_fingerTable.GetImmediateSuccessor();
+				return res ? res : this;
 			}
 
-			virtual ConstIdType& GetNodeId() const override
+			virtual const IdType& GetNodeId() const override
 			{
 				return m_id;
 			}
@@ -96,7 +104,7 @@ namespace Decent
 			AddrType m_addr;
 			IdType m_ringSmallestId;
 			IdType m_ringLargestId;
-			CircularRange<const IdType, IdType> m_cirRange;
+			CircularRange<IdType> m_cirRange;
 			FingerTable<IdType, KeySizeByte, AddrType> m_fingerTable;
 			IdType m_predId;
 			//	Node* m_predecessor;

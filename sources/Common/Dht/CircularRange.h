@@ -53,17 +53,17 @@ namespace Decent
 		* \class CircularRange
 		* \brief A clockwise circular range.
 		*/
-		template<typename ConstValType, typename ValType>
+		template<typename ValType>
 		class CircularRange
 		{
 		private:
-			ConstValType& m_circleStart;
-			ConstValType& m_circleEnd;
+			const ValType& m_circleStart;
+			const ValType& m_circleEnd;
 
 			/**
 			 * \brief	A helper function to check if a value is within a range.
 			 */
-			static constexpr bool Range(ConstValType& v, ConstValType& start, ConstValType& end)
+			static constexpr bool Range(const ValType& v, const ValType& start, const ValType& end)
 			{
 				return start <= v && v <= end;
 			}
@@ -71,7 +71,7 @@ namespace Decent
 			/**
 			* \brief A helper function to check if the testing range is inside the circle.
 			*/
-			bool CheckTestingRangeNN(ConstValType& start, ConstValType& end) const
+			bool CheckTestingRangeNN(const ValType& start, const ValType& end) const
 			{
 				return (m_circleStart <= start && m_circleStart <= end) && (start <= m_circleEnd && end <= m_circleEnd);
 			}
@@ -79,7 +79,7 @@ namespace Decent
 			/**
 			* \brief A helper function to determine the inclusion of a circular range.
 			*/
-			bool CircularRangeNN(ConstValType& v, ConstValType& start, ConstValType& end) const
+			bool CircularRangeNN(const ValType& v, const ValType& start, const ValType& end) const
 			{
 				return Range(v, start, m_circleEnd) || Range(v, m_circleStart, end);
 			}
@@ -87,7 +87,7 @@ namespace Decent
 			/**
 			* \brief A helper function to perform the minus operation.
 			*/
-			ValType MinusChecked(ConstValType& a, ConstValType& b) const
+			ValType MinusChecked(const ValType& a, const ValType& b) const
 			{
 				return a >= b ? a - b : (m_circleEnd - b + 1 + a);
 			}
@@ -97,7 +97,7 @@ namespace Decent
 			CircularRange(const CircularRange&) = delete;
 			CircularRange(CircularRange&&) = delete;
 
-			CircularRange(ConstValType& circleStart, ConstValType& circleEnd) :
+			CircularRange(const ValType& circleStart, const ValType& circleEnd) :
 				m_circleStart(circleStart),
 				m_circleEnd(circleEnd)
 			{}
@@ -105,7 +105,7 @@ namespace Decent
 			/**
 			* \brief Check if value v is on the circle.
 			*/
-			bool IsOnCircle(ConstValType& v) const
+			bool IsOnCircle(const ValType& v) const
 			{
 				return Range(v, m_circleStart, m_circleEnd);
 			}
@@ -117,7 +117,7 @@ namespace Decent
 			* \param end End value of the range.
 			* \param comCircleSEE Is it a complete circle when start equals to end?
 			*/
-			bool IsWithinNN(ConstValType& v, ConstValType& start, ConstValType& end, bool comCircleSEE = true) const
+			bool IsWithinNN(const ValType& v, const ValType& start, const ValType& end, bool comCircleSEE = true) const
 			{
 				/*
 					if (start == end)
@@ -151,7 +151,7 @@ namespace Decent
 			* \param end End value of the range.
 			* \param comCircleSEE Is it a complete circle when start equals to end?
 			*/
-			bool IsWithinNC(ConstValType& v, ConstValType& start, ConstValType& end, bool comCircleSEE = true) const
+			bool IsWithinNC(const ValType& v, const ValType& start, const ValType& end, bool comCircleSEE = true) const
 			{
 				return (IsWithinNN(v, start, end, comCircleSEE) || (v == end));
 			}
@@ -163,7 +163,7 @@ namespace Decent
 			* \param end End value of the range.
 			* \param comCircleSEE Is it a complete circle when start equals to end?
 			*/
-			bool IsWithinCN(ConstValType& v, ConstValType& start, ConstValType& end, bool comCircleSEE = true) const
+			bool IsWithinCN(const ValType& v, const ValType& start, const ValType& end, bool comCircleSEE = true) const
 			{
 				return (IsWithinNN(v, start, end, comCircleSEE) || (v == start));
 			}
@@ -175,7 +175,7 @@ namespace Decent
 			* \param end End value of the range.
 			* \param comCircleSEE Is it a complete circle when start equals to end?
 			*/
-			bool IsNotWithinNC(ConstValType& v, ConstValType& start, ConstValType& end, bool comCircleSEE = true) const
+			bool IsNotWithinNC(const ValType& v, const ValType& start, const ValType& end, bool comCircleSEE = true) const
 			{
 				return !IsWithinNC(v, start, end, comCircleSEE);
 			}
@@ -185,7 +185,7 @@ namespace Decent
 			* \param aOnCirc An initial value that is on the circle and needs to be deducted.
 			* \param b Value to be deducted from aOnCirc.
 			*/
-			ValType Minus(ConstValType& aOnCirc, const uint64_t b) const
+			ValType Minus(const ValType& aOnCirc, const uint64_t b) const
 			{
 				return IsOnCircle(aOnCirc) ? MinusChecked(aOnCirc, b % (m_circleEnd - m_circleStart + 1)) : (throw std::logic_error("The Value of a is not on the circle!"));
 			}

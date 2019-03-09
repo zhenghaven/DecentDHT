@@ -24,9 +24,11 @@ namespace Decent
 		template<typename IdType, typename AddrType>
 		struct FingerTableRecord
 		{
+			typedef Node<IdType, AddrType> NodeBaseType;
+
 			IdType m_startId;
 			IdType m_endId;
-			std::unique_ptr<Node<IdType, AddrType> > m_nodeCnt;
+			std::unique_ptr<NodeBaseType> m_nodeCnt;
 
 			FingerTableRecord() = delete;
 
@@ -49,7 +51,7 @@ namespace Decent
 		class FingerTable
 		{
 		public: //Static members:
-
+			typedef Node<IdType, AddrType> NodeBaseType;
 
 		public:
 			/**
@@ -57,7 +59,7 @@ namespace Decent
 			 * \param ownerNodeId the id of node hosting the finger table.
 			 * \param ownerNode the pointer to the node hosting the finger table.
 			 */
-			FingerTable(const IdType& ownerNodeId, const CircularRange<const IdType, IdType>& circleRange, const std::array<std::unique_ptr<IdType>, KeySizeByte * BITS_PER_BYTE + 1>& pow2iArray) :
+			FingerTable(const IdType& ownerNodeId, const CircularRange<IdType>& circleRange, const std::array<std::unique_ptr<IdType>, KeySizeByte * BITS_PER_BYTE + 1>& pow2iArray) :
 				m_nodeId(ownerNodeId),
 				m_cirRange(circleRange),
 				m_tableRecords()
@@ -88,6 +90,38 @@ namespace Decent
 			*/
 			virtual ~FingerTable()
 			{}
+
+			/**
+			 * \brief	Get the closet predcessor for a specific key.
+			 *
+			 * \param	id	Key for loopup.
+			 *
+			 * \return	The pointer to the closet predcessor node.
+			 */
+			const NodeBaseType* GetClosetPrecFinger(IdType id) const
+			{
+				for (auto rit = m_tableRecords.crbegin(); rit != m_tableRecords.crend(); ++rit)
+				{
+					const NodeBaseType* node = rit->m_nodeCnt.get();
+					const IdType& nodeId = node ? node->GetNodeId() : m_nodeId;
+
+					if (m_cirRange.IsWithinNN(nodeId, m_nodeId, id))
+					{
+						return node;
+					}
+				}
+				return nullptr;
+			}
+
+			/**
+			 * \brief	Get the immediate successor.
+			 *
+			 * \return	The pointer to the immediate successor.
+			 */
+			const NodeBaseType* GetImmediateSuccessor() const
+			{
+				return m_tableRecords[0].m_nodeCnt.get();
+			}
 
 			/**
 			* \brief Called when this node is joining the existing network. The finger table will be re-initialized according to the existing node.
@@ -132,18 +166,6 @@ namespace Decent
 		//	*/
 		//	bool DeUpdateFingerTable(NodeIdType oldId, Node* s, NodeIdType sid, size_t i, std::string& debugOutStr);
 
-		//	/**
-		//	* \brief Get the closet predcessor for a specific key.
-		//	* \param id Key for loopup.
-		//	* \return The pointer to the closet predcessor node.
-		//	*/
-		//	Node* GetClosetPrecFinger(KeyType id) const;
-
-		//	/**
-		//	* \brief Get the immediate successor.
-		//	* \return The pointer to the immediate successor.
-		//	*/
-		//	Node* GetImmediateSuccessor() const;
 
 		//	/**
 		//	* \brief Get the ID of immediate successor.
@@ -165,7 +187,7 @@ namespace Decent
 
 		private:
 			const IdType& m_nodeId;
-			const CircularRange<const IdType, IdType>& m_cirRange;
+			const CircularRange<IdType>& m_cirRange;
 			std::vector<FingerTableRecord<IdType, AddrType> > m_tableRecords;
 		};
 
