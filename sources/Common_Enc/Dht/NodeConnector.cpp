@@ -45,7 +45,7 @@ NodeConnector::~NodeConnector()
 {
 }
 
-NodeConnector::NodeBaseType * NodeConnector::LookupTypeFunc(const MbedTlsObj::BigNumber & key, EncFunc::Dht::NumType type)
+NodeConnector::NodeBasePtrType NodeConnector::LookupTypeFunc(const MbedTlsObj::BigNumber & key, EncFunc::Dht::NumType type)
 {
 	Net::EcallConnector connection(&ocall_decent_dht_cnt_mgr_get_dht, m_address);
 
@@ -67,25 +67,24 @@ NodeConnector::NodeBaseType * NodeConnector::LookupTypeFunc(const MbedTlsObj::Bi
 	BigNumber resId(keyBin);
 	LOGI("Recv result ID: %s.", resId.ToBigEndianHexStr().c_str());
 
-	//return std::make_shared<NodeConnector>(resAddr, std::move(resId));
-	return nullptr;
+	return std::make_shared<NodeConnector>(resAddr, std::move(resId));
 }
 
-NodeConnector::NodeBaseType* NodeConnector::FindSuccessor(const BigNumber & key)
+NodeConnector::NodeBasePtrType NodeConnector::FindSuccessor(const BigNumber & key)
 {
 	LOGI("Finding Successor...");
 	using namespace EncFunc::Dht;
 	return LookupTypeFunc(key, k_findSuccessor);
 }
 
-NodeConnector::NodeBaseType * Decent::Dht::NodeConnector::FindPredecessor(const MbedTlsObj::BigNumber & key)
+NodeConnector::NodeBasePtrType Decent::Dht::NodeConnector::FindPredecessor(const MbedTlsObj::BigNumber & key)
 {
 	LOGI("Finding Predecessor...");
 	using namespace EncFunc::Dht;
 	return LookupTypeFunc(key, k_findPredecessor);
 }
 
-NodeConnector::NodeBaseType * Decent::Dht::NodeConnector::GetImmediateSuccessor()
+NodeConnector::NodeBasePtrType Decent::Dht::NodeConnector::GetImmediateSuccessor()
 {
 	LOGI("Getting Immediate Successor...");
 	using namespace EncFunc::Dht;
@@ -106,8 +105,7 @@ NodeConnector::NodeBaseType * Decent::Dht::NodeConnector::GetImmediateSuccessor(
 	BigNumber resId(keyBin);
 	LOGI("Recv result ID: %s.", resId.ToBigEndianHexStr().c_str());
 
-	//return std::make_shared<NodeConnector>(resAddr, std::move(resId));
-	return nullptr;
+	return std::make_shared<NodeConnector>(resAddr, std::move(resId));
 }
 
 const BigNumber & NodeConnector::GetNodeId()

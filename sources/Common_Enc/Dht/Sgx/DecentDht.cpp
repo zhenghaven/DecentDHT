@@ -31,7 +31,7 @@ static void FindSuccessor(void* connection, Decent::Net::TlsCommLayer &tls)
 	
 	DhtStates::DhtNodeType& localNode = *gs_state.GetDhtNode();
 
-	DhtStates::DhtNodeType::NodeBaseType* resNode = localNode.FindSuccessor(queriedId);
+	DhtStates::DhtNodeType::NodeBasePtrType resNode = localNode.FindSuccessor(queriedId);
 
 	std::array<uint8_t, DhtStates::sk_keySizeByte> resKeyBin{};
 	resNode->GetNodeId().ToBinary(resKeyBin);

@@ -25,23 +25,24 @@ namespace Decent
 		struct FingerTableRecord
 		{
 			typedef Node<IdType, AddrType> NodeBaseType;
+			typedef typename NodeBaseType::NodeBasePtrType NodeBasePtrType;
 
 			IdType m_startId;
 			IdType m_endId;
-			std::unique_ptr<NodeBaseType> m_nodeCnt;
+			NodeBasePtrType m_node;
 
 			FingerTableRecord() = delete;
 
 			FingerTableRecord(const IdType& start, const IdType& end) :
 				m_startId(start),
 				m_endId(end),
-				m_nodeCnt()
+				m_node()
 			{}
 
 			FingerTableRecord(FingerTableRecord&& rhs) :
 				m_startId(std::forward<IdType>(rhs.m_startId)),
 				m_endId(std::forward<IdType>(rhs.m_endId)),
-				m_nodeCnt(std::move(rhs.m_nodeCnt))
+				m_node(std::move(rhs.m_node))
 			{}
 
 			~FingerTableRecord() {}
@@ -52,6 +53,7 @@ namespace Decent
 		{
 		public: //Static members:
 			typedef Node<IdType, AddrType> NodeBaseType;
+			typedef typename NodeBaseType::NodeBasePtrType NodeBasePtrType;
 
 		public:
 			/**
@@ -98,11 +100,11 @@ namespace Decent
 			 *
 			 * \return	The pointer to the closet predcessor node.
 			 */
-			NodeBaseType* GetClosetPrecFinger(IdType id) const
+			NodeBasePtrType GetClosetPrecFinger(IdType id) const
 			{
 				for (auto rit = m_tableRecords.crbegin(); rit != m_tableRecords.crend(); ++rit)
 				{
-					NodeBaseType* node = rit->m_nodeCnt.get();
+					const NodeBasePtrType& node = rit->m_node;
 					const IdType& nodeId = node ? node->GetNodeId() : m_nodeId;
 
 					if (m_cirRange.IsWithinNN(nodeId, m_nodeId, id))
@@ -118,9 +120,9 @@ namespace Decent
 			 *
 			 * \return	The pointer to the immediate successor.
 			 */
-			NodeBaseType* GetImmediateSuccessor() const
+			NodeBasePtrType GetImmediateSuccessor() const
 			{
-				return m_tableRecords[0].m_nodeCnt.get();
+				return m_tableRecords[0].m_node;
 			}
 
 			/**

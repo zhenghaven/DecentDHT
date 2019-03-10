@@ -5,23 +5,22 @@
 //*
 //*/
 #pragma once
-//
-//
-//#include <map>
-//#include <vector>
-//#include <string>
 
+#include <memory>
+
+#include "Node.h"
 #include "FingerTable.h"
 
 namespace Decent
 {
 	namespace Dht
 	{
-		template<typename IdType, typename ConstIdType, size_t KeySizeByte, typename AddrType>
-		class LocalNode : public Node<IdType, AddrType>
+		template<typename IdType, size_t KeySizeByte, typename AddrType>
+		class LocalNode : public Node<IdType, AddrType>, public std::enable_shared_from_this<LocalNode<IdType, KeySizeByte, AddrType> >
 		{
 		public: //static member:
 			typedef Node<IdType, AddrType> NodeBaseType;
+			typedef typename NodeBaseType::NodeBasePtrType NodeBasePtrType;
 
 
 		public:
@@ -51,11 +50,11 @@ namespace Decent
 			 *
 			 * \return	The found successor.
 			 */
-			virtual Node* FindSuccessor(const IdType& key) override
+			virtual NodeBasePtrType FindSuccessor(const IdType& key) override
 			{
 				if (m_cirRange.IsWithinNC(key, m_predId, m_id))
 				{
-					return this;
+					return GetSelfPtr();
 				}
 				return FindPredecessor(key)->GetImmediateSuccessor();
 			}
@@ -67,14 +66,14 @@ namespace Decent
 			 *
 			 * \return	The found predecessor.
 			 */
-			virtual Node* FindPredecessor(const IdType& key) override
+			virtual NodeBasePtrType FindPredecessor(const IdType& key) override
 			{
 				const IdType& immediateSucId = GetImmediateSuccessor()->GetNodeId();
 				if (m_cirRange.IsWithinNC(key, m_id, immediateSucId))
 				{
-					return this;
+					return GetSelfPtr();
 				}
-				Node* nextHop = m_fingerTable.GetClosetPrecFinger(key);
+				NodeBasePtrType nextHop = m_fingerTable.GetClosetPrecFinger(key);
 				return nextHop->FindPredecessor(key);
 			}
 
@@ -83,10 +82,10 @@ namespace Decent
 			 *
 			 * \return	The pointer to the immediate successor.
 			 */
-			virtual Node* GetImmediateSuccessor() override
+			virtual NodeBasePtrType GetImmediateSuccessor() override
 			{
-				Node* res = m_fingerTable.GetImmediateSuccessor();
-				return res ? res : this;
+				NodeBasePtrType res = m_fingerTable.GetImmediateSuccessor();
+				return res ? res : GetSelfPtr();
 			}
 
 			virtual const IdType& GetNodeId() override
@@ -97,6 +96,12 @@ namespace Decent
 			virtual const AddrType& GetAddress() override
 			{
 				return m_addr;
+			}
+
+		protected:
+			NodeBasePtrType GetSelfPtr()
+			{
+				return this->shared_from_this();
 			}
 
 		private:

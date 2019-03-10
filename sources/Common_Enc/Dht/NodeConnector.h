@@ -18,6 +18,7 @@ namespace Decent
 		{
 		public:
 			typedef Node<MbedTlsObj::BigNumber, uint64_t> NodeBaseType;
+			typedef typename NodeBaseType::NodeBasePtrType NodeBasePtrType;
 
 		public:
 			NodeConnector() = delete;
@@ -30,13 +31,13 @@ namespace Decent
 
 			virtual ~NodeConnector();
 
-			virtual NodeBaseType* LookupTypeFunc(const MbedTlsObj::BigNumber& key, EncFunc::Dht::NumType type);
+			virtual NodeBasePtrType LookupTypeFunc(const MbedTlsObj::BigNumber& key, EncFunc::Dht::NumType type);
 
-			virtual NodeBaseType* FindSuccessor(const MbedTlsObj::BigNumber& key) override;
+			virtual NodeBasePtrType FindSuccessor(const MbedTlsObj::BigNumber& key) override;
 
-			virtual NodeBaseType* FindPredecessor(const MbedTlsObj::BigNumber& key) override;
+			virtual NodeBasePtrType FindPredecessor(const MbedTlsObj::BigNumber& key) override;
 
-			virtual NodeBaseType* GetImmediateSuccessor() override;
+			virtual NodeBasePtrType GetImmediateSuccessor() override;
 
 			virtual const MbedTlsObj::BigNumber& GetNodeId() override;
 
