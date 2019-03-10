@@ -21,6 +21,30 @@ namespace
 	DhtStates& gs_state = Dht::GetDhtStatesSingleton();
 }
 
+static void DeUpdateFingerTable(void* connection, Decent::Net::TlsCommLayer &tls){
+
+	std::array<uint8_t, DhtStates::sk_keySizeByte> keyBinBigNum{};
+	uint64_t resAddr;
+	uint64_t i;
+
+	tls.ReceiveRaw(connection, keyBinBigNum.data(), keyBinBigNum.size());
+	BigNumber resId_old(keyBinBigNum);
+
+	std::array<uint8_t, DhtStates::sk_keySizeByte> keyBin{};
+
+	tls.ReceiveRaw(connection, keyBin.data(), keyBin.size());
+	tls.ReceiveStruct(connection, resAddr);
+	tls.ReceiveStruct(connection, i);
+	BigNumber resId(keyBin);
+
+	DhtStates::DhtNodeType::NodeBasePtrType s = std::make_shared<NodeConnector>(resAddr, std::move(resId));
+
+	DhtStates::DhtNodeType& localNode = *gs_state.GetDhtNode();
+
+	localNode.DeUpdateFingerTable(resId_old, s, i);
+
+}
+
 static void UpdateFingerTable(void* connection, Decent::Net::TlsCommLayer &tls){
 
 	std::array<uint8_t, DhtStates::sk_keySizeByte> keyBin{};
@@ -215,6 +239,10 @@ void Dht::ProcessDhtQueries(void * connection, Decent::Net::TlsCommLayer & tls)
 
 	case k_updFingerTable:
 		UpdateFingerTable(connection, tls);
+		break;
+
+	case k_dUpdFingerTable:
+		DeUpdateFingerTable(connection, tls);
 		break;
 
 	default:

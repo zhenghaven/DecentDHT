@@ -176,6 +176,26 @@ void NodeConnector::UpdateFingerTable(NodeBasePtrType & s, uint64_t i)
 void NodeConnector::DeUpdateFingerTable(const MbedTlsObj::BigNumber & oldId, NodeBasePtrType & succ, uint64_t i)
 {
 
+	using namespace EncFunc::Dht;
+	Net::OcallConnector connection(&ocall_decent_dht_cnt_mgr_get_dht, m_address);
+	std::shared_ptr<Ra::TlsConfig> tlsCfg = std::make_shared<Ra::TlsConfig>(AppNames::sk_decentDHT, gs_state, false);
+	Decent::Net::TlsCommLayer tls(connection.m_ptr, tlsCfg, true);
+
+	tls.SendStruct(connection.m_ptr, k_dUpdFingerTable );
+
+
+	std::array<uint8_t, DhtStates::sk_keySizeByte> keyBin{};
+	oldId.ToBinary(keyBin);
+
+	tls.SendRaw(connection.m_ptr, keyBin.data(), keyBin.size());
+
+	succ->GetNodeId().ToBinary(keyBin);
+	uint64_t resAddr = succ->GetAddress();
+
+	tls.SendRaw(connection.m_ptr, keyBin.data(), keyBin.size());
+	tls.SendStruct(connection.m_ptr, resAddr);
+	tls.SendStruct(connection.m_ptr,i);
+
 
 }
 

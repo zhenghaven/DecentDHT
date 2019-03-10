@@ -19,6 +19,7 @@ namespace Decent
 				constexpr NumType k_getImmediatePre = 4;
 				constexpr NumType k_setImmediatePre = 5;
 				constexpr NumType k_updFingerTable  = 6;
+				constexpr NumType k_dUpdFingerTable  = 7;
 			}
 		}
 	}
