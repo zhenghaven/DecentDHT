@@ -79,7 +79,7 @@ namespace Decent
 					IdType pow2im1 = pow2i - 1;
 					NodeBasePtrType p = this->FindPredecessor(m_cirRange.Minus(m_id, pow2im1));
 					NodeBasePtrType selfPtr = GetSelfPtr();
-					p->UpdateFingerTable(selfPtr, i);
+					p->UpdateFingerTable(selfPtr, static_cast<uint64_t>(i));
 				}
 			}
 
@@ -88,37 +88,61 @@ namespace Decent
 			 * 			to update its finger table according to that new node. This function will forward the
 			 * 			call to FingerTable class, and notify its predecessor.
 			 *
-			 * \param [in,out]	s		   	Pointer to the new node.
-			 * \param 		  	i		   	row of the finger table that needs to be checked.
+			 * \param [in,out]	succ	Pointer to the new node.
+			 * \param 		  	i   	row of the finger table that needs to be checked.
 			 */
-			virtual void UpdateFingerTable(NodeBasePtrType& s, size_t i) override
+			virtual void UpdateFingerTable(NodeBasePtrType& succ, uint64_t i) override
 			{
-				m_fingerTable.UpdateFingerTable(s, i);
+				if (m_fingerTable.UpdateFingerTable(succ, static_cast<size_t>(i)))
+				{
+					GetImmediatePredecessor()->UpdateFingerTable(succ, i);
+				}
+			}
+
+			/** \brief	Leaving the network. */
+			virtual void Leave()
+			{
+				GetImmediateSuccessor()->SetImmediatePredecessor(GetImmediatePredecessor());
+
+				DeUpdateOthers();
+
+				//TODO:
+				//GetImmediateSuccessor()->DeMigrateData(m_localKeys);
+			}
+
+			/** \brief	Called when this node is leaving the network. */
+			void DeUpdateOthers()
+			{
+				NodeBasePtrType succ = GetImmediateSuccessor();
+
+				for (size_t i = 0; i < sk_keySizeBit; ++i)
+				{
+					const IdType& pow2i = (*m_pow2iArray)[i];
+					IdType pow2im1 = pow2i - 1;
+					NodeBasePtrType p = this->FindPredecessor(m_cirRange.Minus(m_id, pow2im1));
+					if (p->GetNodeId() != this->GetNodeId()) //Do not update the node self.
+					{
+						p->DeUpdateFingerTable(this->GetNodeId(), succ, static_cast<uint64_t>(i));
+					}
+				}
 			}
 
 			/**
-			* \brief Leaving the network.
-			* \param debugOutStr [out] return the character string that contains the trace of the lookup operation.
-			*/
-			//virtual void Leave();
-
-			/**
-			* \brief Called when this node is leaving the network.
-			* \param debugOutStr [out] return the character string that contains the trace of the lookup operation.
-			*/
-			//void DeUpdateOthers(std::string& debugOutStr);
-			
-			/**
-			* \brief Called when a new node is leaving the network, and this node possibly need to de-update its finger table accordingly.
-			*        This function will forward the call to FingerTable class, and notify its predecessor.
-			* \param oldID ID of the leaving node.
-			* \param s Pointer to the successor of the leaving node.
-			* \param sid ID of leaving node's successor.
-			* \param i Row of the finger table that needs to be checked.
-			* \param debugOutStr [out] return the character string that contains the trace of the lookup operation.
-			* \return Return true if the table is de-updated, otherwise, return false.
-			*/
-			//virtual void DeUpdateFingerTable(NodeIdType oldId, Node* s, NodeIdType sid, size_t i, std::string& debugOutStr);
+			 * \brief	Called when a new node is leaving the network, and this node possibly need to de-
+			 * 			update its finger table accordingly. This function will forward the call to
+			 * 			FingerTable class, and notify its predecessor.
+			 *
+			 * \param 		  	oldId	ID of the leaving node.
+			 * \param [in,out]	succ 	Pointer to the successor of the leaving node.
+			 * \param 		  	i	 	Row of the finger table that needs to be checked.
+			 */
+			virtual void DeUpdateFingerTable(const IdType& oldId, NodeBasePtrType& succ, uint64_t i) override
+			{
+				if (m_fingerTable.DeUpdateFingerTable(oldId, succ, static_cast<size_t>(i)) && oldId != GetImmediatePredecessor()->GetNodeId())
+				{
+					GetImmediatePredecessor()->DeUpdateFingerTable(oldId, succ, i);
+				}
+			}
 			
 			/**
 			 * \brief	Find the successor of a specific key value.

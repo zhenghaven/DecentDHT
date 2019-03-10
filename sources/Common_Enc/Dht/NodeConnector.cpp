@@ -117,7 +117,11 @@ void NodeConnector::SetImmediatePredecessor(NodeBasePtrType pred)
 {
 }
 
-void NodeConnector::UpdateFingerTable(NodeBasePtrType & s, size_t i)
+void NodeConnector::UpdateFingerTable(NodeBasePtrType & s, uint64_t i)
+{
+}
+
+void NodeConnector::DeUpdateFingerTable(const MbedTlsObj::BigNumber & oldId, NodeBasePtrType & succ, uint64_t i)
 {
 }
 

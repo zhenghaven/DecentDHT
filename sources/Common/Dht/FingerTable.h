@@ -181,31 +181,40 @@ namespace Decent
 			 * \brief	Called when a new node is joining the existing network, and this node possibly need
 			 * 			to update its finger table according to that new node.
 			 *
-			 * \param [in,out]	s		   	Pointer to the new node.
-			 * \param 		  	i		   	row of the finger table that needs to be checked.
+			 * \param [in,out]	succ	Pointer to the new node.
+			 * \param 		  	i   	row of the finger table that needs to be checked.
 			 *
 			 * \return	Return true if the table is updated, otherwise, return false.
 			 */
-			bool UpdateFingerTable(NodeBasePtrType& s, size_t i)
+			bool UpdateFingerTable(NodeBasePtrType& succ, size_t i)
 			{
-				if (m_cirRange.IsWithinCN(s->GetNodeId(), m_tableRecords[i].m_startId, m_tableRecords[i].m_node->GetNodeId(), false))
+				if (m_cirRange.IsWithinCN(succ->GetNodeId(), m_tableRecords[i].m_startId, m_tableRecords[i].m_node->GetNodeId(), false))
 				{
-					m_tableRecords[i].m_node = s;
+					m_tableRecords[i].m_node = succ;
 					return true;
 				}
 				return false;
 			}
 
 			/**
-			* \brief Called when a new node is leaving the network, and this node possibly need to de-update its finger table accordingly.
-			* \param oldID ID of the leaving node.
-			* \param s Pointer to the successor of the leaving node.
-			* \param sid ID of leaving node's successor.
-			* \param i Row of the finger table that needs to be checked.
-			* \param debugOutStr [out] return the character string that contains the trace of the lookup operation.
-			* \return Return true if the table is de-updated, otherwise, return false.
-			*/
-			//bool DeUpdateFingerTable(NodeIdType oldId, Node* s, NodeIdType sid, size_t i, std::string& debugOutStr);
+			 * \brief	Called when a new node is leaving the network, and this node possibly need to de-
+			 * 			update its finger table accordingly.
+			 *
+			 * \param 		  	oldId	ID of the leaving node.
+			 * \param [in,out]	succ 	Pointer to the successor of the leaving node.
+			 * \param 		  	i	 	Row of the finger table that needs to be checked.
+			 *
+			 * \return	Return true if the table is de-updated, otherwise, return false.
+			 */
+			bool DeUpdateFingerTable(const IdType& oldId, NodeBasePtrType& succ, size_t i)
+			{
+				if (m_tableRecords[i].m_node->GetNodeId() == oldId)
+				{
+					m_tableRecords[i].m_node = succ;
+					return true;
+				}
+				return false;
+			}
 
 		private:
 			const IdType& m_nodeId;

@@ -29,6 +29,7 @@ namespace Decent
 
 			NodeConnector(uint64_t address, MbedTlsObj::BigNumber&& Id);
 
+			/** \brief	Destructor */
 			virtual ~NodeConnector();
 
 			virtual NodeBasePtrType LookupTypeFunc(const MbedTlsObj::BigNumber& key, EncFunc::Dht::NumType type);
@@ -43,7 +44,9 @@ namespace Decent
 
 			virtual void SetImmediatePredecessor(NodeBasePtrType pred) override;
 
-			virtual void UpdateFingerTable(NodeBasePtrType& s, size_t i) override;
+			virtual void UpdateFingerTable(NodeBasePtrType& s, uint64_t i) override;
+
+			virtual void DeUpdateFingerTable(const MbedTlsObj::BigNumber& oldId, NodeBasePtrType& succ, uint64_t i) override;
 
 			virtual const MbedTlsObj::BigNumber& GetNodeId() override;
 
