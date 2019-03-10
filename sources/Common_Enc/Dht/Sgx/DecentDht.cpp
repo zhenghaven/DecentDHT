@@ -10,6 +10,7 @@
 #include "../../../Common/Dht/Node.h"
 
 #include "../../../Common_Enc/Dht/DhtStatesSingleton.h"
+#include "../../../Common_Enc/Dht/NodeConnector.h"
 
 using namespace Decent;
 using namespace Decent::Dht;
@@ -18,6 +19,64 @@ using namespace Decent::MbedTlsObj;
 namespace
 {
 	DhtStates& gs_state = Dht::GetDhtStatesSingleton();
+}
+
+static void UpdateFingerTable(void* connection, Decent::Net::TlsCommLayer &tls){
+
+	std::array<uint8_t, DhtStates::sk_keySizeByte> keyBin{};
+	uint64_t resAddr;
+	size_t i;
+
+	tls.ReceiveRaw(connection, keyBin.data(), keyBin.size());
+	tls.ReceiveStruct(connection, resAddr);
+	tls.ReceiveStruct(connection, i);
+
+	BigNumber resId(keyBin);
+
+	DhtStates::DhtNodeType::NodeBasePtrType s = std::make_shared<NodeConnector>(resAddr, std::move(resId));
+
+	DhtStates::DhtNodeType& localNode = *gs_state.GetDhtNode();
+
+	localNode.UpdateFingerTable(s, i);
+
+
+}
+
+static void SetImmediatePredecessor(void* connection, Decent::Net::TlsCommLayer &tls)
+{
+	LOGI("Setting Immediate Predecessor...");
+
+	std::array<uint8_t, DhtStates::sk_keySizeByte> keyBin{};
+	uint64_t resAddr;
+	tls.ReceiveRaw(connection, keyBin.data(), keyBin.size());
+	tls.ReceiveStruct(connection, resAddr);
+
+	BigNumber resId(keyBin);
+
+	DhtStates::DhtNodeType::NodeBasePtrType pre = std::make_shared<NodeConnector>(resAddr, std::move(resId));
+
+	DhtStates::DhtNodeType& localNode = *gs_state.GetDhtNode();
+
+	localNode.SetImmediatePredecessor(pre);
+}
+
+static void GetImmediatePredecessor(void* connection, Decent::Net::TlsCommLayer &tls)
+{
+	LOGI("Getting Immediate Predecessor...");
+
+	DhtStates::DhtNodeType& localNode = *gs_state.GetDhtNode();
+
+	DhtStates::DhtNodeType::NodeBasePtrType resNode = localNode.GetImmediatePredecessor();
+
+	std::array<uint8_t, DhtStates::sk_keySizeByte> resKeyBin{};
+	resNode->GetNodeId().ToBinary(resKeyBin);
+
+	uint64_t resAddr = resNode->GetAddress();
+
+	tls.SendRaw(connection, resKeyBin.data(), resKeyBin.size()); //3. Sent resultant ID
+	tls.SendStruct(connection, resAddr); //4. Sent Address - Done!
+
+	LOGI("Sent result ID: %s.", resNode->GetNodeId().ToBigEndianHexStr().c_str());
 }
 
 
@@ -144,6 +203,18 @@ void Dht::ProcessDhtQueries(void * connection, Decent::Net::TlsCommLayer & tls)
 
 	case k_getNodeId:
 	    GetNodeId(connection, tls);
+		break;
+
+	case k_setImmediatePre:
+		SetImmediatePredecessor(connection, tls);
+		break;
+
+	case k_getImmediatePre:
+		GetImmediatePredecessor(connection, tls);
+		break;
+
+	case k_updFingerTable:
+		UpdateFingerTable(connection, tls);
 		break;
 
 	default:

@@ -110,15 +110,68 @@ NodeConnector::NodeBasePtrType NodeConnector::GetImmediateSuccessor()
 
 NodeConnector::NodeBasePtrType NodeConnector::GetImmediatePredecessor()
 {
-	return NodeBasePtrType();
+
+	LOGI("Getting Immediate Predecessor...");
+	using namespace EncFunc::Dht;
+
+	Net::OcallConnector connection(&ocall_decent_dht_cnt_mgr_get_dht, m_address);
+
+	std::shared_ptr<Ra::TlsConfig> tlsCfg = std::make_shared<Ra::TlsConfig>(AppNames::sk_decentDHT, gs_state, false);
+	Decent::Net::TlsCommLayer tls(connection.m_ptr, tlsCfg, true);
+
+	tls.SendStruct(connection.m_ptr, k_getImmediatePre); //1. Send function type
+
+	std::array<uint8_t, DhtStates::sk_keySizeByte> keyBin{};
+	tls.ReceiveRaw(connection.m_ptr, keyBin.data(), keyBin.size()); //2. Received resultant ID
+
+	uint64_t resAddr = 0;
+	tls.ReceiveStruct(connection.m_ptr, resAddr); //3. Received Address - Done!
+
+	BigNumber resId(keyBin);
+	LOGI("Recv result ID: %s.", resId.ToBigEndianHexStr().c_str());
+
+	return std::make_shared<NodeConnector>(resAddr, std::move(resId));
+
 }
 
 void NodeConnector::SetImmediatePredecessor(NodeBasePtrType pred)
 {
+	using namespace EncFunc::Dht;
+	Net::OcallConnector connection(&ocall_decent_dht_cnt_mgr_get_dht, m_address);
+
+	std::shared_ptr<Ra::TlsConfig> tlsCfg = std::make_shared<Ra::TlsConfig>(AppNames::sk_decentDHT, gs_state, false);
+	Decent::Net::TlsCommLayer tls(connection.m_ptr, tlsCfg, true);
+
+	tls.SendStruct(connection.m_ptr, k_setImmediatePre); //1. Send function type
+
+	std::array<uint8_t, DhtStates::sk_keySizeByte> keyBin{};
+
+	pred->GetNodeId().ToBinary(keyBin);
+
+	uint64_t resAddr = pred->GetAddress();
+
+	tls.SendRaw(connection.m_ptr, keyBin.data(), keyBin.size());
+	tls.SendStruct(connection.m_ptr, resAddr);
 }
 
 void NodeConnector::UpdateFingerTable(NodeBasePtrType & s, size_t i)
 {
+	using namespace EncFunc::Dht;
+	Net::OcallConnector connection(&ocall_decent_dht_cnt_mgr_get_dht, m_address);
+
+	std::shared_ptr<Ra::TlsConfig> tlsCfg = std::make_shared<Ra::TlsConfig>(AppNames::sk_decentDHT, gs_state, false);
+	Decent::Net::TlsCommLayer tls(connection.m_ptr, tlsCfg, true);
+
+	tls.SendStruct(connection.m_ptr, k_updFingerTable); //1. Send function type
+
+	std::array<uint8_t, DhtStates::sk_keySizeByte> keyBin{};
+	s->GetNodeId().ToBinary(keyBin);
+
+	uint64_t resAddr = s->GetAddress();
+	tls.SendRaw(connection.m_ptr, keyBin.data(), keyBin.size());
+	tls.SendStruct(connection.m_ptr, resAddr);
+	tls.SendStruct(connection.m_ptr,i);
+
 }
 
 const BigNumber & NodeConnector::GetNodeId()
