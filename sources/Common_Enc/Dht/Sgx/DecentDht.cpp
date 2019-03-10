@@ -20,6 +20,64 @@ namespace
 	DhtStates& gs_state = Dht::GetDhtStatesSingleton();
 }
 
+
+static void GetImmediateSucessor(void* connection, Decent::Net::TlsCommLayer &tls)
+{
+    LOGI("Finding Immediate Successor...");
+
+    DhtStates::DhtNodeType& localNode = *gs_state.GetDhtNode();
+
+    DhtStates::DhtNodeType::NodeBaseType* resNode = localNode.GetImmediateSuccessor();
+
+    std::array<uint8_t, DhtStates::sk_keySizeByte> resKeyBin{};
+    resNode->GetNodeId().ToBinary(resKeyBin);
+
+    uint64_t resAddr = resNode->GetAddress();
+
+    tls.SendRaw(connection, resKeyBin.data(), resKeyBin.size()); //3. Sent resultant ID
+    tls.SendStruct(connection, resAddr); //4. Sent Address - Done!
+
+    LOGI("Sent result ID: %s.", resNode->GetNodeId().ToBigEndianHexStr().c_str());
+}
+
+
+
+static void GetNodeId(void* connection, Decent::Net::TlsCommLayer &tls)
+{
+    LOGI("Getting the NodeId...");
+    DhtStates::DhtNodeType& localNode = *gs_state.GetDhtNode();
+    std::array<uint8_t, DhtStates::sk_keySizeByte> keyBin{};
+    localNode.GetNodeId().ToBinary(keyBin);
+
+    tls.SendRaw(connection, keyBin.data(), keyBin.size()); //3. Sent nodeId ID
+
+    LOGI("Sent result ID: %s.", localNode.GetNodeId().ToBigEndianHexStr().c_str());
+}
+
+static void FindPredecessor(void* connection, Decent::Net::TlsCommLayer &tls)
+{
+    LOGI("Finding Predecessor...");
+    std::array<uint8_t, DhtStates::sk_keySizeByte> keyBin{};
+    tls.ReceiveRaw(connection, keyBin.data(), keyBin.size()); //2. Received queried ID
+
+    ConstBigNumber queriedId(keyBin);
+    LOGI("Recv queried ID: %s.", static_cast<const BigNumber&>(queriedId).ToBigEndianHexStr().c_str());
+
+    DhtStates::DhtNodeType& localNode = *gs_state.GetDhtNode();
+
+    DhtStates::DhtNodeType::NodeBaseType* resNode = localNode.FindPredecessor(queriedId);
+
+    std::array<uint8_t, DhtStates::sk_keySizeByte> resKeyBin{};
+    resNode->GetNodeId().ToBinary(resKeyBin);
+
+    uint64_t resAddr = resNode->GetAddress();
+
+    tls.SendRaw(connection, resKeyBin.data(), resKeyBin.size()); //3. Sent resultant ID
+    tls.SendStruct(connection, resAddr); //4. Sent Address - Done!
+
+    LOGI("Sent result ID: %s.", resNode->GetNodeId().ToBigEndianHexStr().c_str());
+}
+
 static void FindSuccessor(void* connection, Decent::Net::TlsCommLayer &tls) 
 {
 	LOGI("Finding Successor...");
@@ -71,18 +129,23 @@ void Dht::ProcessDhtQueries(void * connection, Decent::Net::TlsCommLayer & tls)
 
 	switch (funcNum)
 	{
+
 	case k_findSuccessor:
 		FindSuccessor(connection, tls);
 		break;
+
 	case k_findPredecessor:
-
+        FindPredecessor(connection, tls);
 		break;
+
 	case k_getImmediateSuc:
-
+        GetImmediateSucessor(connection,tls);
 		break;
+
 	case k_getNodeId:
-
+	    GetNodeId(connection, tls);
 		break;
+
 	default:
 		break;
 	}
