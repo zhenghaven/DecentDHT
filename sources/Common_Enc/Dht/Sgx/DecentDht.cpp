@@ -25,7 +25,7 @@ static void UpdateFingerTable(void* connection, Decent::Net::TlsCommLayer &tls){
 
 	std::array<uint8_t, DhtStates::sk_keySizeByte> keyBin{};
 	uint64_t resAddr;
-	size_t i;
+	uint64_t i;
 
 	tls.ReceiveRaw(connection, keyBin.data(), keyBin.size());
 	tls.ReceiveStruct(connection, resAddr);
