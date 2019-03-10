@@ -27,7 +27,7 @@ static void GetImmediateSucessor(void* connection, Decent::Net::TlsCommLayer &tl
 
     DhtStates::DhtNodeType& localNode = *gs_state.GetDhtNode();
 
-    DhtStates::DhtNodeType::NodeBaseType* resNode = localNode.GetImmediateSuccessor();
+    DhtStates::DhtNodeType::NodeBasePtrType resNode = localNode.GetImmediateSuccessor();
 
     std::array<uint8_t, DhtStates::sk_keySizeByte> resKeyBin{};
     resNode->GetNodeId().ToBinary(resKeyBin);
@@ -65,7 +65,7 @@ static void FindPredecessor(void* connection, Decent::Net::TlsCommLayer &tls)
 
     DhtStates::DhtNodeType& localNode = *gs_state.GetDhtNode();
 
-    DhtStates::DhtNodeType::NodeBaseType* resNode = localNode.FindPredecessor(queriedId);
+    DhtStates::DhtNodeType::NodeBasePtrType resNode = localNode.FindPredecessor(queriedId);
 
     std::array<uint8_t, DhtStates::sk_keySizeByte> resKeyBin{};
     resNode->GetNodeId().ToBinary(resKeyBin);
