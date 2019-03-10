@@ -25,6 +25,12 @@ namespace Decent
 
 			virtual NodeBasePtrType GetImmediateSuccessor() = 0;
 
+			virtual NodeBasePtrType GetImmediatePredecessor() = 0;
+
+			virtual void SetImmediatePredecessor(NodeBasePtrType pred) = 0;
+
+			virtual void UpdateFingerTable(NodeBasePtrType& s, size_t i) = 0;
+
 			virtual const IdType& GetNodeId() = 0;
 
 			virtual const AddrType& GetAddress() = 0;

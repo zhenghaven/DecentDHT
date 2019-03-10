@@ -13,9 +13,9 @@ namespace Decent
 {
 	namespace Dht
 	{
-		//template<typename ConstIdType>
-		//class Node;
-
+		/**
+		 * \brief	Number of bits per byte.
+		 */
 		constexpr size_t BITS_PER_BYTE = 8;
 
 		/**
@@ -54,14 +54,22 @@ namespace Decent
 		public: //Static members:
 			typedef Node<IdType, AddrType> NodeBaseType;
 			typedef typename NodeBaseType::NodeBasePtrType NodeBasePtrType;
+			static constexpr size_t sk_keySizeBit = KeySizeByte * BITS_PER_BYTE;
+			typedef std::array<IdType, sk_keySizeBit + 1> Pow2iArrayType;
 
 		public:
+
 			/**
-			 * \brief Construct the FingerTable. This will also initialize the finger table as if the owner is the only node in the network.
-			 * \param ownerNodeId the id of node hosting the finger table.
-			 * \param ownerNode the pointer to the node hosting the finger table.
+			 * \brief	Construct the FingerTable. This will also initialize the finger table as if the owner
+			 * 			is the only node in the network.
+			 *
+			 * \exception	std::runtime_error	Raised when a runtime error condition occurs.
+			 *
+			 * \param	ownerNodeId	the id of node hosting the finger table.
+			 * \param	circleRange	Circular range tester object.
+			 * \param	pow2iArray 	Array of 2^i, where 0 <= i <= ([key size in bits] + 1).
 			 */
-			FingerTable(const IdType& ownerNodeId, const CircularRange<IdType>& circleRange, const std::array<std::unique_ptr<IdType>, KeySizeByte * BITS_PER_BYTE + 1>& pow2iArray) :
+			FingerTable(const IdType& ownerNodeId, const CircularRange<IdType>& circleRange, std::shared_ptr<const Pow2iArrayType> pow2iArray) :
 				m_nodeId(ownerNodeId),
 				m_cirRange(circleRange),
 				m_tableRecords()
@@ -71,12 +79,12 @@ namespace Decent
 				    throw std::runtime_error("Node ID used to contruct finger table is out of range!");
 				}
 				
-				const IdType& pow2m = *pow2iArray[KeySizeByte * BITS_PER_BYTE];
+				const IdType& pow2m = (*pow2iArray)[KeySizeByte * BITS_PER_BYTE];
 				
 				IdType prevEndId = (m_nodeId + static_cast<int64_t>(1)) % pow2m;
 				for (size_t i = 0; i < KeySizeByte * BITS_PER_BYTE; ++i)
 				{
-					IdType nextEndId = (m_nodeId + *pow2iArray[i + 1]) % pow2m;
+					IdType nextEndId = (m_nodeId + (*pow2iArray)[i + 1]) % pow2m;
 					m_tableRecords.push_back(FingerTableRecord<IdType, AddrType>(prevEndId, nextEndId));
 					prevEndId = std::move(nextEndId);
 				}
@@ -126,71 +134,84 @@ namespace Decent
 			}
 
 			/**
-			* \brief Called when this node is joining the existing network. The finger table will be re-initialized according to the existing node.
-			* \param exNode Pointer to an existing node.
-			* \param outPred [out] return the immediate predecessor.
-			* \param outSucc [out] return the immediate successor.
+			* \brief	Get the immediate predecessor node.
+			*
+			* \return	Return the pointer to immediate predecessor node.
 			*/
-			//void JoinTo(Node<IdType>* exNode, Node*& outPred, Node*& outSucc);
+			NodeBasePtrType GetImmediatePredecessor() const
+			{
+				return m_predecessor;
+			}
 
+			/**
+			* \brief	Set the immediate predecessor of this node.
+			*
+			* \param	pred	pointer to the new immediate predecessor node.
+			*/
+			void SetImmediatePredecessor(NodeBasePtrType pred)
+			{
+				m_predecessor = pred;
+			}
 
+			/**
+			 * \brief	Called when this node is joining the existing network. The finger table will be re-
+			 * 			initialized according to the existing node.
+			 *
+			 * \param [in,out]	exNode	Pointer to an existing node.
+			 */
+			void JoinTo(NodeBaseType& exNode)
+			{
+				m_tableRecords[0].m_node = exNode.FindSuccessor(m_tableRecords[0].m_startId);
+				m_predecessor = m_tableRecords[0].m_node->GetImmediatePredecessor();
+				//outSucc = m_tableRecords[0].m_node;
+				for (size_t i = 0; i < (m_tableRecords.size() - 1); ++i)
+				{
+					if (m_cirRange.IsWithinCN(m_tableRecords[i + 1].m_startId, m_nodeId, m_tableRecords[i].m_node->GetNodeId()))
+					{
+						m_tableRecords[i + 1].m_node = m_tableRecords[i].m_node;
+					}
+					else
+					{
+						m_tableRecords[i + 1].m_node = exNode.FindSuccessor(m_tableRecords[i + 1].m_startId);
+					}
+				}
+			}
 
-		//	/**
-		//	* \brief Called when this node is joining the existing network and after its finger table is re-initialized.
-		//	* \param debugOutStr [out] return the character string that contains the trace of the lookup operation.
-		//	*/
-		//	void UpdateOthers(std::string& debugOutStr);
+			/**
+			 * \brief	Called when a new node is joining the existing network, and this node possibly need
+			 * 			to update its finger table according to that new node.
+			 *
+			 * \param [in,out]	s		   	Pointer to the new node.
+			 * \param 		  	i		   	row of the finger table that needs to be checked.
+			 *
+			 * \return	Return true if the table is updated, otherwise, return false.
+			 */
+			bool UpdateFingerTable(NodeBasePtrType& s, size_t i)
+			{
+				if (m_cirRange.IsWithinCN(s->GetNodeId(), m_tableRecords[i].m_startId, m_tableRecords[i].m_node->GetNodeId(), false))
+				{
+					m_tableRecords[i].m_node = s;
+					return true;
+				}
+				return false;
+			}
 
-		//	/**
-		//	* \brief Called when this node is leaving the network.
-		//	* \param debugOutStr [out] return the character string that contains the trace of the lookup operation.
-		//	*/
-		//	void DeUpdateOthers(std::string& debugOutStr);
-
-		//	/**
-		//	* \brief Called when a new node is joining the existing network, and this node possibly need to update its finger table according to that new node.
-		//	* \param s Pointer to the new node.
-		//	* \param sid ID of the new node.
-		//	* \param i row of the finger table that needs to be checked.
-		//	* \param debugOutStr [out] return the character string that contains the trace of the lookup operation.
-		//	* \return Return true if the table is updated, otherwise, return false.
-		//	*/
-		//	bool UpdateFingerTable(Node* s, NodeIdType sid, size_t i, std::string& debugOutStr);
-
-		//	/**
-		//	* \brief Called when a new node is leaving the network, and this node possibly need to de-update its finger table accordingly.
-		//	* \param oldID ID of the leaving node.
-		//	* \param s Pointer to the successor of the leaving node.
-		//	* \param sid ID of leaving node's successor.
-		//	* \param i Row of the finger table that needs to be checked.
-		//	* \param debugOutStr [out] return the character string that contains the trace of the lookup operation.
-		//	* \return Return true if the table is de-updated, otherwise, return false.
-		//	*/
-		//	bool DeUpdateFingerTable(NodeIdType oldId, Node* s, NodeIdType sid, size_t i, std::string& debugOutStr);
-
-
-		//	/**
-		//	* \brief Get the ID of immediate successor.
-		//	* \return The ID of immediate successor.
-		//	*/
-		//	NodeIdType GetImmediateSuccessorId() const;
-
-		//	/**
-		//	* \brief Get the styled character string that shows the finger table.
-		//	* \return The styled character string that shows the finger table.
-		//	*/
-		//	std::string ToStyledString() const;
-
-		//	/**
-		//	* \brief Print the styled character string to a specific output stream.
-		//	* \param stream Output stream.
-		//	*/
-		//	void PrintStyledString(std::basic_ostream<char, std::char_traits<char> >& stream) const;
+			/**
+			* \brief Called when a new node is leaving the network, and this node possibly need to de-update its finger table accordingly.
+			* \param oldID ID of the leaving node.
+			* \param s Pointer to the successor of the leaving node.
+			* \param sid ID of leaving node's successor.
+			* \param i Row of the finger table that needs to be checked.
+			* \param debugOutStr [out] return the character string that contains the trace of the lookup operation.
+			* \return Return true if the table is de-updated, otherwise, return false.
+			*/
+			//bool DeUpdateFingerTable(NodeIdType oldId, Node* s, NodeIdType sid, size_t i, std::string& debugOutStr);
 
 		private:
 			const IdType& m_nodeId;
 			const CircularRange<IdType>& m_cirRange;
 			std::vector<FingerTableRecord<IdType, AddrType> > m_tableRecords;
+			NodeBasePtrType m_predecessor;
 		};
 
 	}

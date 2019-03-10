@@ -39,6 +39,12 @@ namespace Decent
 
 			virtual NodeBasePtrType GetImmediateSuccessor() override;
 
+			virtual NodeBasePtrType GetImmediatePredecessor() override;
+
+			virtual void SetImmediatePredecessor(NodeBasePtrType pred) override;
+
+			virtual void UpdateFingerTable(NodeBasePtrType& s, size_t i) override;
+
 			virtual const MbedTlsObj::BigNumber& GetNodeId() override;
 
 			virtual const uint64_t& GetAddress() override { return m_address; }

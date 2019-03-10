@@ -38,15 +38,15 @@ namespace Decent
 		}
 
 		template<size_t N>
-		struct FilledArray
+		struct FilledByteArray
 		{
 			static_assert(N >= 1, "N must be at least 1");
 
 			static constexpr const uint8_t(&value)[N] = detail::Array_impl<N - 1>::value;
 
-			FilledArray() = delete;
-			FilledArray(const FilledArray&) = delete;
-			FilledArray(FilledArray&&) = delete;
+			FilledByteArray() = delete;
+			FilledByteArray(const FilledByteArray&) = delete;
+			FilledByteArray(FilledByteArray&&) = delete;
 		};
 
 		/**
@@ -185,9 +185,9 @@ namespace Decent
 			* \param aOnCirc An initial value that is on the circle and needs to be deducted.
 			* \param b Value to be deducted from aOnCirc.
 			*/
-			ValType Minus(const ValType& aOnCirc, const uint64_t b) const
+			ValType Minus(const ValType& aOnCirc, const ValType& b) const
 			{
-				return IsOnCircle(aOnCirc) ? MinusChecked(aOnCirc, b % (m_circleEnd - m_circleStart + 1)) : (throw std::logic_error("The Value of a is not on the circle!"));
+				return IsOnCircle(aOnCirc) ? MinusChecked(aOnCirc, b % ((m_circleEnd - m_circleStart) + 1)) : (throw std::logic_error("The Value of a is not on the circle!"));
 			}
 		};
 	}

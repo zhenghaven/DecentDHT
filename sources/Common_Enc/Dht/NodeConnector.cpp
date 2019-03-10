@@ -77,14 +77,14 @@ NodeConnector::NodeBasePtrType NodeConnector::FindSuccessor(const BigNumber & ke
 	return LookupTypeFunc(key, k_findSuccessor);
 }
 
-NodeConnector::NodeBasePtrType Decent::Dht::NodeConnector::FindPredecessor(const MbedTlsObj::BigNumber & key)
+NodeConnector::NodeBasePtrType NodeConnector::FindPredecessor(const MbedTlsObj::BigNumber & key)
 {
 	LOGI("Finding Predecessor...");
 	using namespace EncFunc::Dht;
 	return LookupTypeFunc(key, k_findPredecessor);
 }
 
-NodeConnector::NodeBasePtrType Decent::Dht::NodeConnector::GetImmediateSuccessor()
+NodeConnector::NodeBasePtrType NodeConnector::GetImmediateSuccessor()
 {
 	LOGI("Getting Immediate Successor...");
 	using namespace EncFunc::Dht;
@@ -106,6 +106,19 @@ NodeConnector::NodeBasePtrType Decent::Dht::NodeConnector::GetImmediateSuccessor
 	LOGI("Recv result ID: %s.", resId.ToBigEndianHexStr().c_str());
 
 	return std::make_shared<NodeConnector>(resAddr, std::move(resId));
+}
+
+NodeConnector::NodeBasePtrType NodeConnector::GetImmediatePredecessor()
+{
+	return NodeBasePtrType();
+}
+
+void NodeConnector::SetImmediatePredecessor(NodeBasePtrType pred)
+{
+}
+
+void NodeConnector::UpdateFingerTable(NodeBasePtrType & s, size_t i)
+{
 }
 
 const BigNumber & NodeConnector::GetNodeId()

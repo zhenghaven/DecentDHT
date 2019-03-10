@@ -39,20 +39,21 @@ using namespace Decent::Ra::Message;
  */
 int main(int argc, char ** argv)
 {
-	std::array<std::unique_ptr<MbedTlsObj::BigNumber>, 256 + 1 > pow2iArray;
-	for (size_t i = 0; i < pow2iArray.size(); ++i)
+	typedef LocalNode<MbedTlsObj::BigNumber, 32, uint64_t> BigNumLocalNode;
+
+	std::shared_ptr<BigNumLocalNode::Pow2iArrayType > pow2iArray = std::make_shared<BigNumLocalNode::Pow2iArrayType >();
+	for (size_t i = 0; i < pow2iArray->size(); ++i)
 	{
-		pow2iArray[i] = std::make_unique<MbedTlsObj::BigNumber>(MbedTlsObj::sk_empty);
-		pow2iArray[i]->SetBit(i, true);
+		(*pow2iArray)[i].SetBit(i, true);
 	}
 
 
 	{
-		static_assert(sizeof(FilledArray<32>::value) == 32, "The size of the filled array is unexpected. Probably the compiler doesn't support the implmentation.");
+		static_assert(sizeof(FilledByteArray<32>::value) == 32, "The size of the filled array is unexpected. Probably the compiler doesn't support the implmentation.");
 		MbedTlsObj::BigNumber smallest(0LL, MbedTlsObj::sk_struct);
-		MbedTlsObj::BigNumber largest(FilledArray<32>::value, MbedTlsObj::sk_struct);
-		MbedTlsObj::BigNumber nodeId(100LL, MbedTlsObj::sk_struct);
-		LocalNode<MbedTlsObj::BigNumber, 32, uint64_t> locNode(nodeId, 0LL, smallest, largest, pow2iArray);
+		MbedTlsObj::BigNumber largest(FilledByteArray<32>::value, MbedTlsObj::sk_struct);
+		MbedTlsObj::BigNumber nodeId(0LL, MbedTlsObj::sk_struct);
+		BigNumLocalNode locNode(nodeId, 0LL, smallest, largest, pow2iArray);
 
 		locNode.FindSuccessor(MbedTlsObj::BigNumber(103LL, MbedTlsObj::sk_struct));
 	}
