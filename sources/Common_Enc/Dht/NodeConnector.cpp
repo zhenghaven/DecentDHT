@@ -154,7 +154,11 @@ void NodeConnector::SetImmediatePredecessor(NodeBasePtrType pred)
 	tls.SendStruct(connection.m_ptr, resAddr);
 }
 
-void NodeConnector::UpdateFingerTable(NodeBasePtrType & s, size_t i)
+void NodeConnector::UpdateFingerTable(NodeBasePtrType & s, uint64_t i)
+{
+}
+
+void NodeConnector::DeUpdateFingerTable(const MbedTlsObj::BigNumber & oldId, NodeBasePtrType & succ, uint64_t i)
 {
 	using namespace EncFunc::Dht;
 	Net::OcallConnector connection(&ocall_decent_dht_cnt_mgr_get_dht, m_address);
