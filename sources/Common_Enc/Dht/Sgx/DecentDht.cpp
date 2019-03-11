@@ -29,7 +29,7 @@ static void DeUpdateFingerTable(void* connection, Decent::Net::TlsCommLayer &tls
 
 	tls.ReceiveRaw(connection, oldIdBin.data(), oldIdBin.size()); //2. Receive old ID.
 
-	DhtStates::DhtLocalNodeType::NodeBasePtrType s = NodeConnector::ReceiveNode(connection, tls); //3. Receive node.
+	DhtStates::DhtLocalNodeType::NodeBasePtr s = NodeConnector::ReceiveNode(connection, tls); //3. Receive node.
 	tls.ReceiveStruct(connection, i); //3. Receive i. - Done!
 
 	DhtStates::DhtLocalNodePtrType localNode = gs_state.GetDhtNode();
@@ -39,7 +39,7 @@ static void DeUpdateFingerTable(void* connection, Decent::Net::TlsCommLayer &tls
 
 static void UpdateFingerTable(void* connection, Decent::Net::TlsCommLayer &tls)
 {
-	DhtStates::DhtLocalNodeType::NodeBasePtrType s = NodeConnector::ReceiveNode(connection, tls); //2. Receive node.
+	DhtStates::DhtLocalNodeType::NodeBasePtr s = NodeConnector::ReceiveNode(connection, tls); //2. Receive node.
 
 	uint64_t i;
 	tls.ReceiveStruct(connection, i); //3. Receive i. - Done!

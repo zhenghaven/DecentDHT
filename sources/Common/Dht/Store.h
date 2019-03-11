@@ -11,22 +11,22 @@ namespace Decent
 	namespace Dht
 	{
 		template<typename IdType, typename AddrType>
-		class Store
+		class StoreBase
 		{
 		public: //static member:
 			typedef std::set<IdType> IndexingType;
 
 		public:
-			Store() = delete;
+			StoreBase() = delete;
 
-			Store(const IdType& ringStart, const IdType& ringEnd) :
+			StoreBase(const IdType& ringStart, const IdType& ringEnd) :
 				m_ringStart(ringStart),
 				m_ringEnd(ringEnd),
 				m_indexing(),
 				m_indexingMutex()
 			{}
 
-			virtual ~Store()
+			virtual ~StoreBase()
 			{}
 
 			/**

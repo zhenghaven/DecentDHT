@@ -24,12 +24,12 @@ namespace Decent
 		template<typename IdType, typename AddrType>
 		struct FingerTableRecord
 		{
-			typedef Node<IdType, AddrType> NodeBaseType;
-			typedef typename NodeBaseType::NodeBasePtrType NodeBasePtrType;
+			typedef NodeBase<IdType, AddrType> NodeBaseType;
+			typedef typename NodeBaseType::NodeBasePtr NodeBasePtr;
 
 			IdType m_startId;
 			IdType m_endId;
-			NodeBasePtrType m_node;
+			NodeBasePtr m_node;
 
 			FingerTableRecord() = delete;
 
@@ -52,8 +52,8 @@ namespace Decent
 		class FingerTable
 		{
 		public: //Static members:
-			typedef Node<IdType, AddrType> NodeBaseType;
-			typedef typename NodeBaseType::NodeBasePtrType NodeBasePtrType;
+			typedef NodeBase<IdType, AddrType> NodeBaseType;
+			typedef typename NodeBaseType::NodeBasePtr NodeBasePtr;
 			static constexpr size_t sk_keySizeBit = KeySizeByte * BITS_PER_BYTE;
 			typedef std::array<IdType, sk_keySizeBit + 1> Pow2iArrayType;
 
@@ -108,11 +108,11 @@ namespace Decent
 			 *
 			 * \return	The pointer to the closet predcessor node.
 			 */
-			NodeBasePtrType GetClosetPrecFinger(IdType id) const
+			NodeBasePtr GetClosetPrecFinger(IdType id) const
 			{
 				for (auto rit = m_tableRecords.crbegin(); rit != m_tableRecords.crend(); ++rit)
 				{
-					const NodeBasePtrType& node = rit->m_node;
+					const NodeBasePtr& node = rit->m_node;
 					const IdType& nodeId = node ? node->GetNodeId() : m_nodeId;
 
 					if (m_cirRange.IsWithinNN(nodeId, m_nodeId, id))
@@ -128,7 +128,7 @@ namespace Decent
 			 *
 			 * \return	The pointer to the immediate successor.
 			 */
-			NodeBasePtrType GetImmediateSuccessor() const
+			NodeBasePtr GetImmediateSuccessor() const
 			{
 				return m_tableRecords[0].m_node;
 			}
@@ -138,7 +138,7 @@ namespace Decent
 			*
 			* \return	Return the pointer to immediate predecessor node.
 			*/
-			NodeBasePtrType GetImmediatePredecessor() const
+			NodeBasePtr GetImmediatePredecessor() const
 			{
 				return m_predecessor;
 			}
@@ -148,7 +148,7 @@ namespace Decent
 			*
 			* \param	pred	pointer to the new immediate predecessor node.
 			*/
-			void SetImmediatePredecessor(NodeBasePtrType pred)
+			void SetImmediatePredecessor(NodeBasePtr pred)
 			{
 				m_predecessor = pred;
 			}
@@ -186,7 +186,7 @@ namespace Decent
 			 *
 			 * \return	Return true if the table is updated, otherwise, return false.
 			 */
-			bool UpdateFingerTable(NodeBasePtrType& succ, size_t i)
+			bool UpdateFingerTable(NodeBasePtr& succ, size_t i)
 			{
 				if (m_cirRange.IsWithinCN(succ->GetNodeId(), m_tableRecords[i].m_startId, m_tableRecords[i].m_node->GetNodeId(), false))
 				{
@@ -206,7 +206,7 @@ namespace Decent
 			 *
 			 * \return	Return true if the table is de-updated, otherwise, return false.
 			 */
-			bool DeUpdateFingerTable(const IdType& oldId, NodeBasePtrType& succ, size_t i)
+			bool DeUpdateFingerTable(const IdType& oldId, NodeBasePtr& succ, size_t i)
 			{
 				if (m_tableRecords[i].m_node->GetNodeId() == oldId)
 				{
@@ -220,7 +220,7 @@ namespace Decent
 			const IdType& m_nodeId;
 			const CircularRange<IdType>& m_cirRange;
 			std::vector<FingerTableRecord<IdType, AddrType> > m_tableRecords;
-			NodeBasePtrType m_predecessor;
+			NodeBasePtr m_predecessor;
 		};
 
 	}

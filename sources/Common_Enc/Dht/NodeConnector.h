@@ -18,15 +18,15 @@ namespace Decent
 
 	namespace Dht
 	{
-		class NodeConnector : public Node<MbedTlsObj::BigNumber, uint64_t>
+		class NodeConnector : public NodeBase<MbedTlsObj::BigNumber, uint64_t>
 		{
 		public:
-			typedef Node<MbedTlsObj::BigNumber, uint64_t> NodeBaseType;
-			typedef typename NodeBaseType::NodeBasePtrType NodeBasePtrType;
+			typedef NodeBase<MbedTlsObj::BigNumber, uint64_t> NodeBaseType;
+			typedef typename NodeBaseType::NodeBasePtr NodeBasePtr;
 
-			static void SendNode(void* connection, Decent::Net::TlsCommLayer& tls, NodeBasePtrType node);
+			static void SendNode(void* connection, Decent::Net::TlsCommLayer& tls, NodeBasePtr node);
 
-			static NodeBasePtrType ReceiveNode(void* connection, Decent::Net::TlsCommLayer& tls);
+			static NodeBasePtr ReceiveNode(void* connection, Decent::Net::TlsCommLayer& tls);
 
 		public:
 			NodeConnector() = delete;
@@ -40,21 +40,21 @@ namespace Decent
 			/** \brief	Destructor */
 			virtual ~NodeConnector();
 
-			virtual NodeBasePtrType LookupTypeFunc(const MbedTlsObj::BigNumber& key, EncFunc::Dht::NumType type);
+			virtual NodeBasePtr LookupTypeFunc(const MbedTlsObj::BigNumber& key, EncFunc::Dht::NumType type);
 
-			virtual NodeBasePtrType FindSuccessor(const MbedTlsObj::BigNumber& key) override;
+			virtual NodeBasePtr FindSuccessor(const MbedTlsObj::BigNumber& key) override;
 
-			virtual NodeBasePtrType FindPredecessor(const MbedTlsObj::BigNumber& key) override;
+			virtual NodeBasePtr FindPredecessor(const MbedTlsObj::BigNumber& key) override;
 
-			virtual NodeBasePtrType GetImmediateSuccessor() override;
+			virtual NodeBasePtr GetImmediateSuccessor() override;
 
-			virtual NodeBasePtrType GetImmediatePredecessor() override;
+			virtual NodeBasePtr GetImmediatePredecessor() override;
 
-			virtual void SetImmediatePredecessor(NodeBasePtrType pred) override;
+			virtual void SetImmediatePredecessor(NodeBasePtr pred) override;
 
-			virtual void UpdateFingerTable(NodeBasePtrType& s, uint64_t i) override;
+			virtual void UpdateFingerTable(NodeBasePtr& s, uint64_t i) override;
 
-			virtual void DeUpdateFingerTable(const MbedTlsObj::BigNumber& oldId, NodeBasePtrType& succ, uint64_t i) override;
+			virtual void DeUpdateFingerTable(const MbedTlsObj::BigNumber& oldId, NodeBasePtr& succ, uint64_t i) override;
 
 			virtual const MbedTlsObj::BigNumber& GetNodeId() override;
 

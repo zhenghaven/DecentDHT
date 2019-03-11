@@ -8,17 +8,17 @@ namespace Decent
 	namespace Dht
 	{
 		template<typename IdType, typename AddrType>
-		class Node
+		class NodeBase
 		{
 		public: //static members:
-			typedef std::shared_ptr<Node> NodeBasePtrType;
+			typedef std::shared_ptr<NodeBase> NodeBasePtr;
 
 		public:
 			/** \brief	Default constructor */
-			Node() = default;
+			NodeBase() = default;
 
 			/** \brief	Destructor */
-			virtual ~Node()
+			virtual ~NodeBase()
 			{}
 
 			/**
@@ -28,7 +28,7 @@ namespace Decent
 			 *
 			 * \return	The found successor.
 			 */
-			virtual NodeBasePtrType FindSuccessor(const IdType& key) = 0;
+			virtual NodeBasePtr FindSuccessor(const IdType& key) = 0;
 
 			/**
 			 * \brief	Find the predcessor of a specific key value.
@@ -37,28 +37,28 @@ namespace Decent
 			 *
 			 * \return	The found predecessor.
 			 */
-			virtual NodeBasePtrType FindPredecessor(const IdType& key) = 0;
+			virtual NodeBasePtr FindPredecessor(const IdType& key) = 0;
 
 			/**
 			 * \brief	Get the immediate successor.
 			 *
 			 * \return	The pointer to the immediate successor.
 			 */
-			virtual NodeBasePtrType GetImmediateSuccessor() = 0;
+			virtual NodeBasePtr GetImmediateSuccessor() = 0;
 
 			/**
 			 * \brief	Get the immediate predecessor node.
 			 *
 			 * \return	Return the pointer to immediate predecessor node.
 			 */
-			virtual NodeBasePtrType GetImmediatePredecessor() = 0;
+			virtual NodeBasePtr GetImmediatePredecessor() = 0;
 
 			/**
 			 * \brief	Set the immediate predecessor of this node.
 			 *
 			 * \param	pred	pointer to the new immediate predecessor node.
 			 */
-			virtual void SetImmediatePredecessor(NodeBasePtrType pred) = 0;
+			virtual void SetImmediatePredecessor(NodeBasePtr pred) = 0;
 
 			/**
 			 * \brief	Called when a new node is joining the existing network, and this node possibly need
@@ -68,7 +68,7 @@ namespace Decent
 			 * \param [in,out]	succ	Pointer to the new node.
 			 * \param 		  	i   	row of the finger table that needs to be checked.
 			 */
-			virtual void UpdateFingerTable(NodeBasePtrType& s, uint64_t i) = 0;
+			virtual void UpdateFingerTable(NodeBasePtr& s, uint64_t i) = 0;
 
 			/**
 			 * \brief	Called when a new node is leaving the network, and this node possibly need to de-
@@ -79,7 +79,7 @@ namespace Decent
 			 * \param [in,out]	succ 	Pointer to the successor of the leaving node.
 			 * \param 		  	i	 	Row of the finger table that needs to be checked.
 			 */
-			virtual void DeUpdateFingerTable(const IdType& oldId, NodeBasePtrType& succ, uint64_t i) = 0;
+			virtual void DeUpdateFingerTable(const IdType& oldId, NodeBasePtr& succ, uint64_t i) = 0;
 
 			/**
 			 * \brief	Gets the ID of this node

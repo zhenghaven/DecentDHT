@@ -10,11 +10,11 @@ namespace Decent
 {
 	namespace Dht
 	{
-		class DhtStore : public Store<MbedTlsObj::BigNumber, uint64_t>
+		class DhtStore : public StoreBase<MbedTlsObj::BigNumber, uint64_t>
 		{
 		public:
 			DhtStore(const MbedTlsObj::BigNumber& ringStart, const MbedTlsObj::BigNumber& ringEnd) :
-				Store(ringStart, ringEnd)
+				StoreBase(ringStart, ringEnd)
 			{}
 
 			virtual ~DhtStore();

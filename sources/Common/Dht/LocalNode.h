@@ -16,11 +16,11 @@ namespace Decent
 	namespace Dht
 	{
 		template<typename IdType, size_t KeySizeByte, typename AddrType>
-		class LocalNode : public Node<IdType, AddrType>, public std::enable_shared_from_this<LocalNode<IdType, KeySizeByte, AddrType> >
+		class LocalNode : public NodeBase<IdType, AddrType>, public std::enable_shared_from_this<LocalNode<IdType, KeySizeByte, AddrType> >
 		{
 		public: //static member:
-			typedef Node<IdType, AddrType> NodeBaseType;
-			typedef typename NodeBaseType::NodeBasePtrType NodeBasePtrType;
+			typedef NodeBase<IdType, AddrType> NodeBaseType;
+			typedef typename NodeBaseType::NodeBasePtr NodeBasePtr;
 			static constexpr size_t sk_keySizeBit = KeySizeByte * BITS_PER_BYTE;
 			typedef std::array<IdType, sk_keySizeBit + 1> Pow2iArrayType;
 
@@ -77,8 +77,8 @@ namespace Decent
 				{
 					const IdType& pow2i = (*m_pow2iArray)[i];
 					IdType pow2im1 = pow2i - 1;
-					NodeBasePtrType p = this->FindPredecessor(m_cirRange.Minus(m_id, pow2im1));
-					NodeBasePtrType selfPtr = GetSelfPtr();
+					NodeBasePtr p = this->FindPredecessor(m_cirRange.Minus(m_id, pow2im1));
+					NodeBasePtr selfPtr = GetSelfPtr();
 					p->UpdateFingerTable(selfPtr, static_cast<uint64_t>(i));
 				}
 			}
@@ -91,7 +91,7 @@ namespace Decent
 			 * \param [in,out]	succ	Pointer to the new node.
 			 * \param 		  	i   	row of the finger table that needs to be checked.
 			 */
-			virtual void UpdateFingerTable(NodeBasePtrType& succ, uint64_t i) override
+			virtual void UpdateFingerTable(NodeBasePtr& succ, uint64_t i) override
 			{
 				if (m_fingerTable.UpdateFingerTable(succ, static_cast<size_t>(i)))
 				{
@@ -113,13 +113,13 @@ namespace Decent
 			/** \brief	Called when this node is leaving the network. */
 			void DeUpdateOthers()
 			{
-				NodeBasePtrType succ = GetImmediateSuccessor();
+				NodeBasePtr succ = GetImmediateSuccessor();
 
 				for (size_t i = 0; i < sk_keySizeBit; ++i)
 				{
 					const IdType& pow2i = (*m_pow2iArray)[i];
 					IdType pow2im1 = pow2i - 1;
-					NodeBasePtrType p = this->FindPredecessor(m_cirRange.Minus(m_id, pow2im1));
+					NodeBasePtr p = this->FindPredecessor(m_cirRange.Minus(m_id, pow2im1));
 					if (p->GetNodeId() != this->GetNodeId()) //Do not update the node self.
 					{
 						p->DeUpdateFingerTable(this->GetNodeId(), succ, static_cast<uint64_t>(i));
@@ -136,7 +136,7 @@ namespace Decent
 			 * \param [in,out]	succ 	Pointer to the successor of the leaving node.
 			 * \param 		  	i	 	Row of the finger table that needs to be checked.
 			 */
-			virtual void DeUpdateFingerTable(const IdType& oldId, NodeBasePtrType& succ, uint64_t i) override
+			virtual void DeUpdateFingerTable(const IdType& oldId, NodeBasePtr& succ, uint64_t i) override
 			{
 				if (m_fingerTable.DeUpdateFingerTable(oldId, succ, static_cast<size_t>(i)) && oldId != GetImmediatePredecessor()->GetNodeId())
 				{
@@ -151,7 +151,7 @@ namespace Decent
 			 *
 			 * \return	The found successor.
 			 */
-			virtual NodeBasePtrType FindSuccessor(const IdType& key) override
+			virtual NodeBasePtr FindSuccessor(const IdType& key) override
 			{
 				if (this->IsResponsibleFor(key))
 				{
@@ -167,14 +167,14 @@ namespace Decent
 			 *
 			 * \return	The found predecessor.
 			 */
-			virtual NodeBasePtrType FindPredecessor(const IdType& key) override
+			virtual NodeBasePtr FindPredecessor(const IdType& key) override
 			{
 				const IdType& immediateSucId = GetImmediateSuccessor()->GetNodeId();
 				if (m_cirRange.IsWithinNC(key, m_id, immediateSucId))
 				{
 					return GetSelfPtr();
 				}
-				NodeBasePtrType nextHop = m_fingerTable.GetClosetPrecFinger(key);
+				NodeBasePtr nextHop = m_fingerTable.GetClosetPrecFinger(key);
 				return nextHop->FindPredecessor(key);
 			}
 
@@ -183,9 +183,9 @@ namespace Decent
 			 *
 			 * \return	The pointer to the immediate successor.
 			 */
-			virtual NodeBasePtrType GetImmediateSuccessor() override
+			virtual NodeBasePtr GetImmediateSuccessor() override
 			{
-				NodeBasePtrType res = m_fingerTable.GetImmediateSuccessor();
+				NodeBasePtr res = m_fingerTable.GetImmediateSuccessor();
 				return res ? res : GetSelfPtr();
 			}
 
@@ -194,9 +194,9 @@ namespace Decent
 			 *
 			 * \return	Return the pointer to immediate predecessor node.
 			 */
-			virtual NodeBasePtrType GetImmediatePredecessor() override
+			virtual NodeBasePtr GetImmediatePredecessor() override
 			{
-				NodeBasePtrType res = m_fingerTable.GetImmediatePredecessor();
+				NodeBasePtr res = m_fingerTable.GetImmediatePredecessor();
 				return res ? res : GetSelfPtr();
 			}
 
@@ -205,7 +205,7 @@ namespace Decent
 			 *
 			 * \param	pred	pointer to the new immediate predecessor node.
 			 */
-			virtual void SetImmediatePredecessor(NodeBasePtrType pred) override
+			virtual void SetImmediatePredecessor(NodeBasePtr pred) override
 			{
 				if (pred->GetAddress() == m_addr && pred->GetNodeId() == m_id)
 				{
@@ -249,7 +249,7 @@ namespace Decent
 			 *
 			 * \return	The self shared pointer.
 			 */
-			NodeBasePtrType GetSelfPtr()
+			NodeBasePtr GetSelfPtr()
 			{
 				return this->shared_from_this();
 			}
@@ -262,8 +262,6 @@ namespace Decent
 			CircularRange<IdType> m_cirRange; 
 			std::shared_ptr<const Pow2iArrayType> m_pow2iArray;
 			FingerTable<IdType, KeySizeByte, AddrType> m_fingerTable;
-			//	std::map<KeyType, ValueType> m_localKeys;
-
 		};
 	}
 }

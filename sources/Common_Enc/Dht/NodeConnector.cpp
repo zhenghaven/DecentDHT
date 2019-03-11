@@ -25,7 +25,7 @@ namespace
 	DhtStates& gs_state = GetDhtStatesSingleton();
 }
 
-void NodeConnector::SendNode(void * connection, TlsCommLayer & tls, NodeBasePtrType node)
+void NodeConnector::SendNode(void * connection, TlsCommLayer & tls, NodeBasePtr node)
 {
 	std::array<uint8_t, DhtStates::sk_keySizeByte> keyBin{};
 	node->GetNodeId().ToBinary(keyBin);
@@ -37,7 +37,7 @@ void NodeConnector::SendNode(void * connection, TlsCommLayer & tls, NodeBasePtrT
 	LOGI("Sent result ID: %s.", node->GetNodeId().ToBigEndianHexStr().c_str());
 }
 
-NodeConnector::NodeBasePtrType NodeConnector::ReceiveNode(void * connection, TlsCommLayer & tls)
+NodeConnector::NodeBasePtr NodeConnector::ReceiveNode(void * connection, TlsCommLayer & tls)
 {
 	std::array<uint8_t, DhtStates::sk_keySizeByte> keyBin{};
 	uint64_t addr;
@@ -71,7 +71,7 @@ NodeConnector::~NodeConnector()
 {
 }
 
-NodeConnector::NodeBasePtrType NodeConnector::LookupTypeFunc(const MbedTlsObj::BigNumber & key, EncFunc::Dht::NumType type)
+NodeConnector::NodeBasePtr NodeConnector::LookupTypeFunc(const MbedTlsObj::BigNumber & key, EncFunc::Dht::NumType type)
 {
 	Net::OcallConnector connection(&ocall_decent_dht_cnt_mgr_get_dht, m_address);
 
@@ -88,21 +88,21 @@ NodeConnector::NodeBasePtrType NodeConnector::LookupTypeFunc(const MbedTlsObj::B
 	return ReceiveNode(connection.m_ptr, tls); //3. Receive node. - Done!
 }
 
-NodeConnector::NodeBasePtrType NodeConnector::FindSuccessor(const BigNumber & key)
+NodeConnector::NodeBasePtr NodeConnector::FindSuccessor(const BigNumber & key)
 {
 	LOGI("Finding Successor...");
 	using namespace EncFunc::Dht;
 	return LookupTypeFunc(key, k_findSuccessor);
 }
 
-NodeConnector::NodeBasePtrType NodeConnector::FindPredecessor(const MbedTlsObj::BigNumber & key)
+NodeConnector::NodeBasePtr NodeConnector::FindPredecessor(const MbedTlsObj::BigNumber & key)
 {
 	LOGI("Finding Predecessor...");
 	using namespace EncFunc::Dht;
 	return LookupTypeFunc(key, k_findPredecessor);
 }
 
-NodeConnector::NodeBasePtrType NodeConnector::GetImmediateSuccessor()
+NodeConnector::NodeBasePtr NodeConnector::GetImmediateSuccessor()
 {
 	LOGI("Getting Immediate Successor...");
 	using namespace EncFunc::Dht;
@@ -117,7 +117,7 @@ NodeConnector::NodeBasePtrType NodeConnector::GetImmediateSuccessor()
 	return ReceiveNode(connection.m_ptr, tls); //2. Receive node. - Done!
 }
 
-NodeConnector::NodeBasePtrType NodeConnector::GetImmediatePredecessor()
+NodeConnector::NodeBasePtr NodeConnector::GetImmediatePredecessor()
 {
 
 	LOGI("Getting Immediate Predecessor...");
@@ -134,7 +134,7 @@ NodeConnector::NodeBasePtrType NodeConnector::GetImmediatePredecessor()
 
 }
 
-void NodeConnector::SetImmediatePredecessor(NodeBasePtrType pred)
+void NodeConnector::SetImmediatePredecessor(NodeBasePtr pred)
 {
 	using namespace EncFunc::Dht;
 	Net::OcallConnector connection(&ocall_decent_dht_cnt_mgr_get_dht, m_address);
@@ -147,7 +147,7 @@ void NodeConnector::SetImmediatePredecessor(NodeBasePtrType pred)
 	SendNode(connection.m_ptr, tls, pred); //2. Send Node. - Done!
 }
 
-void NodeConnector::UpdateFingerTable(NodeBasePtrType & s, uint64_t i)
+void NodeConnector::UpdateFingerTable(NodeBasePtr & s, uint64_t i)
 {
 	using namespace EncFunc::Dht;
 	Net::OcallConnector connection(&ocall_decent_dht_cnt_mgr_get_dht, m_address);
@@ -161,7 +161,7 @@ void NodeConnector::UpdateFingerTable(NodeBasePtrType & s, uint64_t i)
 	tls.SendStruct(connection.m_ptr,i); //3. Send i. - Done!
 }
 
-void NodeConnector::DeUpdateFingerTable(const MbedTlsObj::BigNumber & oldId, NodeBasePtrType & succ, uint64_t i)
+void NodeConnector::DeUpdateFingerTable(const MbedTlsObj::BigNumber & oldId, NodeBasePtr & succ, uint64_t i)
 {
 
 	using namespace EncFunc::Dht;
