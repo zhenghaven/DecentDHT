@@ -10,7 +10,7 @@
 
 #include "../Common/Dht/CircularRange.h"
 #include "../Common_Enc/Dht/DhtStates.h"
-#include "../Common_Enc/Dht/DhtStore.h"
+#include "../Common_Enc/Dht/EnclaveStore.h"
 #include "../Common_Enc/Dht/DhtStatesSingleton.h"
 
 using namespace Decent;
@@ -49,9 +49,9 @@ namespace
 		return inst;
 	}
 
-	static DhtStore& GetDhtStore()
+	static EnclaveStore& GetDhtStore()
 	{
-		static DhtStore inst(MbedTlsObj::BigNumber(0LL, MbedTlsObj::sk_struct), MbedTlsObj::BigNumber(FilledByteArray<32>::value, MbedTlsObj::sk_struct));
+		static EnclaveStore inst(MbedTlsObj::BigNumber(0LL, MbedTlsObj::sk_struct), MbedTlsObj::BigNumber(FilledByteArray<32>::value, MbedTlsObj::sk_struct));
 
 		return inst;
 	}

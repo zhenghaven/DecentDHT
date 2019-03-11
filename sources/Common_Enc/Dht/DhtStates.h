@@ -10,7 +10,7 @@ namespace Decent
 		template<typename IdType, size_t KeySizeByte, typename AddrType>
 		class LocalNode;
 
-		class DhtStore;
+		class EnclaveStore;
 
 		class DhtStates : public Ra::AppStates
 		{
@@ -21,7 +21,7 @@ namespace Decent
 			typedef std::shared_ptr<DhtLocalNodeType> DhtLocalNodePtrType;
 
 		public:
-			DhtStates(Ra::AppCertContainer & certCntnr, Ra::KeyContainer & keyCntnr, Ra::WhiteList::DecentServer & serverWl, const Ra::WhiteList::HardCoded & hardCodedWl, GetLoadedWlFunc getLoadedFunc, DhtStore& dhtStore) :
+			DhtStates(Ra::AppCertContainer & certCntnr, Ra::KeyContainer & keyCntnr, Ra::WhiteList::DecentServer & serverWl, const Ra::WhiteList::HardCoded & hardCodedWl, GetLoadedWlFunc getLoadedFunc, EnclaveStore& dhtStore) :
 				AppStates(certCntnr, keyCntnr, serverWl, hardCodedWl, getLoadedFunc),
 				m_dhtNode(),
 				m_dhtStore(dhtStore)
@@ -40,19 +40,19 @@ namespace Decent
 				return m_dhtNode;
 			}
 
-			const DhtStore& GetDhtStore() const
+			const EnclaveStore& GetDhtStore() const
 			{
 				return m_dhtStore;
 			}
 
-			DhtStore& GetDhtStore()
+			EnclaveStore& GetDhtStore()
 			{
 				return m_dhtStore;
 			}
 
 		private:
 			DhtLocalNodePtrType m_dhtNode;
-			DhtStore& m_dhtStore;
+			EnclaveStore& m_dhtStore;
 		};
 	}
 }

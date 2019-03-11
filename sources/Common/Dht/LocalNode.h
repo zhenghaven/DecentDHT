@@ -8,7 +8,7 @@
 
 #include <memory>
 
-#include "Node.h"
+#include "NodeBase.h"
 #include "FingerTable.h"
 
 namespace Decent

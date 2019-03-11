@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../../Common/Dht/Node.h"
+#include "../../Common/Dht/NodeBase.h"
 #include "../../Common/Dht/FuncNums.h"
 
 #include <memory>

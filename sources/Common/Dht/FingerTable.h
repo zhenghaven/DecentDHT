@@ -6,7 +6,7 @@
 
 #include <DecentApi/Common/Common.h>
 
-#include "Node.h"
+#include "NodeBase.h"
 #include "CircularRange.h"
 
 namespace Decent

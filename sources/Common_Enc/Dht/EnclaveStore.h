@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../../Common/Dht/Store.h"
+#include "../../Common/Dht/StoreBase.h"
 
 #include <DecentApi/Common/MbedTls/BigNumber.h>
 
@@ -10,14 +10,14 @@ namespace Decent
 {
 	namespace Dht
 	{
-		class DhtStore : public StoreBase<MbedTlsObj::BigNumber, uint64_t>
+		class EnclaveStore : public StoreBase<MbedTlsObj::BigNumber, uint64_t>
 		{
 		public:
-			DhtStore(const MbedTlsObj::BigNumber& ringStart, const MbedTlsObj::BigNumber& ringEnd) :
+			EnclaveStore(const MbedTlsObj::BigNumber& ringStart, const MbedTlsObj::BigNumber& ringEnd) :
 				StoreBase(ringStart, ringEnd)
 			{}
 
-			virtual ~DhtStore();
+			virtual ~EnclaveStore();
 
 			void MigrateFrom(const uint64_t& addr, const MbedTlsObj::BigNumber& start, const MbedTlsObj::BigNumber& end) override;
 

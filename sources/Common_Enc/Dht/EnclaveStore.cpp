@@ -1,4 +1,4 @@
-#include "DhtStore.h"
+#include "EnclaveStore.h"
 
 #include <DecentApi/Common/Common.h>
 #include <DecentApi/Common/Ra/TlsConfig.h>
@@ -27,11 +27,11 @@ namespace
 	}
 }
 
-DhtStore::~DhtStore()
+EnclaveStore::~EnclaveStore()
 {
 }
 
-void DhtStore::MigrateFrom(const uint64_t & addr, const MbedTlsObj::BigNumber & start, const MbedTlsObj::BigNumber & end)
+void EnclaveStore::MigrateFrom(const uint64_t & addr, const MbedTlsObj::BigNumber & start, const MbedTlsObj::BigNumber & end)
 {
 	LOGI("Migrating data from peer...");
 	using namespace EncFunc::Store;
@@ -54,7 +54,7 @@ void DhtStore::MigrateFrom(const uint64_t & addr, const MbedTlsObj::BigNumber & 
 	}); //4. Receive data.
 }
 
-void DhtStore::MigrateTo(const uint64_t & addr)
+void EnclaveStore::MigrateTo(const uint64_t & addr)
 {
 	LOGI("Migrating data to peer...");
 	using namespace EncFunc::Store;
@@ -78,24 +78,24 @@ void DhtStore::MigrateTo(const uint64_t & addr)
 		sendIndexing); //2. Send data.
 }
 
-bool DhtStore::IsResponsibleFor(const MbedTlsObj::BigNumber & key) const
+bool EnclaveStore::IsResponsibleFor(const MbedTlsObj::BigNumber & key) const
 {
 	DhtStates::DhtLocalNodePtrType localNode = gs_state.GetDhtNode();
 	return localNode ? localNode->IsResponsibleFor(key) : false;
 }
 
-void DhtStore::GetValue(const MbedTlsObj::BigNumber & key, std::vector<uint8_t>& data)
+void EnclaveStore::GetValue(const MbedTlsObj::BigNumber & key, std::vector<uint8_t>& data)
 {
 	//TODO: work with file system.
 }
 
-std::vector<uint8_t> DhtStore::DeleteData(const MbedTlsObj::BigNumber & key)
+std::vector<uint8_t> EnclaveStore::DeleteData(const MbedTlsObj::BigNumber & key)
 {
 	//TODO: work with file system.
 	return std::vector<uint8_t>();
 }
 
-void DhtStore::SaveData(const MbedTlsObj::BigNumber & key, std::vector<uint8_t>&& data)
+void EnclaveStore::SaveData(const MbedTlsObj::BigNumber & key, std::vector<uint8_t>&& data)
 {
 	//TODO: work with file system.
 }
