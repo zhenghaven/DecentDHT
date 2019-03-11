@@ -23,6 +23,7 @@ namespace Decent
 		namespace ConnectionManager
 		{
 			std::unique_ptr<Decent::Net::Connection> GetConnection2DecentDht(const Decent::Net::SmartMessages& hsMsg, uint64_t address);
+			std::unique_ptr<Decent::Net::Connection> GetConnection2DecentDhtStore(const Decent::Net::SmartMessages& hsMsg, uint64_t address);
 		}
 	}
 }

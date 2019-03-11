@@ -21,7 +21,7 @@ using namespace Decent::Ra;
 
 namespace
 {
-	DhtStates& gs_state = Dht::GetDhtStatesSingleton();
+	DhtStates& gs_state = GetDhtStatesSingleton();
 }
 
 NodeConnector::NodeConnector(uint64_t address) :

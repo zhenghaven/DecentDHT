@@ -8,9 +8,12 @@
 #include <DecentApi/Common/Ra/WhiteList/HardCoded.h>
 #include <DecentApi/Common/Ra/WhiteList/DecentServer.h>
 
+#include "../Common/Dht/CircularRange.h"
 #include "../Common_Enc/Dht/DhtStates.h"
+#include "../Common_Enc/Dht/DhtStore.h"
 #include "../Common_Enc/Dht/DhtStatesSingleton.h"
 
+using namespace Decent;
 using namespace Decent::Ra;
 using namespace Decent::Dht;
 
@@ -45,11 +48,18 @@ namespace
 		static const WhiteList::Loaded inst(instPtr);
 		return inst;
 	}
+
+	static DhtStore& GetDhtStore()
+	{
+		static DhtStore inst(MbedTlsObj::BigNumber(0LL, MbedTlsObj::sk_struct), MbedTlsObj::BigNumber(FilledByteArray<32>::value, MbedTlsObj::sk_struct));
+
+		return inst;
+	}
 }
 
 DhtStates& Decent::Dht::GetDhtStatesSingleton()
 {
-	static DhtStates state(GetCertContainer(), GetKeyContainer(), GetServerWhiteList(), GetHardCodedWhiteList(), &GetLoadedWhiteListImpl);
+	static DhtStates state(GetCertContainer(), GetKeyContainer(), GetServerWhiteList(), GetHardCodedWhiteList(), &GetLoadedWhiteListImpl, GetDhtStore());
 
 	return state;
 }

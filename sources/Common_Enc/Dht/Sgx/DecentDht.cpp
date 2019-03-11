@@ -5,6 +5,7 @@
 #include <DecentApi/Common/Net/TlsCommLayer.h>
 #include <DecentApi/Common/MbedTls/BigNumber.h>
 
+#include "../../../Common/Dht/LocalNode.h"
 #include "../../../Common/Dht/FuncNums.h"
 #include "../../../Common/Dht/AppNames.h"
 #include "../../../Common/Dht/Node.h"
@@ -20,14 +21,13 @@ namespace
 	DhtStates& gs_state = Dht::GetDhtStatesSingleton();
 }
 
-
 static void GetImmediateSucessor(void* connection, Decent::Net::TlsCommLayer &tls)
 {
     LOGI("Finding Immediate Successor...");
 
-    DhtStates::DhtNodeType& localNode = *gs_state.GetDhtNode();
+    DhtStates::DhtLocalNodePtrType localNode = gs_state.GetDhtNode();
 
-    DhtStates::DhtNodeType::NodeBasePtrType resNode = localNode.GetImmediateSuccessor();
+    DhtStates::DhtLocalNodeType::NodeBasePtrType resNode = localNode->GetImmediateSuccessor();
 
     std::array<uint8_t, DhtStates::sk_keySizeByte> resKeyBin{};
     resNode->GetNodeId().ToBinary(resKeyBin);
@@ -40,18 +40,16 @@ static void GetImmediateSucessor(void* connection, Decent::Net::TlsCommLayer &tl
     LOGI("Sent result ID: %s.", resNode->GetNodeId().ToBigEndianHexStr().c_str());
 }
 
-
-
 static void GetNodeId(void* connection, Decent::Net::TlsCommLayer &tls)
 {
     LOGI("Getting the NodeId...");
-    DhtStates::DhtNodeType& localNode = *gs_state.GetDhtNode();
+	DhtStates::DhtLocalNodePtrType localNode = gs_state.GetDhtNode();
     std::array<uint8_t, DhtStates::sk_keySizeByte> keyBin{};
-    localNode.GetNodeId().ToBinary(keyBin);
+    localNode->GetNodeId().ToBinary(keyBin);
 
     tls.SendRaw(connection, keyBin.data(), keyBin.size()); //3. Sent nodeId ID
 
-    LOGI("Sent result ID: %s.", localNode.GetNodeId().ToBigEndianHexStr().c_str());
+    LOGI("Sent result ID: %s.", localNode->GetNodeId().ToBigEndianHexStr().c_str());
 }
 
 static void FindPredecessor(void* connection, Decent::Net::TlsCommLayer &tls)
@@ -63,9 +61,9 @@ static void FindPredecessor(void* connection, Decent::Net::TlsCommLayer &tls)
     ConstBigNumber queriedId(keyBin);
     LOGI("Recv queried ID: %s.", static_cast<const BigNumber&>(queriedId).ToBigEndianHexStr().c_str());
 
-    DhtStates::DhtNodeType& localNode = *gs_state.GetDhtNode();
+	DhtStates::DhtLocalNodePtrType localNode = gs_state.GetDhtNode();
 
-    DhtStates::DhtNodeType::NodeBasePtrType resNode = localNode.FindPredecessor(queriedId);
+    DhtStates::DhtLocalNodeType::NodeBasePtrType resNode = localNode->FindPredecessor(queriedId);
 
     std::array<uint8_t, DhtStates::sk_keySizeByte> resKeyBin{};
     resNode->GetNodeId().ToBinary(resKeyBin);
@@ -86,10 +84,10 @@ static void FindSuccessor(void* connection, Decent::Net::TlsCommLayer &tls)
 
 	ConstBigNumber queriedId(keyBin);
 	LOGI("Recv queried ID: %s.", static_cast<const BigNumber&>(queriedId).ToBigEndianHexStr().c_str());
-	
-	DhtStates::DhtNodeType& localNode = *gs_state.GetDhtNode();
 
-	DhtStates::DhtNodeType::NodeBasePtrType resNode = localNode.FindSuccessor(queriedId);
+	DhtStates::DhtLocalNodePtrType localNode = gs_state.GetDhtNode();
+
+	DhtStates::DhtLocalNodeType::NodeBasePtrType resNode = localNode->FindSuccessor(queriedId);
 
 	std::array<uint8_t, DhtStates::sk_keySizeByte> resKeyBin{};
 	resNode->GetNodeId().ToBinary(resKeyBin);
@@ -100,22 +98,6 @@ static void FindSuccessor(void* connection, Decent::Net::TlsCommLayer &tls)
 	tls.SendStruct(connection, resAddr); //4. Sent Address - Done!
 
 	LOGI("Sent result ID: %s.", resNode->GetNodeId().ToBigEndianHexStr().c_str());
-}
-
-extern "C" int ecall_decent_dht_proc_msg_from_dht(void* connection)
-{
-	if (!gs_state.GetDhtNode())
-	{
-		LOGW("Local DHT Node had not been initialized yet!");
-		return false;
-	}
-
-    std::shared_ptr<Decent::Ra::TlsConfig> tlsCfg = std::make_shared<Decent::Ra::TlsConfig>(AppNames::sk_decentDHT, gs_state, true);
-    Decent::Net::TlsCommLayer tls(connection, tlsCfg, true);
-
-	ProcessDhtQueries(connection, tls);
-
-    return false;
 }
 
 void Dht::ProcessDhtQueries(void * connection, Decent::Net::TlsCommLayer & tls)
@@ -149,4 +131,20 @@ void Dht::ProcessDhtQueries(void * connection, Decent::Net::TlsCommLayer & tls)
 	default:
 		break;
 	}
+}
+
+extern "C" int ecall_decent_dht_proc_msg_from_dht(void* connection)
+{
+	if (!gs_state.GetDhtNode())
+	{
+		LOGW("Local DHT Node had not been initialized yet!");
+		return false;
+	}
+
+    std::shared_ptr<Decent::Ra::TlsConfig> tlsCfg = std::make_shared<Decent::Ra::TlsConfig>(AppNames::sk_decentDHT, gs_state, true);
+    Decent::Net::TlsCommLayer tls(connection, tlsCfg, true);
+
+	ProcessDhtQueries(connection, tls);
+
+    return false;
 }

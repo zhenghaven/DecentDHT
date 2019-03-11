@@ -16,3 +16,14 @@ Json::Value& FromDht::GetJsonMsg(Json::Value& outJson) const
 
 	return root;
 }
+
+constexpr char const FromStore::sk_ValueCat[];
+
+Json::Value& FromStore::GetJsonMsg(Json::Value& outJson) const
+{
+	Json::Value& root = SmartMessages::GetJsonMsg(outJson);
+
+	root = Json::nullValue;
+
+	return root;
+}

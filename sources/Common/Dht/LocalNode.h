@@ -153,7 +153,7 @@ namespace Decent
 			 */
 			virtual NodeBasePtrType FindSuccessor(const IdType& key) override
 			{
-				if (m_cirRange.IsWithinNC(key, m_fingerTable.GetImmediatePredecessor()->GetNodeId(), m_id))
+				if (this->IsResponsibleFor(key))
 				{
 					return GetSelfPtr();
 				}
@@ -235,6 +235,11 @@ namespace Decent
 			virtual const AddrType& GetAddress() override
 			{
 				return m_addr;
+			}
+
+			bool IsResponsibleFor(const IdType& key) const
+			{
+				return m_cirRange.IsWithinNC(key, m_fingerTable.GetImmediatePredecessor()->GetNodeId(), m_id);
 			}
 
 		protected:
