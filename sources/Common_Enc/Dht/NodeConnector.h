@@ -11,6 +11,10 @@ namespace Decent
 	{
 		class BigNumber;
 	}
+	namespace Net
+	{
+		class TlsCommLayer;
+	}
 
 	namespace Dht
 	{
@@ -19,6 +23,10 @@ namespace Decent
 		public:
 			typedef Node<MbedTlsObj::BigNumber, uint64_t> NodeBaseType;
 			typedef typename NodeBaseType::NodeBasePtrType NodeBasePtrType;
+
+			static void SendNode(void* connection, Decent::Net::TlsCommLayer& tls, NodeBasePtrType node);
+
+			static NodeBasePtrType ReceiveNode(void* connection, Decent::Net::TlsCommLayer& tls);
 
 		public:
 			NodeConnector() = delete;

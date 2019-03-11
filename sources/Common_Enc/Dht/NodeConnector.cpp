@@ -18,10 +18,36 @@ using namespace Decent;
 using namespace Decent::Dht;
 using namespace Decent::MbedTlsObj;
 using namespace Decent::Ra;
+using namespace Decent::Net;
 
 namespace
 {
 	DhtStates& gs_state = GetDhtStatesSingleton();
+}
+
+void NodeConnector::SendNode(void * connection, TlsCommLayer & tls, NodeBasePtrType node)
+{
+	std::array<uint8_t, DhtStates::sk_keySizeByte> keyBin{};
+	node->GetNodeId().ToBinary(keyBin);
+	tls.SendRaw(connection, keyBin.data(), keyBin.size()); //1. Sent resultant ID
+
+	uint64_t addr = node->GetAddress();
+	tls.SendStruct(connection, addr); //2. Sent Address - Done!
+
+	LOGI("Sent result ID: %s.", node->GetNodeId().ToBigEndianHexStr().c_str());
+}
+
+NodeConnector::NodeBasePtrType NodeConnector::ReceiveNode(void * connection, TlsCommLayer & tls)
+{
+	std::array<uint8_t, DhtStates::sk_keySizeByte> keyBin{};
+	uint64_t addr;
+
+	tls.ReceiveRaw(connection, keyBin.data(), keyBin.size()); //1. Receive ID
+	tls.ReceiveStruct(connection, addr); //2. Receive Address.
+
+	LOGI("Recv result ID: %s.", BigNumber(keyBin).ToBigEndianHexStr().c_str());
+
+	return std::make_shared<NodeConnector>(addr, BigNumber(keyBin));
 }
 
 NodeConnector::NodeConnector(uint64_t address) :
@@ -59,15 +85,7 @@ NodeConnector::NodeBasePtrType NodeConnector::LookupTypeFunc(const MbedTlsObj::B
 	tls.SendRaw(connection.m_ptr, keyBin.data(), keyBin.size()); //2. Send queried ID
 	LOGI("Sent queried ID: %s.", key.ToBigEndianHexStr().c_str());
 
-	tls.ReceiveRaw(connection.m_ptr, keyBin.data(), keyBin.size()); //3. Received resultant ID
-
-	uint64_t resAddr = 0;
-	tls.ReceiveStruct(connection.m_ptr, resAddr); //4. Received Address - Done!
-
-	BigNumber resId(keyBin);
-	LOGI("Recv result ID: %s.", resId.ToBigEndianHexStr().c_str());
-
-	return std::make_shared<NodeConnector>(resAddr, std::move(resId));
+	return ReceiveNode(connection.m_ptr, tls); //3. Receive node. - Done!
 }
 
 NodeConnector::NodeBasePtrType NodeConnector::FindSuccessor(const BigNumber & key)
@@ -96,16 +114,7 @@ NodeConnector::NodeBasePtrType NodeConnector::GetImmediateSuccessor()
 
 	tls.SendStruct(connection.m_ptr, k_getImmediateSuc); //1. Send function type
 
-	std::array<uint8_t, DhtStates::sk_keySizeByte> keyBin{};
-	tls.ReceiveRaw(connection.m_ptr, keyBin.data(), keyBin.size()); //2. Received resultant ID
-
-	uint64_t resAddr = 0;
-	tls.ReceiveStruct(connection.m_ptr, resAddr); //3. Received Address - Done!
-
-	BigNumber resId(keyBin);
-	LOGI("Recv result ID: %s.", resId.ToBigEndianHexStr().c_str());
-
-	return std::make_shared<NodeConnector>(resAddr, std::move(resId));
+	return ReceiveNode(connection.m_ptr, tls); //2. Receive node. - Done!
 }
 
 NodeConnector::NodeBasePtrType NodeConnector::GetImmediatePredecessor()
@@ -121,16 +130,7 @@ NodeConnector::NodeBasePtrType NodeConnector::GetImmediatePredecessor()
 
 	tls.SendStruct(connection.m_ptr, k_getImmediatePre); //1. Send function type
 
-	std::array<uint8_t, DhtStates::sk_keySizeByte> keyBin{};
-	tls.ReceiveRaw(connection.m_ptr, keyBin.data(), keyBin.size()); //2. Received resultant ID
-
-	uint64_t resAddr = 0;
-	tls.ReceiveStruct(connection.m_ptr, resAddr); //3. Received Address - Done!
-
-	BigNumber resId(keyBin);
-	LOGI("Recv result ID: %s.", resId.ToBigEndianHexStr().c_str());
-
-	return std::make_shared<NodeConnector>(resAddr, std::move(resId));
+	return ReceiveNode(connection.m_ptr, tls); //2. Receive node. - Done!
 
 }
 
@@ -144,14 +144,7 @@ void NodeConnector::SetImmediatePredecessor(NodeBasePtrType pred)
 
 	tls.SendStruct(connection.m_ptr, k_setImmediatePre); //1. Send function type
 
-	std::array<uint8_t, DhtStates::sk_keySizeByte> keyBin{};
-
-	pred->GetNodeId().ToBinary(keyBin);
-
-	uint64_t resAddr = pred->GetAddress();
-
-	tls.SendRaw(connection.m_ptr, keyBin.data(), keyBin.size());
-	tls.SendStruct(connection.m_ptr, resAddr);
+	SendNode(connection.m_ptr, tls, pred); //2. Send Node. - Done!
 }
 
 void NodeConnector::UpdateFingerTable(NodeBasePtrType & s, uint64_t i)
@@ -164,13 +157,8 @@ void NodeConnector::UpdateFingerTable(NodeBasePtrType & s, uint64_t i)
 
 	tls.SendStruct(connection.m_ptr, k_updFingerTable); //1. Send function type
 
-	std::array<uint8_t, DhtStates::sk_keySizeByte> keyBin{};
-	s->GetNodeId().ToBinary(keyBin);
-
-	uint64_t resAddr = s->GetAddress();
-	tls.SendRaw(connection.m_ptr, keyBin.data(), keyBin.size());
-	tls.SendStruct(connection.m_ptr, resAddr);
-	tls.SendStruct(connection.m_ptr,i);
+	SendNode(connection.m_ptr, tls, s); //2. Send Node.
+	tls.SendStruct(connection.m_ptr,i); //3. Send i. - Done!
 }
 
 void NodeConnector::DeUpdateFingerTable(const MbedTlsObj::BigNumber & oldId, NodeBasePtrType & succ, uint64_t i)
@@ -181,22 +169,14 @@ void NodeConnector::DeUpdateFingerTable(const MbedTlsObj::BigNumber & oldId, Nod
 	std::shared_ptr<Ra::TlsConfig> tlsCfg = std::make_shared<Ra::TlsConfig>(AppNames::sk_decentDHT, gs_state, false);
 	Decent::Net::TlsCommLayer tls(connection.m_ptr, tlsCfg, true);
 
-	tls.SendStruct(connection.m_ptr, k_dUpdFingerTable );
-
+	tls.SendStruct(connection.m_ptr, k_dUpdFingerTable); //1. Send function type
 
 	std::array<uint8_t, DhtStates::sk_keySizeByte> keyBin{};
 	oldId.ToBinary(keyBin);
+	tls.SendRaw(connection.m_ptr, keyBin.data(), keyBin.size()); //2. Send oldId.
 
-	tls.SendRaw(connection.m_ptr, keyBin.data(), keyBin.size());
-
-	succ->GetNodeId().ToBinary(keyBin);
-	uint64_t resAddr = succ->GetAddress();
-
-	tls.SendRaw(connection.m_ptr, keyBin.data(), keyBin.size());
-	tls.SendStruct(connection.m_ptr, resAddr);
-	tls.SendStruct(connection.m_ptr,i);
-
-
+	SendNode(connection.m_ptr, tls, succ); //3. Send Node.
+	tls.SendStruct(connection.m_ptr,i); //4. Send i. - Done!
 }
 
 const BigNumber & NodeConnector::GetNodeId()

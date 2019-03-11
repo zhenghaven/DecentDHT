@@ -22,32 +22,6 @@ namespace
 	DhtStates& gs_state = Dht::GetDhtStatesSingleton();
 }
 
-static void SendNode(void* connection, Decent::Net::TlsCommLayer &tls, DhtStates::DhtLocalNodeType::NodeBasePtrType node)
-{
-	std::array<uint8_t, DhtStates::sk_keySizeByte> keyBin{};
-	node->GetNodeId().ToBinary(keyBin);
-
-	uint64_t addr = node->GetAddress();
-
-	tls.SendRaw(connection, keyBin.data(), keyBin.size()); //1. Sent resultant ID
-	tls.SendStruct(connection, addr); //2. Sent Address - Done!
-
-	LOGI("Sent result ID: %s.", node->GetNodeId().ToBigEndianHexStr().c_str());
-}
-
-static DhtStates::DhtLocalNodeType::NodeBasePtrType ReceiveNode(void* connection, Decent::Net::TlsCommLayer &tls)
-{
-	std::array<uint8_t, DhtStates::sk_keySizeByte> keyBin{};
-	uint64_t addr;
-
-	tls.ReceiveRaw(connection, keyBin.data(), keyBin.size()); //1. Receive ID
-	tls.ReceiveStruct(connection, addr); //2. Receive Address.
-
-	LOGI("Recv result ID: %s.", BigNumber(keyBin).ToBigEndianHexStr().c_str());
-
-	return std::make_shared<NodeConnector>(addr, BigNumber(keyBin));
-}
-
 static void DeUpdateFingerTable(void* connection, Decent::Net::TlsCommLayer &tls){
 
 	std::array<uint8_t, DhtStates::sk_keySizeByte> oldIdBin{};
@@ -55,7 +29,7 @@ static void DeUpdateFingerTable(void* connection, Decent::Net::TlsCommLayer &tls
 
 	tls.ReceiveRaw(connection, oldIdBin.data(), oldIdBin.size()); //2. Receive old ID.
 
-	DhtStates::DhtLocalNodeType::NodeBasePtrType s = ReceiveNode(connection, tls); //3. Receive node.
+	DhtStates::DhtLocalNodeType::NodeBasePtrType s = NodeConnector::ReceiveNode(connection, tls); //3. Receive node.
 	tls.ReceiveStruct(connection, i); //3. Receive i. - Done!
 
 	DhtStates::DhtLocalNodePtrType localNode = gs_state.GetDhtNode();
@@ -65,7 +39,7 @@ static void DeUpdateFingerTable(void* connection, Decent::Net::TlsCommLayer &tls
 
 static void UpdateFingerTable(void* connection, Decent::Net::TlsCommLayer &tls)
 {
-	DhtStates::DhtLocalNodeType::NodeBasePtrType s = ReceiveNode(connection, tls); //2. Receive node.
+	DhtStates::DhtLocalNodeType::NodeBasePtrType s = NodeConnector::ReceiveNode(connection, tls); //2. Receive node.
 
 	uint64_t i;
 	tls.ReceiveStruct(connection, i); //3. Receive i. - Done!
@@ -81,7 +55,7 @@ static void GetImmediatePredecessor(void* connection, Decent::Net::TlsCommLayer 
 
 	DhtStates::DhtLocalNodePtrType localNode = gs_state.GetDhtNode();
 
-	SendNode(connection, tls, localNode->GetImmediatePredecessor()); //2. Send Node. - Done!
+	NodeConnector::SendNode(connection, tls, localNode->GetImmediatePredecessor()); //2. Send Node. - Done!
 }
 
 static void SetImmediatePredecessor(void* connection, Decent::Net::TlsCommLayer &tls)
@@ -90,7 +64,7 @@ static void SetImmediatePredecessor(void* connection, Decent::Net::TlsCommLayer 
 
 	DhtStates::DhtLocalNodePtrType localNode = gs_state.GetDhtNode();
 
-	localNode->SetImmediatePredecessor(ReceiveNode(connection, tls)); //2. Receive Node. - Done!
+	localNode->SetImmediatePredecessor(NodeConnector::ReceiveNode(connection, tls)); //2. Receive Node. - Done!
 }
 
 static void GetImmediateSucessor(void* connection, Decent::Net::TlsCommLayer &tls)
@@ -99,7 +73,7 @@ static void GetImmediateSucessor(void* connection, Decent::Net::TlsCommLayer &tl
 
     DhtStates::DhtLocalNodePtrType localNode = gs_state.GetDhtNode();
 
-	SendNode(connection, tls, localNode->GetImmediateSuccessor()); //2. Send Node. - Done!
+	NodeConnector::SendNode(connection, tls, localNode->GetImmediateSuccessor()); //2. Send Node. - Done!
 }
 
 static void GetNodeId(void* connection, Decent::Net::TlsCommLayer &tls)
@@ -125,7 +99,7 @@ static void FindPredecessor(void* connection, Decent::Net::TlsCommLayer &tls)
 
 	DhtStates::DhtLocalNodePtrType localNode = gs_state.GetDhtNode();
 
-	SendNode(connection, tls, localNode->FindPredecessor(queriedId)); //3. Send Node. - Done!
+	NodeConnector::SendNode(connection, tls, localNode->FindPredecessor(queriedId)); //3. Send Node. - Done!
 }
 
 static void FindSuccessor(void* connection, Decent::Net::TlsCommLayer &tls) 
@@ -139,7 +113,7 @@ static void FindSuccessor(void* connection, Decent::Net::TlsCommLayer &tls)
 
 	DhtStates::DhtLocalNodePtrType localNode = gs_state.GetDhtNode();
 
-	SendNode(connection, tls, localNode->FindSuccessor(queriedId)); //3. Send Node. - Done!
+	NodeConnector::SendNode(connection, tls, localNode->FindSuccessor(queriedId)); //3. Send Node. - Done!
 }
 
 void Dht::ProcessDhtQueries(void * connection, Decent::Net::TlsCommLayer & tls)
