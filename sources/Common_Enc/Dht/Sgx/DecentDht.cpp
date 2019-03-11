@@ -11,6 +11,7 @@
 #include "../../../Common/Dht/Node.h"
 
 #include "../../../Common_Enc/Dht/DhtStatesSingleton.h"
+#include "../../../Common_Enc/Dht/NodeConnector.h"
 
 using namespace Decent;
 using namespace Decent::Dht;
@@ -21,23 +22,84 @@ namespace
 	DhtStates& gs_state = Dht::GetDhtStatesSingleton();
 }
 
+static void SendNode(void* connection, Decent::Net::TlsCommLayer &tls, DhtStates::DhtLocalNodeType::NodeBasePtrType node)
+{
+	std::array<uint8_t, DhtStates::sk_keySizeByte> keyBin{};
+	node->GetNodeId().ToBinary(keyBin);
+
+	uint64_t addr = node->GetAddress();
+
+	tls.SendRaw(connection, keyBin.data(), keyBin.size()); //1. Sent resultant ID
+	tls.SendStruct(connection, addr); //2. Sent Address - Done!
+
+	LOGI("Sent result ID: %s.", node->GetNodeId().ToBigEndianHexStr().c_str());
+}
+
+static DhtStates::DhtLocalNodeType::NodeBasePtrType ReceiveNode(void* connection, Decent::Net::TlsCommLayer &tls)
+{
+	std::array<uint8_t, DhtStates::sk_keySizeByte> keyBin{};
+	uint64_t addr;
+
+	tls.ReceiveRaw(connection, keyBin.data(), keyBin.size()); //1. Receive ID
+	tls.ReceiveStruct(connection, addr); //2. Receive Address.
+
+	LOGI("Recv result ID: %s.", BigNumber(keyBin).ToBigEndianHexStr().c_str());
+
+	return std::make_shared<NodeConnector>(addr, BigNumber(keyBin));
+}
+
+static void DeUpdateFingerTable(void* connection, Decent::Net::TlsCommLayer &tls){
+
+	std::array<uint8_t, DhtStates::sk_keySizeByte> oldIdBin{};
+	uint64_t i;
+
+	tls.ReceiveRaw(connection, oldIdBin.data(), oldIdBin.size()); //2. Receive old ID.
+
+	DhtStates::DhtLocalNodeType::NodeBasePtrType s = ReceiveNode(connection, tls); //3. Receive node.
+	tls.ReceiveStruct(connection, i); //3. Receive i. - Done!
+
+	DhtStates::DhtLocalNodePtrType localNode = gs_state.GetDhtNode();
+
+	localNode->DeUpdateFingerTable(ConstBigNumber(oldIdBin), s, i);
+}
+
+static void UpdateFingerTable(void* connection, Decent::Net::TlsCommLayer &tls)
+{
+	DhtStates::DhtLocalNodeType::NodeBasePtrType s = ReceiveNode(connection, tls); //2. Receive node.
+
+	uint64_t i;
+	tls.ReceiveStruct(connection, i); //3. Receive i. - Done!
+
+	DhtStates::DhtLocalNodePtrType localNode = gs_state.GetDhtNode();
+
+	localNode->UpdateFingerTable(s, i);
+}
+
+static void GetImmediatePredecessor(void* connection, Decent::Net::TlsCommLayer &tls)
+{
+	LOGI("Getting Immediate Predecessor...");
+
+	DhtStates::DhtLocalNodePtrType localNode = gs_state.GetDhtNode();
+
+	SendNode(connection, tls, localNode->GetImmediatePredecessor()); //2. Send Node. - Done!
+}
+
+static void SetImmediatePredecessor(void* connection, Decent::Net::TlsCommLayer &tls)
+{
+	LOGI("Setting Immediate Predecessor...");
+
+	DhtStates::DhtLocalNodePtrType localNode = gs_state.GetDhtNode();
+
+	localNode->SetImmediatePredecessor(ReceiveNode(connection, tls)); //2. Receive Node. - Done!
+}
+
 static void GetImmediateSucessor(void* connection, Decent::Net::TlsCommLayer &tls)
 {
     LOGI("Finding Immediate Successor...");
 
     DhtStates::DhtLocalNodePtrType localNode = gs_state.GetDhtNode();
 
-    DhtStates::DhtLocalNodeType::NodeBasePtrType resNode = localNode->GetImmediateSuccessor();
-
-    std::array<uint8_t, DhtStates::sk_keySizeByte> resKeyBin{};
-    resNode->GetNodeId().ToBinary(resKeyBin);
-
-    uint64_t resAddr = resNode->GetAddress();
-
-    tls.SendRaw(connection, resKeyBin.data(), resKeyBin.size()); //3. Sent resultant ID
-    tls.SendStruct(connection, resAddr); //4. Sent Address - Done!
-
-    LOGI("Sent result ID: %s.", resNode->GetNodeId().ToBigEndianHexStr().c_str());
+	SendNode(connection, tls, localNode->GetImmediateSuccessor()); //2. Send Node. - Done!
 }
 
 static void GetNodeId(void* connection, Decent::Net::TlsCommLayer &tls)
@@ -47,7 +109,7 @@ static void GetNodeId(void* connection, Decent::Net::TlsCommLayer &tls)
     std::array<uint8_t, DhtStates::sk_keySizeByte> keyBin{};
     localNode->GetNodeId().ToBinary(keyBin);
 
-    tls.SendRaw(connection, keyBin.data(), keyBin.size()); //3. Sent nodeId ID
+    tls.SendRaw(connection, keyBin.data(), keyBin.size()); //2. Sent nodeId ID
 
     LOGI("Sent result ID: %s.", localNode->GetNodeId().ToBigEndianHexStr().c_str());
 }
@@ -63,17 +125,7 @@ static void FindPredecessor(void* connection, Decent::Net::TlsCommLayer &tls)
 
 	DhtStates::DhtLocalNodePtrType localNode = gs_state.GetDhtNode();
 
-    DhtStates::DhtLocalNodeType::NodeBasePtrType resNode = localNode->FindPredecessor(queriedId);
-
-    std::array<uint8_t, DhtStates::sk_keySizeByte> resKeyBin{};
-    resNode->GetNodeId().ToBinary(resKeyBin);
-
-    uint64_t resAddr = resNode->GetAddress();
-
-    tls.SendRaw(connection, resKeyBin.data(), resKeyBin.size()); //3. Sent resultant ID
-    tls.SendStruct(connection, resAddr); //4. Sent Address - Done!
-
-    LOGI("Sent result ID: %s.", resNode->GetNodeId().ToBigEndianHexStr().c_str());
+	SendNode(connection, tls, localNode->FindPredecessor(queriedId)); //3. Send Node. - Done!
 }
 
 static void FindSuccessor(void* connection, Decent::Net::TlsCommLayer &tls) 
@@ -87,17 +139,7 @@ static void FindSuccessor(void* connection, Decent::Net::TlsCommLayer &tls)
 
 	DhtStates::DhtLocalNodePtrType localNode = gs_state.GetDhtNode();
 
-	DhtStates::DhtLocalNodeType::NodeBasePtrType resNode = localNode->FindSuccessor(queriedId);
-
-	std::array<uint8_t, DhtStates::sk_keySizeByte> resKeyBin{};
-	resNode->GetNodeId().ToBinary(resKeyBin);
-
-	uint64_t resAddr = resNode->GetAddress();
-
-	tls.SendRaw(connection, resKeyBin.data(), resKeyBin.size()); //3. Sent resultant ID
-	tls.SendStruct(connection, resAddr); //4. Sent Address - Done!
-
-	LOGI("Sent result ID: %s.", resNode->GetNodeId().ToBigEndianHexStr().c_str());
+	SendNode(connection, tls, localNode->FindSuccessor(queriedId)); //3. Send Node. - Done!
 }
 
 void Dht::ProcessDhtQueries(void * connection, Decent::Net::TlsCommLayer & tls)
@@ -126,6 +168,22 @@ void Dht::ProcessDhtQueries(void * connection, Decent::Net::TlsCommLayer & tls)
 
 	case k_getNodeId:
 	    GetNodeId(connection, tls);
+		break;
+
+	case k_setImmediatePre:
+		SetImmediatePredecessor(connection, tls);
+		break;
+
+	case k_getImmediatePre:
+		GetImmediatePredecessor(connection, tls);
+		break;
+
+	case k_updFingerTable:
+		UpdateFingerTable(connection, tls);
+		break;
+
+	case k_dUpdFingerTable:
+		DeUpdateFingerTable(connection, tls);
 		break;
 
 	default:
