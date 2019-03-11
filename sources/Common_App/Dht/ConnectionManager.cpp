@@ -1,7 +1,3 @@
-#include "ConnectionManager.h"
-
-#include <boost/asio/ip/address_v4.hpp>
-
 #include <DecentApi/Common/Common.h>
 #include <DecentApi/CommonApp/Net/TCPConnection.h>
 #include <DecentApi/CommonApp/Tools/ConfigManager.h>
@@ -31,21 +27,10 @@ namespace
 		catch (const std::exception& e)
 		{
 			const char* msgStr = e.what();
-			LOGW("Failed to establish connection. (Err Msg: %s)", msgStr);
+			PRINT_W("Failed to establish connection. (Err Msg: %s)", msgStr);
 			return nullptr;
 		}
 	}
-}
-
-
-std::unique_ptr<Connection> ConnectionManager::GetConnection2DecentDht(const SmartMessages& hsMsg, uint64_t address)
-{
-	return InternalGetConnection(hsMsg, address);
-}
-
-std::unique_ptr<Connection> ConnectionManager::GetConnection2DecentDhtStore(const SmartMessages & hsMsg, uint64_t address)
-{
-	return InternalGetConnection(hsMsg, address);
 }
 
 extern "C" void ocall_decent_dht_cnt_mgr_get_dht(void** out_cnt_ptr, uint64_t address)

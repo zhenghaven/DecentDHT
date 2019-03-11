@@ -24,8 +24,10 @@ namespace Decent
 			typedef NodeBase<MbedTlsObj::BigNumber, uint64_t> NodeBaseType;
 			typedef typename NodeBaseType::NodeBasePtr NodeBasePtr;
 
+			static void SendNode(Decent::Net::TlsCommLayer& tls, NodeBasePtr node);
 			static void SendNode(void* connection, Decent::Net::TlsCommLayer& tls, NodeBasePtr node);
 
+			static NodeBasePtr ReceiveNode(Decent::Net::TlsCommLayer& tls);
 			static NodeBasePtr ReceiveNode(void* connection, Decent::Net::TlsCommLayer& tls);
 
 		public:
