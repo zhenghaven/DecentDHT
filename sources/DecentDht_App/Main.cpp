@@ -20,6 +20,7 @@
 #include <DecentApi/Common/MbedTls/BigNumber.h>
 
 #include "../Common/Dht/AppNames.h"
+#include "../Common/Dht/StoreBase.h"
 #include "../Common_App/Tools.h"
 #include "../Common_App/Dht/DecentDhtApp.h"
 #include "../Common/Dht/CircularRange.h"
@@ -53,9 +54,29 @@ int main(int argc, char ** argv)
 		MbedTlsObj::BigNumber smallest(0LL, MbedTlsObj::sk_struct);
 		MbedTlsObj::BigNumber largest(FilledByteArray<32>::value, MbedTlsObj::sk_struct);
 		MbedTlsObj::BigNumber nodeId(0LL, MbedTlsObj::sk_struct);
-		BigNumLocalNode locNode(nodeId, 0LL, smallest, largest, pow2iArray);
+		std::shared_ptr<BigNumLocalNode> locNode = std::make_shared<BigNumLocalNode>(nodeId, 0LL, smallest, largest, pow2iArray);
 
-		locNode.FindSuccessor(MbedTlsObj::BigNumber(103LL, MbedTlsObj::sk_struct));
+		locNode->FindSuccessor(MbedTlsObj::BigNumber(103LL, MbedTlsObj::sk_struct));
+	}
+
+	{
+		using namespace MbedTlsObj;
+		BigNumber smallest(0LL, MbedTlsObj::sk_struct);
+		BigNumber largest(FilledByteArray<8>::value, MbedTlsObj::sk_struct);
+		StoreBase<BigNumber, uint64_t> dhtStore(smallest, largest);
+
+		dhtStore.SetValue(ConstBigNumber(0LL, sk_struct), std::vector<uint8_t>());
+		dhtStore.SetValue(ConstBigNumber(5LL, sk_struct), std::vector<uint8_t>());
+		dhtStore.SetValue(ConstBigNumber(24LL, sk_struct), std::vector<uint8_t>());
+		dhtStore.SetValue(ConstBigNumber(68LL, sk_struct), std::vector<uint8_t>());
+		dhtStore.SetValue(ConstBigNumber(85LL, sk_struct), std::vector<uint8_t>());
+		dhtStore.SetValue(ConstBigNumber(90LL, sk_struct), std::vector<uint8_t>());
+		dhtStore.SetValue(ConstBigNumber(125LL, sk_struct), std::vector<uint8_t>());
+		dhtStore.SetValue(ConstBigNumber(167LL, sk_struct), std::vector<uint8_t>());
+		dhtStore.SetValue(ConstBigNumber(220LL, sk_struct), std::vector<uint8_t>());
+		dhtStore.SetValue(ConstBigNumber(255LL, sk_struct), std::vector<uint8_t>());
+
+		dhtStore.SendMigratingData([](const void*, const size_t) {}, [](const BigNumber&) {}, ConstBigNumber(10LL, sk_struct), ConstBigNumber(130LL, sk_struct));
 	}
 	std::cout << "================ Decent DHT ================" << std::endl;
 

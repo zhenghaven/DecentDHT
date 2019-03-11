@@ -15,6 +15,7 @@
 using namespace Decent;
 using namespace Decent::Dht;
 using namespace Decent::Net;
+using namespace Decent::MbedTlsObj;
 
 namespace
 {
@@ -48,9 +49,16 @@ void EnclaveStore::MigrateFrom(const uint64_t & addr, const MbedTlsObj::BigNumbe
 	end.ToBinary(keyBin);
 	tls.SendRaw(keyBin.data(), keyBin.size()); //3. Send end key.
 
-	RecvMigratingData([&tls](void* buffer, const size_t size) -> void
+	RecvMigratingData(
+		[&tls](void* buffer, const size_t size) -> void
 	{
 		tls.ReceiveRaw(buffer, size);
+	}, 
+	[&tls]() -> BigNumber
+	{
+		std::array<uint8_t, DhtStates::sk_keySizeByte> keyBuf{};
+		tls.ReceiveRaw(keyBuf.data(), keyBuf.size());
+		return BigNumber(keyBuf);
 	}); //4. Receive data.
 }
 
@@ -71,9 +79,16 @@ void EnclaveStore::MigrateTo(const uint64_t & addr)
 
 	tls.SendStruct(k_setMigrateData); //1. Send function type
 
-	SendMigratingData([&tls](void* buffer, const size_t size) -> void
+	SendMigratingData(
+		[&tls](void* buffer, const size_t size) -> void
 	{
-		tls.ReceiveRaw(buffer, size);
+		tls.SendRaw(buffer, size);
+	},
+	[&tls](const BigNumber& key) -> void
+	{
+		std::array<uint8_t, DhtStates::sk_keySizeByte> keyBuf{};
+		key.ToBinary(keyBuf);
+		tls.SendRaw(keyBuf.data(), keyBuf.size());
 	},
 		sendIndexing); //2. Send data.
 }
@@ -97,5 +112,11 @@ std::vector<uint8_t> EnclaveStore::DeleteData(const MbedTlsObj::BigNumber & key)
 
 void EnclaveStore::SaveData(const MbedTlsObj::BigNumber & key, std::vector<uint8_t>&& data)
 {
+	EnclaveStore::SaveData(BigNumber(key), std::forward<std::vector<uint8_t> >(data));
+}
+
+void EnclaveStore::SaveData(MbedTlsObj::BigNumber&& key, std::vector<uint8_t>&& data)
+{
+	StoreBase::SaveData(std::forward<MbedTlsObj::BigNumber >(key), std::forward<std::vector<uint8_t> >(data));
 	//TODO: work with file system.
 }

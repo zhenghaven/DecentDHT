@@ -232,14 +232,14 @@ namespace Decent
 			 *
 			 * \return	The address of this node.
 			 */
-			virtual const AddrType& GetAddress() override
+			virtual const AddrType& GetAddress() const override
 			{
 				return m_addr;
 			}
 
-			bool IsResponsibleFor(const IdType& key) const
+			bool IsResponsibleFor(const IdType& key)
 			{
-				return m_cirRange.IsWithinNC(key, m_fingerTable.GetImmediatePredecessor()->GetNodeId(), m_id);
+				return m_cirRange.IsWithinNC(key, GetImmediatePredecessor()->GetNodeId(), m_id);
 			}
 
 		protected:

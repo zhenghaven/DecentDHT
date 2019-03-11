@@ -60,7 +60,7 @@ namespace Decent
 
 			virtual const MbedTlsObj::BigNumber& GetNodeId() override;
 
-			virtual const uint64_t& GetAddress() override { return m_address; }
+			virtual const uint64_t& GetAddress() const override { return m_address; }
 
 		private:
 			uint64_t m_address;

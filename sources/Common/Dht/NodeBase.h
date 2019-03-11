@@ -12,6 +12,7 @@ namespace Decent
 		{
 		public: //static members:
 			typedef std::shared_ptr<NodeBase> NodeBasePtr;
+			typedef std::shared_ptr<const NodeBase> ConstNodeBasePtr;
 
 		public:
 			/** \brief	Default constructor */
@@ -93,7 +94,7 @@ namespace Decent
 			 *
 			 * \return	The address of this node.
 			 */
-			virtual const AddrType& GetAddress() = 0;
+			virtual const AddrType& GetAddress() const = 0;
 
 		};
 	}
