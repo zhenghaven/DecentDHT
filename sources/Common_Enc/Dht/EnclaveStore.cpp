@@ -45,6 +45,7 @@ void EnclaveStore::MigrateFrom(const uint64_t & addr, const MbedTlsObj::BigNumbe
 	std::array<uint8_t, DhtStates::sk_keySizeByte> keyBin{};
 
 	start.ToBinary(keyBin);
+
 	tls.SendRaw(keyBin.data(), keyBin.size()); //2. Send start key.
 	end.ToBinary(keyBin);
 	tls.SendRaw(keyBin.data(), keyBin.size()); //3. Send end key.
