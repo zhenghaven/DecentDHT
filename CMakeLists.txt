@@ -339,6 +339,7 @@ foreach(Proj_Name IN ITEMS ${Enc_Proj_Name_List})
 		IntelSGX::SDK_Trusted_service 
 		IntelSGX::SDK_Trusted_key_exchange 
 		IntelSGX::SDK_Trusted_crypto 
+		IntelSGX::SDK_Trusted_file_system 
 		DecentRa_App_Enclave 
 		mbedcrypto_enclave 
 		mbedx509_enclave 
@@ -366,6 +367,7 @@ foreach(Proj_Name IN ITEMS ${Enc_Proj_Name_List})
 	target_link_libraries(${Proj_Name}_App 
 		${COMMON_STANDARD_LIBRARIES} 
 		IntelSGX::SDK_Untrusted
+		IntelSGX::SDK_Untrusted_file_system
 		DecentRa_App_App 
 		jsoncpp_lib_static 
 		mbedcrypto 
