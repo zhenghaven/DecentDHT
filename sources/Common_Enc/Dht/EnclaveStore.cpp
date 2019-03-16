@@ -3,7 +3,11 @@
 #include <DecentApi/Common/Common.h>
 #include <DecentApi/Common/Ra/TlsConfig.h>
 #include <DecentApi/Common/Net/TlsCommLayer.h>
+#include <DecentApi/Common/Tools/FileSystemUtil.h>
 #include <DecentApi/CommonEnclave/Net/EnclaveNetConnector.h>
+#include <DecentApi/CommonEnclave/Tools/Crypto.h>
+#include <DecentApi/CommonEnclave/Tools/PlainFile.h>
+#include <DecentApi/CommonEnclave/Tools/SecureFile.h>
 
 #include "../../Common/Dht/LocalNode.h"
 #include "../../Common/Dht/FuncNums.h"
@@ -26,6 +30,8 @@ namespace
 		static std::shared_ptr<Ra::TlsConfig> tlsCfg = std::make_shared<Ra::TlsConfig>(AppNames::sk_decentDHT, gs_state, false);
 		return tlsCfg;
 	}
+
+	constexpr char const gsk_storeSealKeyLabel[] = "DecentStoreSealKey";
 }
 
 EnclaveStore::~EnclaveStore()
@@ -102,13 +108,49 @@ bool EnclaveStore::IsResponsibleFor(const MbedTlsObj::BigNumber & key) const
 
 void EnclaveStore::GetValue(const MbedTlsObj::BigNumber & key, std::vector<uint8_t>& data)
 {
-	//TODO: work with file system.
+	using namespace Decent::Tools;
+
+	const std::string fileName = key.ToBigEndianHexStr();
+	
+	std::vector<uint8_t> meta;
+	try
+	{
+		PlainFile metaFile(fileName + ".meta", FileBase::Mode::Read);
+		meta.resize(metaFile.GetFileSize());
+		metaFile.ReadBlockExactSize(meta);
+	}
+	catch (const Decent::RuntimeException&)
+	{
+		data.resize(0);
+		return;
+	}
+
+	General128BitKey sealKey;
+	DeriveSealKey(KeyPolicy::ByMrEnclave, gsk_storeSealKeyLabel, sealKey, meta);
+
+	try
+	{
+		SecureFile dataFile(fileName + ".data", sealKey, FileBase::Mode::Read);
+		data.resize(dataFile.GetFileSize());
+		dataFile.ReadBlockExactSize(data);
+	}
+	catch (const Decent::RuntimeException&)
+	{
+		data.resize(0);
+		return;
+	}
 }
 
 std::vector<uint8_t> EnclaveStore::DeleteData(const MbedTlsObj::BigNumber & key)
 {
-	//TODO: work with file system.
-	return std::vector<uint8_t>();
+	std::vector<uint8_t> res;
+	GetValue(key, res);
+
+	const std::string fileName = key.ToBigEndianHexStr();
+	Tools::FileSysDeleteFile(fileName + ".meta");
+	Tools::FileSysDeleteFile(fileName + ".data");
+	
+	return std::move(res);
 }
 
 void EnclaveStore::SaveData(const MbedTlsObj::BigNumber & key, std::vector<uint8_t>&& data)
@@ -118,6 +160,25 @@ void EnclaveStore::SaveData(const MbedTlsObj::BigNumber & key, std::vector<uint8
 
 void EnclaveStore::SaveData(MbedTlsObj::BigNumber&& key, std::vector<uint8_t>&& data)
 {
-	StoreBase::SaveData(std::forward<MbedTlsObj::BigNumber >(key), std::forward<std::vector<uint8_t> >(data));
-	//TODO: work with file system.
+	using namespace Decent::Tools;
+
+	StoreBase::SaveData(std::forward<MbedTlsObj::BigNumber>(key), std::forward<std::vector<uint8_t> >(data));
+
+	const std::string fileName = key.ToBigEndianHexStr();
+	
+	std::vector<uint8_t> meta;
+	GenSealKeyRecoverMeta(meta);
+
+	General128BitKey sealKey;
+	DeriveSealKey(KeyPolicy::ByMrEnclave, gsk_storeSealKeyLabel, sealKey, meta);
+
+	{
+		WritablePlainFile metaFile(fileName + ".meta", WritableFileBase::WritableMode::Write);
+		metaFile.WriteBlockExactSize(meta);
+	}
+	
+	{
+		WritableSecureFile dataFile(fileName + ".data", sealKey, WritableFileBase::WritableMode::Write);
+		dataFile.WriteBlockExactSize(data);
+	}
 }

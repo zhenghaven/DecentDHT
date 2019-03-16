@@ -220,7 +220,7 @@ namespace Decent
 			 */
 			virtual void SaveData(IdType&& key, std::vector<uint8_t>&& data)
 			{
-				m_indexing.insert(key);
+				m_indexing.insert(std::forward<IdType>(key));
 			}
 
 			/**

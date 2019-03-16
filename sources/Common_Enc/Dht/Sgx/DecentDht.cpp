@@ -5,10 +5,9 @@
 #include <DecentApi/Common/Net/TlsCommLayer.h>
 
 #include "../../../Common/Dht/AppNames.h"
+#include "../../../Common/Dht/FuncNums.h"
 #include "../DhtStatesSingleton.h"
 #include "../EnclaveStore.h"
-#include "../../../Common/Dht/FuncNums.h"
-
 
 using namespace Decent;
 using namespace Decent::Dht;
@@ -20,81 +19,70 @@ namespace
 	DhtStates& gs_state = Dht::GetDhtStatesSingleton();
 }
 
+static void GetMigrateData(Decent::Net::TlsCommLayer & tls)
+{
+    std::array<uint8_t, DhtStates::sk_keySizeByte> startKeyBin{};
+    tls.ReceiveRaw(startKeyBin.data(), startKeyBin.size());
+	ConstBigNumber start(startKeyBin);
 
-static void GetMigrateData(void * connection, Decent::Net::TlsCommLayer & tls){
-    using namespace EncFunc::Store;
+	std::array<uint8_t, DhtStates::sk_keySizeByte> endKeyBin{};
+    tls.ReceiveRaw(endKeyBin.data(), endKeyBin.size());
+	ConstBigNumber end(endKeyBin);
 
-    std::array<uint8_t, DhtStates::sk_keySizeByte> keyBin{};
-    tls.ReceiveRaw(keyBin.data(), keyBin.size());
-    BigNumber start = BigNumber(keyBin);
-    tls.ReceiveRaw(keyBin.data(), keyBin.size());
-    BigNumber end = BigNumber(keyBin);
+	gs_state.GetDhtStore().SendMigratingData(
+		[&tls](void* buffer, const size_t size) -> void
+	{
+		tls.SendRaw(buffer, size);
+	},
+		[&tls](const BigNumber& key) -> void
+	{
+		std::array<uint8_t, DhtStates::sk_keySizeByte> keyBuf{};
+		key.ToBinary(keyBuf);
+		tls.SendRaw(keyBuf.data(), keyBuf.size());
+	},
+		start, end);
+}
 
-
-    gs_state.GetDhtStore().SendMigratingData([&tls](void* buffer, const size_t size) -> void
-                                             {
-                                                 tls.SendRaw(buffer, size);
-                                             },
-                                             [&tls](const BigNumber& key) -> void
-                                             {
-                                                 std::array<uint8_t, DhtStates::sk_keySizeByte> keyBuf{};
-                                                 key.ToBinary(keyBuf);
-                                                 tls.SendRaw(keyBuf.data(), keyBuf.size());
-                                             },start, end);
+static void SetMigrateData(Decent::Net::TlsCommLayer & tls)
+{
+	gs_state.GetDhtStore().RecvMigratingData(
+		[&tls](void* buffer, const size_t size) -> void
+	{
+		tls.ReceiveRaw(buffer, size);
+	},
+		[&tls]() -> BigNumber
+	{
+		std::array<uint8_t, DhtStates::sk_keySizeByte> keyBuf{};
+		tls.ReceiveRaw(keyBuf.data(), keyBuf.size());
+		return BigNumber(keyBuf);
+	});
 
 }
 
-static void SetMigrateData(Decent::Net::TlsCommLayer & tls){
-    using namespace EncFunc::Store;
+static void SetData(Decent::Net::TlsCommLayer & tls)
+{
+	std::array<uint8_t, DhtStates::sk_keySizeByte> keyBin{};
+	tls.ReceiveRaw(keyBin.data(), keyBin.size());
+	ConstBigNumber key(keyBin);
 
-    gs_state.GetDhtStore().RecvMigratingData(
-            [&tls](void* buffer, const size_t size) -> void
-            {
-                tls.ReceiveRaw(buffer, size);
-            },
-            [&tls]() -> BigNumber
-            {
-                std::array<uint8_t, DhtStates::sk_keySizeByte> keyBuf{};
-                tls.ReceiveRaw(keyBuf.data(), keyBuf.size());
-                return BigNumber(keyBuf);
-            });
+	std::vector<uint8_t> buffer;
+	tls.ReceiveMsg(buffer);
 
-}
-
-static void SetData(Decent::Net::TlsCommLayer & tls){
-
-    using namespace EncFunc::Store;
-
-    std::array<uint8_t, DhtStates::sk_keySizeByte> keyBin{};
-    tls.ReceiveRaw(keyBin.data(), keyBin.size());
-    BigNumber key = BigNumber(keyBin);
-
-    std::string buffer;
-    tls.ReceiveMsg(buffer);
-
-
-//    gs_state.GetDhtStore().SetValue(key, buffer);
-
+	gs_state.GetDhtStore().SetValue(key, std::move(buffer));
 }
 
 
-static void GetData(Decent::Net::TlsCommLayer & tls){
+static void GetData(Decent::Net::TlsCommLayer & tls)
+{
+	std::array<uint8_t, DhtStates::sk_keySizeByte> keyBin{};
+	tls.ReceiveRaw(keyBin.data(), keyBin.size());
+	BigNumber key = BigNumber(keyBin);
 
-    std::array<uint8_t, DhtStates::sk_keySizeByte> keyBin{};
-    tls.ReceiveRaw(keyBin.data(), keyBin.size());
-    BigNumber key = BigNumber(keyBin);
+	std::vector<uint8_t> buffer;
+	gs_state.GetDhtStore().GetValue(key, buffer);
 
-    std::string buffer;
-
-
-//    gs_state.GetDhtStore().GetValue(key, buffer);
-
-    tls.SendMsg(buffer);
-
+	tls.SendMsg(buffer);
 }
-
-
-
 
 extern "C" int ecall_decent_dht_proc_msg_from_dht(void* connection)
 {
@@ -112,8 +100,6 @@ extern "C" int ecall_decent_dht_proc_msg_from_dht(void* connection)
 	return false;
 }
 
-
-
 extern "C" int ecall_decent_dht_proc_msg_from_store(void* connection)
 {
 	if (!gs_state.GetDhtNode())
@@ -121,41 +107,65 @@ extern "C" int ecall_decent_dht_proc_msg_from_store(void* connection)
 		LOGW("Local DHT Node had not been initialized yet!");
 		return false;
 	}
-    using namespace EncFunc::Store;
+
+	using namespace EncFunc::Store;
 
 	std::shared_ptr<Decent::Ra::TlsConfig> tlsCfg = std::make_shared<Decent::Ra::TlsConfig>(AppNames::sk_decentDHT, gs_state, true);
 	Decent::Net::TlsCommLayer tls(connection, tlsCfg, true);
 
-    LOGI("Processing DHT queries...");
+	LOGI("Processing DHT store operations...");
 
-    NumType funcNum;
-    tls.ReceiveStruct(connection, funcNum); //1. Received function type.
+	NumType funcNum;
+	tls.ReceiveStruct(funcNum); //1. Received function type.
 
-    switch (funcNum)
-    {
+	switch (funcNum)
+	{
+	case k_getMigrateData:
+		GetMigrateData(tls);
+		break;
 
-        case k_getMigrateData:
-            GetMigrateData(connection, tls);
-            break;
+	case k_setMigrateData:
+		SetMigrateData(tls);
+		break;
 
-        case k_setMigrateData:
-            SetMigrateData(tls);
-            break;
+	default:
+		break;
+	}
 
-        case k_getData:
-            GetData(tls);
-            break;
+	return false;
+}
 
-        case k_setData:
-            SetData(tls);
-            break;
+extern "C" int ecall_decent_dht_proc_msg_from_app(void* connection)
+{
+	if (!gs_state.GetDhtNode())
+	{
+		LOGW("Local DHT Node had not been initialized yet!");
+		return false;
+	}
 
-        default:
-            break;
-    }
+	using namespace EncFunc::Store;
 
+	std::shared_ptr<Decent::Ra::TlsConfig> tlsCfg = std::make_shared<Decent::Ra::TlsConfig>(AppNames::sk_decentDHT, gs_state, true);
+	Decent::Net::TlsCommLayer tls(connection, tlsCfg, true);
 
-	//gs_state.GetDhtStore().RecvMigratingData()
+	LOGI("Processing DHT store operations...");
+
+	NumType funcNum;
+	tls.ReceiveStruct(funcNum); //1. Received function type.
+
+	switch (funcNum)
+	{
+	case k_getData:
+		GetData(tls);
+		break;
+
+	case k_setData:
+		SetData(tls);
+		break;
+
+	default:
+		break;
+	}
 
 	return false;
 }
