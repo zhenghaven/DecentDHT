@@ -50,12 +50,12 @@ int main(int argc, char ** argv)
 
 	{
 		static_assert(sizeof(FilledByteArray<32>::value) == 32, "The size of the filled array is unexpected. Probably the compiler doesn't support the implmentation.");
-		MbedTlsObj::BigNumber smallest(0LL, MbedTlsObj::sk_struct);
-		MbedTlsObj::BigNumber largest(FilledByteArray<32>::value, MbedTlsObj::sk_struct);
-		MbedTlsObj::BigNumber nodeId(0LL, MbedTlsObj::sk_struct);
+		MbedTlsObj::BigNumber smallest = 0;
+		MbedTlsObj::BigNumber largest(FilledByteArray<32>::value, true);
+		MbedTlsObj::BigNumber nodeId = 0;
 		std::shared_ptr<BigNumLocalNode> locNode = std::make_shared<BigNumLocalNode>(nodeId, 0LL, smallest, largest, pow2iArray);
 
-		locNode->FindSuccessor(MbedTlsObj::BigNumber(103LL, MbedTlsObj::sk_struct));
+		locNode->FindSuccessor(MbedTlsObj::BigNumber(103LL));
 	}
 
 	std::cout << "================ Decent DHT ================" << std::endl;
