@@ -9,7 +9,7 @@ namespace Decent
 		class FromDht : public Decent::Net::SmartMessages
 		{
 		public:
-			static constexpr char const sk_ValueCat[] = "FromDht";
+			static constexpr char const sk_ValueCat[] = "Dht::FromDht";
 
 		public:
 			FromDht() :
@@ -33,7 +33,7 @@ namespace Decent
 		class FromStore : public Decent::Net::SmartMessages
 		{
 		public:
-			static constexpr char const sk_ValueCat[] = "FromStore";
+			static constexpr char const sk_ValueCat[] = "Dht::FromStore";
 
 		public:
 			FromStore() :
@@ -45,6 +45,30 @@ namespace Decent
 			{}
 
 			~FromStore()
+			{}
+
+			virtual std::string GetMessageCategoryStr() const override { return sk_ValueCat; }
+
+		protected:
+			virtual Json::Value& GetJsonMsg(Json::Value& outJson) const override;
+
+		};
+
+		class FromApp : public Decent::Net::SmartMessages
+		{
+		public:
+			static constexpr char const sk_ValueCat[] = "Dht::FromApp";
+
+		public:
+			FromApp() :
+				SmartMessages()
+			{}
+
+			FromApp(const Json::Value& msg) :
+				SmartMessages(msg, sk_ValueCat)
+			{}
+
+			~FromApp()
 			{}
 
 			virtual std::string GetMessageCategoryStr() const override { return sk_ValueCat; }

@@ -12,8 +12,11 @@ enclave
 
 	trusted 
 	{
-		//public void ecall_decent_dht_init([in, string] const char* pay_info);
-		public int ecall_decent_dht_proc_msg_from_dht([user_check] void* connection);
+		public int  ecall_decent_dht_init(uint64_t self_addr, int is_first_node, uint64_t ex_addr);
+		public void ecall_decent_dht_deinit();
+		public int  ecall_decent_dht_proc_msg_from_dht([user_check] void* connection);
+		public int  ecall_decent_dht_proc_msg_from_store([user_check] void* connection);
+		public int  ecall_decent_dht_proc_msg_from_app([user_check] void* connection);
 	};
 	
 	untrusted

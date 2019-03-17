@@ -19,7 +19,6 @@
 #include <DecentApi/Common/Ra/WhiteList/HardCoded.h>
 #include <DecentApi/Common/MbedTls/BigNumber.h>
 
-#include "../Common/Dht/AppNames.h"
 #include "../Common_App/Tools.h"
 #include "../Common_App/Dht/DecentDhtApp.h"
 #include "../Common/Dht/CircularRange.h"
@@ -39,34 +38,17 @@ using namespace Decent::Ra::Message;
  */
 int main(int argc, char ** argv)
 {
-	typedef LocalNode<MbedTlsObj::BigNumber, 32, uint64_t> BigNumLocalNode;
-
-	std::shared_ptr<BigNumLocalNode::Pow2iArrayType > pow2iArray = std::make_shared<BigNumLocalNode::Pow2iArrayType >();
-	for (size_t i = 0; i < pow2iArray->size(); ++i)
-	{
-		(*pow2iArray)[i].SetBit(i, true);
-	}
-
-
-	{
-		static_assert(sizeof(FilledByteArray<32>::value) == 32, "The size of the filled array is unexpected. Probably the compiler doesn't support the implmentation.");
-		MbedTlsObj::BigNumber smallest = 0;
-		MbedTlsObj::BigNumber largest(FilledByteArray<32>::value, true);
-		MbedTlsObj::BigNumber nodeId = 0;
-		std::shared_ptr<BigNumLocalNode> locNode = std::make_shared<BigNumLocalNode>(nodeId, 0LL, smallest, largest, pow2iArray);
-
-		locNode->FindSuccessor(MbedTlsObj::BigNumber(103LL));
-	}
-
 	std::cout << "================ Decent DHT ================" << std::endl;
 
 	TCLAP::CmdLine cmd("Decent DHT", ' ', "ver", true);
 
 	TCLAP::ValueArg<std::string> configPathArg("c", "config", "Path to the configuration file.", false, "Config.json", "String");
 	TCLAP::ValueArg<std::string> wlKeyArg("w", "wl-key", "Key for the loaded whitelist.", false, "WhiteListKey", "String");
+	TCLAP::ValueArg<int> exNodePortNum("p", "ex-port", "Port number for existing node.", false, 0, "[0-65535]");
 	TCLAP::SwitchArg isSendWlArg("s", "not-send-wl", "Do not send whitelist to Decent Server.", true);
 	cmd.add(configPathArg);
 	cmd.add(wlKeyArg);
+	cmd.add(exNodePortNum);
 	cmd.add(isSendWlArg);
 
 	cmd.parse(argc, argv);
@@ -80,7 +62,7 @@ int main(int argc, char ** argv)
 	ConfigManager configManager(configJsonStr);
 
 	const ConfigItem& decentServerItem = configManager.GetItem(Ra::WhiteList::sk_nameDecentServer);
-	const ConfigItem& selfItem = configManager.GetItem(AppNames::sk_decentDHT);
+	const ConfigItem& selfItem = configManager.GetItem("DecentDHT");
 
 	uint32_t serverIp = boost::asio::ip::address_v4::from_string(decentServerItem.GetAddr()).to_uint();
 	std::unique_ptr<Net::Connection> serverCon;
@@ -93,11 +75,15 @@ int main(int argc, char ** argv)
 
 	serverCon = std::make_unique<Net::TCPConnection>(serverIp, decentServerItem.GetPort());
 
+	uint32_t selfIp = Net::TCPConnection::GetIpAddressFromStr(selfItem.GetAddr());
+	uint64_t selfFullAddr = Net::TCPConnection::CombineIpAndPort(selfIp, selfItem.GetPort());
+	uint64_t exNodeFullAddr = Net::TCPConnection::CombineIpAndPort(selfIp, static_cast<uint16_t>(exNodePortNum.getValue()));
+
 	std::shared_ptr<DecentDhtApp> enclave;
 	try
 	{
 		enclave = std::make_shared<DecentDhtApp>(
-			ENCLAVE_FILENAME, KnownFolderType::LocalAppDataEnclave, TOKEN_FILENAME, wlKeyArg.getValue(), *serverCon);
+			ENCLAVE_FILENAME, KnownFolderType::LocalAppDataEnclave, TOKEN_FILENAME, wlKeyArg.getValue(), *serverCon, selfFullAddr, exNodeFullAddr);
 	}
 	catch (const std::exception& e)
 	{
@@ -105,10 +91,9 @@ int main(int argc, char ** argv)
 		return -1;
 	}
 
-	Net::SmartServer smartServer;
-
-	uint32_t selfIp = boost::asio::ip::address_v4::from_string(selfItem.GetAddr()).to_uint();
 	std::unique_ptr<Net::Server> server(std::make_unique<Net::TCPServer>(selfIp, selfItem.GetPort()));
+
+	Net::SmartServer smartServer;
 
 	smartServer.AddServer(server, enclave);
 	smartServer.RunUtilUserTerminate();

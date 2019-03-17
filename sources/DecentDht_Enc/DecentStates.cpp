@@ -51,7 +51,7 @@ namespace
 
 	static EnclaveStore& GetDhtStore()
 	{
-		static EnclaveStore inst(0, MbedTlsObj::BigNumber(FilledByteArray<32>::value, true));
+		static EnclaveStore inst(0, MbedTlsObj::BigNumber(FilledByteArray<DhtStates::sk_keySizeByte>::value, true));
 
 		return inst;
 	}

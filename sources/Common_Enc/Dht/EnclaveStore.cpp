@@ -11,7 +11,6 @@
 
 #include "../../Common/Dht/LocalNode.h"
 #include "../../Common/Dht/FuncNums.h"
-#include "../../Common/Dht/AppNames.h"
 
 #include "ConnectionManager.h"
 #include "DhtStatesSingleton.h"

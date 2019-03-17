@@ -5,10 +5,9 @@
 #include <DecentApi/Common/Ra/TlsConfigAnyWhiteListed.h>
 #include <DecentApi/CommonEnclave/Ra/TlsConfigSameEnclave.h>
 
-#include "../../../Common/Dht/AppNames.h"
 #include "../../../Common/Dht/FuncNums.h"
+
 #include "../DhtStatesSingleton.h"
-#include "../EnclaveStore.h"
 
 using namespace Decent;
 using namespace Decent::Dht;
@@ -20,69 +19,29 @@ namespace
 	DhtStates& gs_state = Dht::GetDhtStatesSingleton();
 }
 
-static void GetMigrateData(Decent::Net::TlsCommLayer & tls)
+extern "C" int ecall_decent_dht_init(uint64_t self_addr, int is_first_node, uint64_t ex_addr)
 {
-    std::array<uint8_t, DhtStates::sk_keySizeByte> startKeyBin{};
-    tls.ReceiveRaw(startKeyBin.data(), startKeyBin.size());
-	ConstBigNumber start(startKeyBin);
-
-	std::array<uint8_t, DhtStates::sk_keySizeByte> endKeyBin{};
-    tls.ReceiveRaw(endKeyBin.data(), endKeyBin.size());
-	ConstBigNumber end(endKeyBin);
-
-	gs_state.GetDhtStore().SendMigratingData(
-		[&tls](void* buffer, const size_t size) -> void
+	try
 	{
-		tls.SendRaw(buffer, size);
-	},
-		[&tls](const BigNumber& key) -> void
+		Init(self_addr, is_first_node, ex_addr);
+	}
+	catch (const std::exception& e)
 	{
-		std::array<uint8_t, DhtStates::sk_keySizeByte> keyBuf{};
-		key.ToBinary(keyBuf);
-		tls.SendRaw(keyBuf.data(), keyBuf.size());
-	},
-		start, end);
+		PRINT_I("Failed to initialize DHT node. Error Message: %s.", e.what());
+		return false;
+	}
 }
 
-static void SetMigrateData(Decent::Net::TlsCommLayer & tls)
+extern "C" void ecall_decent_dht_deinit()
 {
-	gs_state.GetDhtStore().RecvMigratingData(
-		[&tls](void* buffer, const size_t size) -> void
+	try
 	{
-		tls.ReceiveRaw(buffer, size);
-	},
-		[&tls]() -> BigNumber
+		DeInit();
+	}
+	catch (const std::exception& e)
 	{
-		std::array<uint8_t, DhtStates::sk_keySizeByte> keyBuf{};
-		tls.ReceiveRaw(keyBuf.data(), keyBuf.size());
-		return BigNumber(keyBuf);
-	});
-
-}
-
-static void SetData(Decent::Net::TlsCommLayer & tls)
-{
-	std::array<uint8_t, DhtStates::sk_keySizeByte> keyBin{};
-	tls.ReceiveRaw(keyBin.data(), keyBin.size());
-	ConstBigNumber key(keyBin);
-
-	std::vector<uint8_t> buffer;
-	tls.ReceiveMsg(buffer);
-
-	gs_state.GetDhtStore().SetValue(key, std::move(buffer));
-}
-
-
-static void GetData(Decent::Net::TlsCommLayer & tls)
-{
-	std::array<uint8_t, DhtStates::sk_keySizeByte> keyBin{};
-	tls.ReceiveRaw(keyBin.data(), keyBin.size());
-	BigNumber key = BigNumber(keyBin);
-
-	std::vector<uint8_t> buffer;
-	gs_state.GetDhtStore().GetValue(key, buffer);
-
-	tls.SendMsg(buffer);
+		PRINT_I("Failed to de-initialize DHT node. Error Message: %s.", e.what());
+	}
 }
 
 extern "C" int ecall_decent_dht_proc_msg_from_dht(void* connection)
@@ -96,7 +55,7 @@ extern "C" int ecall_decent_dht_proc_msg_from_dht(void* connection)
 	std::shared_ptr<Ra::TlsConfigSameEnclave> tlsCfg = std::make_shared<Ra::TlsConfigSameEnclave>(gs_state, Ra::TlsConfig::Mode::ServerVerifyPeer);
 	Decent::Net::TlsCommLayer tls(connection, tlsCfg, true);
 
-	ProcessDhtQueries(connection, tls);
+	ProcessDhtQueries(tls);
 
 	return false;
 }
@@ -144,7 +103,7 @@ extern "C" int ecall_decent_dht_proc_msg_from_app(void* connection)
 		return false;
 	}
 
-	using namespace EncFunc::Store;
+	using namespace EncFunc::App;
 
 	std::shared_ptr<Ra::TlsConfigAnyWhiteListed> tlsCfg = std::make_shared<Ra::TlsConfigAnyWhiteListed>(gs_state, Ra::TlsConfig::Mode::ServerVerifyPeer);
 	Decent::Net::TlsCommLayer tls(connection, tlsCfg, true);
@@ -156,6 +115,10 @@ extern "C" int ecall_decent_dht_proc_msg_from_app(void* connection)
 
 	switch (funcNum)
 	{
+	case k_findSuccessor:
+		FindSuccessor(tls);
+		break;
+
 	case k_getData:
 		GetData(tls);
 		break;

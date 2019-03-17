@@ -27,3 +27,14 @@ Json::Value& FromStore::GetJsonMsg(Json::Value& outJson) const
 
 	return root;
 }
+
+constexpr char const FromApp::sk_ValueCat[];
+
+Json::Value& FromApp::GetJsonMsg(Json::Value& outJson) const
+{
+	Json::Value& root = SmartMessages::GetJsonMsg(outJson);
+
+	root = Json::nullValue;
+
+	return root;
+}

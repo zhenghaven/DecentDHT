@@ -2,7 +2,6 @@
 #include <DecentApi/CommonApp/Net/TCPConnection.h>
 #include <DecentApi/CommonApp/Tools/ConfigManager.h>
 
-#include "../../Common/Dht/AppNames.h"
 #include "Messages.h"
 
 using namespace Decent::Tools;

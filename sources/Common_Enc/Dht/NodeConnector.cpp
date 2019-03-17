@@ -6,7 +6,6 @@
 #include <DecentApi/CommonEnclave/Ra/TlsConfigSameEnclave.h>
 #include <DecentApi/CommonEnclave/Net/EnclaveNetConnector.h>
 
-#include "../../Common/Dht/AppNames.h"
 #include "../../Common/Dht/FuncNums.h"
 #include "DhtStatesSingleton.h"
 #include "ConnectionManager.h"

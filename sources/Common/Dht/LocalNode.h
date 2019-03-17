@@ -62,9 +62,6 @@ namespace Decent
 				GetImmediateSuccessor()->SetImmediatePredecessor(GetSelfPtr());
 
 				UpdateOthers();
-
-				//TODO:
-				//m_fingerTable.GetImmediateSuccessor()->MigrateData(m_localKeys, m_id, m_predcId);
 			}
 
 			/**
@@ -105,9 +102,6 @@ namespace Decent
 				GetImmediateSuccessor()->SetImmediatePredecessor(GetImmediatePredecessor());
 
 				DeUpdateOthers();
-
-				//TODO:
-				//GetImmediateSuccessor()->DeMigrateData(m_localKeys);
 			}
 
 			/** \brief	Called when this node is leaving the network. */
