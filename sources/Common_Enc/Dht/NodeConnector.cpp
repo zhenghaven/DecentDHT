@@ -2,8 +2,8 @@
 
 #include <DecentApi/Common/Common.h>
 #include <DecentApi/Common/make_unique.h>
-#include <DecentApi/Common/Ra/TlsConfig.h>
 #include <DecentApi/Common/Net/TlsCommLayer.h>
+#include <DecentApi/CommonEnclave/Ra/TlsConfigSameEnclave.h>
 #include <DecentApi/CommonEnclave/Net/EnclaveNetConnector.h>
 
 #include "../../Common/Dht/AppNames.h"
@@ -21,9 +21,9 @@ namespace
 {
 	DhtStates& gs_state = GetDhtStatesSingleton();
 
-	static std::shared_ptr<Ra::TlsConfig> GetClientTlsConfigDhtNode()
+	static std::shared_ptr<Ra::TlsConfigSameEnclave> GetClientTlsConfigDhtNode()
 	{
-		static std::shared_ptr<Ra::TlsConfig> tlsCfg = std::make_shared<Ra::TlsConfig>(AppNames::sk_decentDHT, gs_state, false);
+		static std::shared_ptr<Ra::TlsConfigSameEnclave> tlsCfg = std::make_shared<Ra::TlsConfigSameEnclave>(gs_state, Ra::TlsConfig::Mode::ClientHasCert);
 		return tlsCfg;
 	}
 }

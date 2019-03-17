@@ -1,8 +1,9 @@
 #include "../DhtServer.h"
 
 #include <DecentApi/Common/Common.h>
-#include <DecentApi/Common/Ra/TlsConfig.h>
 #include <DecentApi/Common/Net/TlsCommLayer.h>
+#include <DecentApi/Common/Ra/TlsConfigAnyWhiteListed.h>
+#include <DecentApi/CommonEnclave/Ra/TlsConfigSameEnclave.h>
 
 #include "../../../Common/Dht/AppNames.h"
 #include "../../../Common/Dht/FuncNums.h"
@@ -92,7 +93,7 @@ extern "C" int ecall_decent_dht_proc_msg_from_dht(void* connection)
 		return false;
 	}
 
-	std::shared_ptr<Decent::Ra::TlsConfig> tlsCfg = std::make_shared<Decent::Ra::TlsConfig>(AppNames::sk_decentDHT, gs_state, true);
+	std::shared_ptr<Ra::TlsConfigSameEnclave> tlsCfg = std::make_shared<Ra::TlsConfigSameEnclave>(gs_state, Ra::TlsConfig::Mode::ServerVerifyPeer);
 	Decent::Net::TlsCommLayer tls(connection, tlsCfg, true);
 
 	ProcessDhtQueries(connection, tls);
@@ -110,7 +111,7 @@ extern "C" int ecall_decent_dht_proc_msg_from_store(void* connection)
 
 	using namespace EncFunc::Store;
 
-	std::shared_ptr<Decent::Ra::TlsConfig> tlsCfg = std::make_shared<Decent::Ra::TlsConfig>(AppNames::sk_decentDHT, gs_state, true);
+	std::shared_ptr<Ra::TlsConfigSameEnclave> tlsCfg = std::make_shared<Ra::TlsConfigSameEnclave>(gs_state, Ra::TlsConfig::Mode::ServerVerifyPeer);
 	Decent::Net::TlsCommLayer tls(connection, tlsCfg, true);
 
 	LOGI("Processing DHT store operations...");
@@ -145,7 +146,7 @@ extern "C" int ecall_decent_dht_proc_msg_from_app(void* connection)
 
 	using namespace EncFunc::Store;
 
-	std::shared_ptr<Decent::Ra::TlsConfig> tlsCfg = std::make_shared<Decent::Ra::TlsConfig>(AppNames::sk_decentDHT, gs_state, true);
+	std::shared_ptr<Ra::TlsConfigAnyWhiteListed> tlsCfg = std::make_shared<Ra::TlsConfigAnyWhiteListed>(gs_state, Ra::TlsConfig::Mode::ServerVerifyPeer);
 	Decent::Net::TlsCommLayer tls(connection, tlsCfg, true);
 
 	LOGI("Processing DHT store operations...");
