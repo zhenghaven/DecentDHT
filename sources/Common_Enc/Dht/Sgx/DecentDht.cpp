@@ -52,10 +52,19 @@ extern "C" int ecall_decent_dht_proc_msg_from_dht(void* connection)
 		return false;
 	}
 
-	std::shared_ptr<Ra::TlsConfigSameEnclave> tlsCfg = std::make_shared<Ra::TlsConfigSameEnclave>(gs_state, Ra::TlsConfig::Mode::ServerVerifyPeer);
-	Decent::Net::TlsCommLayer tls(connection, tlsCfg, true);
+	LOGI("Processing message from DHT node...");
 
-	ProcessDhtQueries(tls);
+	try
+	{
+		std::shared_ptr<Ra::TlsConfigSameEnclave> tlsCfg = std::make_shared<Ra::TlsConfigSameEnclave>(gs_state, Ra::TlsConfig::Mode::ServerVerifyPeer);
+		Decent::Net::TlsCommLayer tls(connection, tlsCfg, true);
+
+		ProcessDhtQueries(tls);
+	}
+	catch (const std::exception& e)
+	{
+		PRINT_W("Failed to process message from DHT node.\nError message: %s.", e.what());
+	}
 
 	return false;
 }
@@ -70,26 +79,33 @@ extern "C" int ecall_decent_dht_proc_msg_from_store(void* connection)
 
 	using namespace EncFunc::Store;
 
-	std::shared_ptr<Ra::TlsConfigSameEnclave> tlsCfg = std::make_shared<Ra::TlsConfigSameEnclave>(gs_state, Ra::TlsConfig::Mode::ServerVerifyPeer);
-	Decent::Net::TlsCommLayer tls(connection, tlsCfg, true);
+	LOGI("Processing message from DHT store...");
 
-	LOGI("Processing DHT store operations...");
-
-	NumType funcNum;
-	tls.ReceiveStruct(funcNum); //1. Received function type.
-
-	switch (funcNum)
+	try
 	{
-	case k_getMigrateData:
-		GetMigrateData(tls);
-		break;
+		std::shared_ptr<Ra::TlsConfigSameEnclave> tlsCfg = std::make_shared<Ra::TlsConfigSameEnclave>(gs_state, Ra::TlsConfig::Mode::ServerVerifyPeer);
+		Decent::Net::TlsCommLayer tls(connection, tlsCfg, true);
 
-	case k_setMigrateData:
-		SetMigrateData(tls);
-		break;
+		NumType funcNum;
+		tls.ReceiveStruct(funcNum); //1. Received function type.
 
-	default:
-		break;
+		switch (funcNum)
+		{
+		case k_getMigrateData:
+			GetMigrateData(tls);
+			break;
+
+		case k_setMigrateData:
+			SetMigrateData(tls);
+			break;
+
+		default:
+			break;
+		}
+	}
+	catch (const std::exception& e)
+	{
+		PRINT_W("Failed to process message from DHT store.\nError message: %s.", e.what());
 	}
 
 	return false;
@@ -105,30 +121,37 @@ extern "C" int ecall_decent_dht_proc_msg_from_app(void* connection)
 
 	using namespace EncFunc::App;
 
-	std::shared_ptr<Ra::TlsConfigAnyWhiteListed> tlsCfg = std::make_shared<Ra::TlsConfigAnyWhiteListed>(gs_state, Ra::TlsConfig::Mode::ServerVerifyPeer);
-	Decent::Net::TlsCommLayer tls(connection, tlsCfg, true);
+	LOGI("Processing message from App...");
 
-	LOGI("Processing DHT store operations...");
-
-	NumType funcNum;
-	tls.ReceiveStruct(funcNum); //1. Received function type.
-
-	switch (funcNum)
+	try
 	{
-	case k_findSuccessor:
-		FindSuccessor(tls);
-		break;
+		std::shared_ptr<Ra::TlsConfigAnyWhiteListed> tlsCfg = std::make_shared<Ra::TlsConfigAnyWhiteListed>(gs_state, Ra::TlsConfig::Mode::ServerVerifyPeer);
+		Decent::Net::TlsCommLayer tls(connection, tlsCfg, true);
 
-	case k_getData:
-		GetData(tls);
-		break;
+		NumType funcNum;
+		tls.ReceiveStruct(funcNum); //1. Received function type.
 
-	case k_setData:
-		SetData(tls);
-		break;
+		switch (funcNum)
+		{
+		case k_findSuccessor:
+			FindSuccessor(tls);
+			break;
 
-	default:
-		break;
+		case k_getData:
+			GetData(tls);
+			break;
+
+		case k_setData:
+			SetData(tls);
+			break;
+
+		default:
+			break;
+		}
+	}
+	catch (const std::exception& e)
+	{
+		PRINT_W("Failed to process message from App.\nError message: %s.", e.what());
 	}
 
 	return false;
