@@ -161,16 +161,20 @@ void EnclaveStore::SaveData(MbedTlsObj::BigNumber&& key, std::vector<uint8_t>&& 
 {
 	using namespace Decent::Tools;
 
-	StoreBase::SaveData(std::forward<MbedTlsObj::BigNumber>(key), std::forward<std::vector<uint8_t> >(data));
+	std::string fileName = key.ToBigEndianHexStr();
+	LOGI("DHT store: adding key to the index. %s", fileName.c_str());
 
-	const std::string fileName = key.ToBigEndianHexStr();
+	StoreBase::SaveData(std::forward<MbedTlsObj::BigNumber>(key), std::forward<std::vector<uint8_t> >(data));
+	//NOTE: *Key* is not valid after this line!!!
+
+	LOGI("DHT store: writing value: %s", std::string(reinterpret_cast<const char*>(data.data()), data.size()).c_str());
 	
 	std::vector<uint8_t> meta;
 	GenSealKeyRecoverMeta(meta);
-
+	
 	General128BitKey sealKey;
 	DeriveSealKey(KeyPolicy::ByMrEnclave, gsk_storeSealKeyLabel, sealKey, meta);
-
+	
 	{
 		WritablePlainFile metaFile(fileName + ".meta", WritableFileBase::WritableMode::Write);
 		metaFile.WriteBlockExactSize(meta);

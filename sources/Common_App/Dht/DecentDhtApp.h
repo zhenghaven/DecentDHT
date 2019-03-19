@@ -9,9 +9,7 @@ namespace Decent
 		class DecentDhtApp : public Decent::RaSgx::DecentApp
 		{
 		public:
-			DecentDhtApp(const std::string& enclavePath, const std::string& tokenPath, const std::string& wListKey, Net::Connection& serverConn, uint64_t selfAddr, uint64_t exNodeAddr);
-			DecentDhtApp(const fs::path& enclavePath, const fs::path& tokenPath, const std::string& wListKey, Net::Connection& serverConn, uint64_t selfAddr, uint64_t exNodeAddr);
-			DecentDhtApp(const std::string& enclavePath, const Decent::Tools::KnownFolderType tokenLocType, const std::string& tokenFileName, const std::string& wListKey, Net::Connection& serverConn, uint64_t selfAddr, uint64_t exNodeAddr);
+			using DecentApp::DecentApp;
 
 			virtual ~DecentDhtApp();
 
@@ -23,8 +21,9 @@ namespace Decent
 
 			virtual bool ProcessSmartMessage(const std::string& category, const Json::Value& jsonMsg, Decent::Net::Connection& connection) override;
 
+			void InitDhtNode(uint64_t selfAddr, uint64_t exNodeAddr);
+
 		private:
-			void InitEnclave(uint64_t selfAddr, uint64_t exNodeAddr);
 		};
 	}
 }

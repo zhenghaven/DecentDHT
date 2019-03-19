@@ -77,13 +77,20 @@ int main(int argc, char ** argv)
 
 	uint32_t selfIp = Net::TCPConnection::GetIpAddressFromStr(selfItem.GetAddr());
 	uint64_t selfFullAddr = Net::TCPConnection::CombineIpAndPort(selfIp, selfItem.GetPort());
-	uint64_t exNodeFullAddr = Net::TCPConnection::CombineIpAndPort(selfIp, static_cast<uint16_t>(exNodePortNum.getValue()));
+	uint64_t exNodeFullAddr = exNodePortNum.getValue() == 0 ? 0 : Net::TCPConnection::CombineIpAndPort(selfIp, static_cast<uint16_t>(exNodePortNum.getValue()));
+
+	Net::SmartServer smartServer;
+	std::unique_ptr<Net::Server> server(std::make_unique<Net::TCPServer>(selfIp, selfItem.GetPort()));
 
 	std::shared_ptr<DecentDhtApp> enclave;
 	try
 	{
 		enclave = std::make_shared<DecentDhtApp>(
-			ENCLAVE_FILENAME, KnownFolderType::LocalAppDataEnclave, TOKEN_FILENAME, wlKeyArg.getValue(), *serverCon, selfFullAddr, exNodeFullAddr);
+			ENCLAVE_FILENAME, KnownFolderType::LocalAppDataEnclave, TOKEN_FILENAME, wlKeyArg.getValue(), *serverCon);
+
+		smartServer.AddServer(server, enclave);
+
+		enclave->InitDhtNode(selfFullAddr, exNodeFullAddr);
 	}
 	catch (const std::exception& e)
 	{
@@ -91,11 +98,6 @@ int main(int argc, char ** argv)
 		return -1;
 	}
 
-	std::unique_ptr<Net::Server> server(std::make_unique<Net::TCPServer>(selfIp, selfItem.GetPort()));
-
-	Net::SmartServer smartServer;
-
-	smartServer.AddServer(server, enclave);
 	smartServer.RunUtilUserTerminate();
 
 

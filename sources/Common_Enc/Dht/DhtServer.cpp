@@ -20,10 +20,13 @@ using namespace Decent::MbedTlsObj;
 namespace
 {
 	DhtStates& gs_state = Dht::GetDhtStatesSingleton();
+
+	static char gsk_ack[] = "ACK";
 }
 
 void Dht::DeUpdateFingerTable(Decent::Net::TlsCommLayer &tls)
 {
+	//LOGI("DHT Server: De-Updating FingerTable...");
 	std::array<uint8_t, DhtStates::sk_keySizeByte> oldIdBin{};
 	uint64_t i;
 
@@ -31,96 +34,113 @@ void Dht::DeUpdateFingerTable(Decent::Net::TlsCommLayer &tls)
 
 	DhtStates::DhtLocalNodeType::NodeBasePtr s = NodeConnector::ReceiveNode(tls); //3. Receive node.
 	tls.ReceiveStruct(i); //3. Receive i. - Done!
+	PRINT_I("De-updating finger table; i = %llu.", i);
 
 	DhtStates::DhtLocalNodePtrType localNode = gs_state.GetDhtNode();
 
 	localNode->DeUpdateFingerTable(ConstBigNumber(oldIdBin), s, i);
+
+	tls.SendStruct(gsk_ack);
+	//LOGI("");
 }
 
 void Dht::UpdateFingerTable(Decent::Net::TlsCommLayer &tls)
 {
+	//LOGI("DHT Server: Updating FingerTable...");
 	DhtStates::DhtLocalNodeType::NodeBasePtr s = NodeConnector::ReceiveNode(tls); //2. Receive node.
 
 	uint64_t i;
 	tls.ReceiveStruct(i); //3. Receive i. - Done!
+	PRINT_I("Updating finger table; i = %llu.", i);
 
 	DhtStates::DhtLocalNodePtrType localNode = gs_state.GetDhtNode();
 
 	localNode->UpdateFingerTable(s, i);
+
+	tls.SendStruct(gsk_ack);
+	//LOGI("");
 }
 
 void Dht::GetImmediatePredecessor(Decent::Net::TlsCommLayer &tls)
 {
-	LOGI("Getting Immediate Predecessor...");
+	//LOGI("DHT Server: Getting Immediate Predecessor...");
 
 	DhtStates::DhtLocalNodePtrType localNode = gs_state.GetDhtNode();
 
 	NodeConnector::SendNode(tls, localNode->GetImmediatePredecessor()); //2. Send Node. - Done!
+	//LOGI("");
 }
 
 void Dht::SetImmediatePredecessor(Decent::Net::TlsCommLayer &tls)
 {
-	LOGI("Setting Immediate Predecessor...");
+	//LOGI("DHT Server: Setting Immediate Predecessor...");
 
 	DhtStates::DhtLocalNodePtrType localNode = gs_state.GetDhtNode();
 
 	localNode->SetImmediatePredecessor(NodeConnector::ReceiveNode(tls)); //2. Receive Node. - Done!
+
+	tls.SendStruct(gsk_ack);
+	//LOGI("");
 }
 
 void Dht::GetImmediateSucessor(Decent::Net::TlsCommLayer &tls)
 {
-    LOGI("Finding Immediate Successor...");
+    //LOGI("DHT Server: Finding Immediate Successor...");
 
     DhtStates::DhtLocalNodePtrType localNode = gs_state.GetDhtNode();
 
 	NodeConnector::SendNode(tls, localNode->GetImmediateSuccessor()); //2. Send Node. - Done!
+	//LOGI("");
 }
 
 void Dht::GetNodeId(Decent::Net::TlsCommLayer &tls)
 {
-    LOGI("Getting the NodeId...");
+    //LOGI("DHT Server: Getting the NodeId...");
 	DhtStates::DhtLocalNodePtrType localNode = gs_state.GetDhtNode();
     std::array<uint8_t, DhtStates::sk_keySizeByte> keyBin{};
     localNode->GetNodeId().ToBinary(keyBin);
 
     tls.SendRaw(keyBin.data(), keyBin.size()); //2. Sent nodeId ID
 
-    LOGI("Sent result ID: %s.", localNode->GetNodeId().ToBigEndianHexStr().c_str());
+    //LOGI("Sent result ID: %s.", localNode->GetNodeId().ToBigEndianHexStr().c_str());
+	//LOGI("");
 }
 
 void Dht::FindPredecessor(Decent::Net::TlsCommLayer &tls)
 {
-    LOGI("Finding Predecessor...");
+    //LOGI("DHT Server: Finding Predecessor...");
     std::array<uint8_t, DhtStates::sk_keySizeByte> keyBin{};
     tls.ReceiveRaw(keyBin.data(), keyBin.size()); //2. Received queried ID
 
     ConstBigNumber queriedId(keyBin);
-    LOGI("Recv queried ID: %s.", static_cast<const BigNumber&>(queriedId).ToBigEndianHexStr().c_str());
+    //LOGI("Recv queried ID: %s.", static_cast<const BigNumber&>(queriedId).ToBigEndianHexStr().c_str());
 
 	DhtStates::DhtLocalNodePtrType localNode = gs_state.GetDhtNode();
 
 	NodeConnector::SendNode(tls, localNode->FindPredecessor(queriedId)); //3. Send Node. - Done!
+	//LOGI("");
 }
 
 void Dht::FindSuccessor(Decent::Net::TlsCommLayer &tls)
 {
-	LOGI("Finding Successor...");
+	//LOGI("DHT Server: Finding Successor...");
 	std::array<uint8_t, DhtStates::sk_keySizeByte> keyBin{};
 	tls.ReceiveRaw(keyBin.data(), keyBin.size()); //2. Received queried ID
 
 	ConstBigNumber queriedId(keyBin);
-	LOGI("Recv queried ID: %s.", static_cast<const BigNumber&>(queriedId).ToBigEndianHexStr().c_str());
+	//LOGI("Recv queried ID: %s.", static_cast<const BigNumber&>(queriedId).ToBigEndianHexStr().c_str());
 
 	DhtStates::DhtLocalNodePtrType localNode = gs_state.GetDhtNode();
 
 	NodeConnector::SendNode(tls, localNode->FindSuccessor(queriedId)); //3. Send Node. - Done!
+	//LOGI("");
 }
 
 void Dht::ProcessDhtQueries(Decent::Net::TlsCommLayer & tls)
 {
 	using namespace EncFunc::Dht;
 
-	LOGI("Processing DHT queries...");
+	//LOGI("DHT Server: Processing DHT queries...");
 
 	NumType funcNum;
 	tls.ReceiveStruct(funcNum); //1. Received function type.
@@ -210,17 +230,23 @@ void Dht::SetData(Decent::Net::TlsCommLayer & tls)
 	tls.ReceiveRaw(keyBin.data(), keyBin.size());
 	ConstBigNumber key(keyBin);
 
+	//LOGI("Setting data for key %s.", key.Get().ToBigEndianHexStr().c_str());
+
 	std::vector<uint8_t> buffer;
 	tls.ReceiveMsg(buffer);
 
 	gs_state.GetDhtStore().SetValue(key, std::move(buffer));
+
+	tls.SendStruct(gsk_ack);
 }
 
 void Dht::GetData(Decent::Net::TlsCommLayer & tls)
 {
 	std::array<uint8_t, DhtStates::sk_keySizeByte> keyBin{};
 	tls.ReceiveRaw(keyBin.data(), keyBin.size());
-	BigNumber key = BigNumber(keyBin);
+	ConstBigNumber key(keyBin);
+
+	//LOGI("Getting data for key %s.", key.Get().ToBigEndianHexStr().c_str());
 
 	std::vector<uint8_t> buffer;
 	gs_state.GetDhtStore().GetValue(key, buffer);
@@ -238,21 +264,24 @@ void Dht::Init(uint64_t selfAddr, int isFirstNode, uint64_t exAddr)
 
 	BigNumber selfId = BigNumber::Rand(DhtStates::sk_keySizeByte); //For testing purpose, we use random ID.
 
-	MbedTlsObj::BigNumber largest(FilledByteArray<DhtStates::sk_keySizeByte>::value, true);
+	std::array<uint8_t, DhtStates::sk_keySizeByte> filledArray;
+	memset_s(filledArray.data(), filledArray.size(), 0xFF, filledArray.size());
+	MbedTlsObj::ConstBigNumber largest(filledArray);
 
+	PRINT_I("Self Node ID: %s.", selfId.ToBigEndianHexStr().c_str());
 	DhtStates::DhtLocalNodePtrType dhtNode = std::make_shared<DhtStates::DhtLocalNodeType>(selfId, selfAddr, 0, largest, pow2iArray);
+
+	gs_state.GetDhtNode() = dhtNode;
 
 	if (!isFirstNode)
 	{
 		NodeConnector nodeCnt(exAddr);
 		dhtNode->Join(nodeCnt);
+
+		uint64_t succAddr = dhtNode->GetImmediateSuccessor()->GetAddress();
+		const BigNumber& predId = dhtNode->GetImmediatePredecessor()->GetNodeId();
+		gs_state.GetDhtStore().MigrateFrom(succAddr, selfId, predId);
 	}
-
-	uint64_t succAddr = dhtNode->GetImmediateSuccessor()->GetAddress();
-	const BigNumber& predId = dhtNode->GetImmediatePredecessor()->GetNodeId();
-	gs_state.GetDhtStore().MigrateFrom(succAddr, selfId, predId);
-
-	gs_state.GetDhtNode() = dhtNode;
 }
 
 void Dht::DeInit()
@@ -260,5 +289,8 @@ void Dht::DeInit()
 	DhtStates::DhtLocalNodePtrType dhtNode = gs_state.GetDhtNode();
 	uint64_t succAddr = dhtNode->GetImmediateSuccessor()->GetAddress();
 	dhtNode->Leave();
-	gs_state.GetDhtStore().MigrateTo(succAddr);
+	if (dhtNode->GetAddress() != succAddr)
+	{
+		gs_state.GetDhtStore().MigrateTo(succAddr);
+	}
 }

@@ -14,24 +14,6 @@ extern "C" sgx_status_t ecall_decent_dht_proc_msg_from_app(sgx_enclave_id_t eid,
 using namespace Decent::Net;
 using namespace Decent::Dht;
 
-DecentDhtApp::DecentDhtApp(const std::string & enclavePath, const std::string & tokenPath, const std::string & wListKey, Connection & serverConn, uint64_t selfAddr, uint64_t exNodeAddr) :
-	DecentApp(enclavePath, tokenPath, wListKey, serverConn)
-{
-	InitEnclave(selfAddr, exNodeAddr);
-}
-
-DecentDhtApp::DecentDhtApp(const fs::path & enclavePath, const fs::path & tokenPath, const std::string & wListKey, Connection & serverConn, uint64_t selfAddr, uint64_t exNodeAddr) :
-	DecentApp(enclavePath, tokenPath, wListKey, serverConn)
-{
-	InitEnclave(selfAddr, exNodeAddr);
-}
-
-DecentDhtApp::DecentDhtApp(const std::string & enclavePath, const Decent::Tools::KnownFolderType tokenLocType, const std::string & tokenFileName, const std::string & wListKey, Connection & serverConn, uint64_t selfAddr, uint64_t exNodeAddr) :
-	DecentApp(enclavePath, tokenLocType, tokenFileName, wListKey, serverConn)
-{
-	InitEnclave(selfAddr, exNodeAddr);
-}
-
 Decent::Dht::DecentDhtApp::~DecentDhtApp()
 {
 	ecall_decent_dht_deinit(GetEnclaveId());
@@ -87,7 +69,7 @@ bool DecentDhtApp::ProcessSmartMessage(const std::string & category, const Json:
 	}
 }
 
-void DecentDhtApp::InitEnclave(uint64_t selfAddr, uint64_t exNodeAddr)
+void DecentDhtApp::InitDhtNode(uint64_t selfAddr, uint64_t exNodeAddr)
 {
 	int retValue = false;
 

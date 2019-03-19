@@ -8,7 +8,6 @@
 #include <DecentApi/Common/Ra/WhiteList/HardCoded.h>
 #include <DecentApi/Common/Ra/WhiteList/DecentServer.h>
 
-#include "../Common/Dht/CircularRange.h"
 #include "../Common_Enc/Dht/DhtStates.h"
 #include "../Common_Enc/Dht/EnclaveStore.h"
 #include "../Common_Enc/Dht/DhtStatesSingleton.h"
@@ -49,9 +48,16 @@ namespace
 		return inst;
 	}
 
+	static std::array<uint8_t, DhtStates::sk_keySizeByte> GetFilledArray()
+	{
+		std::array<uint8_t, DhtStates::sk_keySizeByte> filledArray;
+		memset_s(filledArray.data(), filledArray.size(), 0xFF, filledArray.size());
+		return filledArray;
+	}
+
 	static EnclaveStore& GetDhtStore()
 	{
-		static EnclaveStore inst(0, MbedTlsObj::BigNumber(FilledByteArray<DhtStates::sk_keySizeByte>::value, true));
+		static EnclaveStore inst(0, MbedTlsObj::ConstBigNumber(GetFilledArray()));
 
 		return inst;
 	}

@@ -163,7 +163,6 @@ namespace Decent
 			{
 				m_tableRecords[0].m_node = exNode.FindSuccessor(m_tableRecords[0].m_startId);
 				m_predecessor = m_tableRecords[0].m_node->GetImmediatePredecessor();
-				//outSucc = m_tableRecords[0].m_node;
 				for (size_t i = 0; i < (m_tableRecords.size() - 1); ++i)
 				{
 					if (m_cirRange.IsWithinCN(m_tableRecords[i + 1].m_startId, m_nodeId, m_tableRecords[i].m_node->GetNodeId()))
@@ -188,7 +187,8 @@ namespace Decent
 			 */
 			bool UpdateFingerTable(NodeBasePtr& succ, size_t i)
 			{
-				if (m_cirRange.IsWithinCN(succ->GetNodeId(), m_tableRecords[i].m_startId, m_tableRecords[i].m_node->GetNodeId(), false))
+				const IdType& nodeIthId = m_tableRecords[i].m_node ? m_tableRecords[i].m_node->GetNodeId() : m_nodeId;
+				if (m_cirRange.IsWithinCN(succ->GetNodeId(), m_tableRecords[i].m_startId, nodeIthId, false))
 				{
 					m_tableRecords[i].m_node = succ;
 					return true;
@@ -208,7 +208,8 @@ namespace Decent
 			 */
 			bool DeUpdateFingerTable(const IdType& oldId, NodeBasePtr& succ, size_t i)
 			{
-				if (m_tableRecords[i].m_node->GetNodeId() == oldId)
+				const IdType& nodeIthId = m_tableRecords[i].m_node ? m_tableRecords[i].m_node->GetNodeId() : m_nodeId;
+				if (nodeIthId == oldId)
 				{
 					m_tableRecords[i].m_node = succ;
 					return true;

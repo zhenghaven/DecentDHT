@@ -14,41 +14,6 @@ namespace Decent
 {
 	namespace Dht
 	{
-		namespace detail
-		{
-			constexpr uint8_t FillFull(const size_t index)
-			{
-				return 0xFF;
-			}
-
-			template<size_t N, size_t... Rest>
-			struct Array_impl
-			{
-				static constexpr auto& value = Array_impl<N - 1, N, Rest...>::value;
-			};
-
-			template<size_t... Rest>
-			struct Array_impl<0, Rest...>
-			{
-				static constexpr const uint8_t value[] = { FillFull(0), FillFull(Rest)... };
-			};
-
-			template<size_t... Rest>
-			constexpr const uint8_t Array_impl<0, Rest...>::value[];
-		}
-
-		template<size_t N>
-		struct FilledByteArray
-		{
-			static_assert(N >= 1, "N must be at least 1");
-
-			static constexpr const uint8_t(&value)[N] = detail::Array_impl<N - 1>::value;
-
-			FilledByteArray() = delete;
-			FilledByteArray(const FilledByteArray&) = delete;
-			FilledByteArray(FilledByteArray&&) = delete;
-		};
-
 		/**
 		* \class CircularRange
 		* \brief A clockwise circular range.
@@ -61,11 +26,35 @@ namespace Decent
 			const ValType& m_circleEnd;
 
 			/**
-			 * \brief	A helper function to check if a value is within a range.
+			 * \brief	A helper function to check if a value is within the range of [start, end].
 			 */
-			static constexpr bool Range(const ValType& v, const ValType& start, const ValType& end)
+			static constexpr bool RangeCC(const ValType& v, const ValType& start, const ValType& end)
 			{
 				return start <= v && v <= end;
+			}
+
+			/**
+			 * \brief	A helper function to check if a value is within the range of (start, end).
+			 */
+			static constexpr bool RangeNN(const ValType& v, const ValType& start, const ValType& end)
+			{
+				return start < v && v < end;
+			}
+
+			/**
+			 * \brief	A helper function to check if a value is within the range of [start, end).
+			 */
+			static constexpr bool RangeCN(const ValType& v, const ValType& start, const ValType& end)
+			{
+				return start <= v && v < end;
+			}
+
+			/**
+			 * \brief	A helper function to check if a value is within the range of (start, end].
+			 */
+			static constexpr bool RangeNC(const ValType& v, const ValType& start, const ValType& end)
+			{
+				return start < v && v <= end;
 			}
 
 			/**
@@ -81,7 +70,7 @@ namespace Decent
 			*/
 			bool CircularRangeNN(const ValType& v, const ValType& start, const ValType& end) const
 			{
-				return Range(v, start, m_circleEnd) || Range(v, m_circleStart, end);
+				return RangeNC(v, start, m_circleEnd) || RangeCN(v, m_circleStart, end);
 			}
 
 			/**
@@ -107,7 +96,7 @@ namespace Decent
 			*/
 			bool IsOnCircle(const ValType& v) const
 			{
-				return Range(v, m_circleStart, m_circleEnd);
+				return RangeCC(v, m_circleStart, m_circleEnd);
 			}
 
 			/**
@@ -139,7 +128,7 @@ namespace Decent
 				//Invalid case: 'start' or 'end' is out of circle range, or v is not on the circle.
 				return (!CheckTestingRangeNN(start, end) || !IsOnCircle(v)) ? (throw std::logic_error("Testing range is outside of the circle!")) : //Make sure the testing range is valid.
 					(start == end ? comCircleSEE && (v != start) : //CASE 1: A complete circle
-					(start < end ? Range(v, start, end) : //CASE 2: A simple range
+					(start < end ? RangeNN(v, start, end) : //CASE 2: A simple range
 						(CircularRangeNN(v, start, end)) //CASE 3: A circular range
 						));
 			}

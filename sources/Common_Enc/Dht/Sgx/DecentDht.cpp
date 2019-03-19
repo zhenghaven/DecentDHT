@@ -30,6 +30,7 @@ extern "C" int ecall_decent_dht_init(uint64_t self_addr, int is_first_node, uint
 		PRINT_I("Failed to initialize DHT node. Error Message: %s.", e.what());
 		return false;
 	}
+	return true;
 }
 
 extern "C" void ecall_decent_dht_deinit()
@@ -52,7 +53,7 @@ extern "C" int ecall_decent_dht_proc_msg_from_dht(void* connection)
 		return false;
 	}
 
-	LOGI("Processing message from DHT node...");
+	//LOGI("Processing message from DHT node...");
 
 	try
 	{
@@ -79,7 +80,7 @@ extern "C" int ecall_decent_dht_proc_msg_from_store(void* connection)
 
 	using namespace EncFunc::Store;
 
-	LOGI("Processing message from DHT store...");
+	//LOGI("Processing message from DHT store...");
 
 	try
 	{

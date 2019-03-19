@@ -4,7 +4,7 @@ using namespace Decent::Ra::WhiteList;
 
 HardCoded::HardCoded() :
 	StaticTypeList(WhiteListType({
-		std::make_pair("oAOdvFKiux89iqcybpLkXly7oAZIvsfeGxh8QqAwT6k=", sk_nameDecentServer)
+		std::make_pair("3g1NYpHp/qwf+eXnb6Mx6xhyY75LDnHKD+YcadAMIN0=", sk_nameDecentServer)
 		}))
 {
 }
