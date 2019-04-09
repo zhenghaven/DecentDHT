@@ -21,8 +21,8 @@ namespace Decent
 			typedef std::shared_ptr<DhtLocalNodeType> DhtLocalNodePtrType;
 
 		public:
-			DhtStates(Ra::AppCertContainer & certCntnr, Ra::KeyContainer & keyCntnr, Ra::WhiteList::DecentServer & serverWl, const Ra::WhiteList::HardCoded & hardCodedWl, GetLoadedWlFunc getLoadedFunc, EnclaveStore& dhtStore) :
-				AppStates(certCntnr, keyCntnr, serverWl, hardCodedWl, getLoadedFunc),
+			DhtStates(Ra::AppCertContainer & certCntnr, Ra::KeyContainer & keyCntnr, Ra::WhiteList::DecentServer & serverWl, GetLoadedWlFunc getLoadedFunc, EnclaveStore& dhtStore) :
+				AppStates(certCntnr, keyCntnr, serverWl, getLoadedFunc),
 				m_dhtNode(),
 				m_dhtStore(dhtStore)
 			{}

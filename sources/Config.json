@@ -1,15 +1,21 @@
 {
-	"DecentServer" : 
+	"_comment_01" : "A configuration file for Decent DHT", 
+	
+	"Enclaves" :
 	{
-		"Address" : "127.0.0.1", 
-		"Port" : 57755, 
-		"LoadedWhiteList" : false
-	}, 
-	"DecentDHT" : 
-	{
-		"Address" : "127.0.0.1", 
-		"Port" : 57756, 
-		"LoadedWhiteList" : true, 
-		"Hash" : "DecentDHT"
+		"DecentServer" : 
+		{
+			"Address" : "127.0.0.1", 
+			"Port" : 57755, 
+			"LoadedWhiteList" : true, 
+			"Hash" : "DecentServer"
+		}, 
+		"DecentDHT" : 
+		{
+			"Address" : "127.0.0.1", 
+			"Port" : 57756, 
+			"LoadedWhiteList" : true, 
+			"Hash" : "DecentDHT"
+		}
 	}
 }

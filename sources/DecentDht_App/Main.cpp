@@ -16,7 +16,7 @@
 #include <DecentApi/CommonApp/Tools/ConfigManager.h>
 
 #include <DecentApi/Common/Common.h>
-#include <DecentApi/Common/Ra/WhiteList/HardCoded.h>
+#include <DecentApi/Common/Ra/WhiteList/WhiteList.h>
 #include <DecentApi/Common/MbedTls/BigNumber.h>
 
 #include "../Common_App/Tools.h"

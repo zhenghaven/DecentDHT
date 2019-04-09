@@ -5,7 +5,6 @@
 #include <DecentApi/DecentAppEnclave/AppCertContainer.h>
 #include <DecentApi/Common/Ra/KeyContainer.h>
 #include <DecentApi/Common/Ra/WhiteList/Loaded.h>
-#include <DecentApi/Common/Ra/WhiteList/HardCoded.h>
 #include <DecentApi/Common/Ra/WhiteList/DecentServer.h>
 
 #include "../Common_Enc/Dht/DhtStates.h"
@@ -36,12 +35,6 @@ namespace
 		return inst;
 	}
 
-	static const WhiteList::HardCoded& GetHardCodedWhiteList()
-	{
-		static const WhiteList::HardCoded inst;
-		return inst;
-	}
-
 	static const WhiteList::Loaded& GetLoadedWhiteListImpl(WhiteList::Loaded* instPtr)
 	{
 		static const WhiteList::Loaded inst(instPtr);
@@ -65,7 +58,7 @@ namespace
 
 DhtStates& Decent::Dht::GetDhtStatesSingleton()
 {
-	static DhtStates state(GetCertContainer(), GetKeyContainer(), GetServerWhiteList(), GetHardCodedWhiteList(), &GetLoadedWhiteListImpl, GetDhtStore());
+	static DhtStates state(GetCertContainer(), GetKeyContainer(), GetServerWhiteList(), &GetLoadedWhiteListImpl, GetDhtStore());
 
 	return state;
 }
