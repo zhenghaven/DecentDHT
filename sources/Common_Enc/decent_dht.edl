@@ -14,14 +14,14 @@ enclave
 	{
 		public int  ecall_decent_dht_init(uint64_t self_addr, int is_first_node, uint64_t ex_addr);
 		public void ecall_decent_dht_deinit();
-		public int  ecall_decent_dht_proc_msg_from_dht([user_check] void* connection);
-		public int  ecall_decent_dht_proc_msg_from_store([user_check] void* connection);
-		public int  ecall_decent_dht_proc_msg_from_app([user_check] void* connection);
+		public int  ecall_decent_dht_proc_msg_from_dht([user_check] void* connection) transition_using_threads;
+		public int  ecall_decent_dht_proc_msg_from_store([user_check] void* connection) transition_using_threads;
+		public int  ecall_decent_dht_proc_msg_from_app([user_check] void* connection) transition_using_threads;
 	};
 	
 	untrusted
 	{
-		void ocall_decent_dht_cnt_mgr_get_dht([out] void** out_cnt_ptr, uint64_t address);
-		void ocall_decent_dht_cnt_mgr_get_store([out] void** out_cnt_ptr, uint64_t address);
+		void ocall_decent_dht_cnt_mgr_get_dht([out] void** out_cnt_ptr, uint64_t address) transition_using_threads;
+		void ocall_decent_dht_cnt_mgr_get_store([out] void** out_cnt_ptr, uint64_t address) transition_using_threads;
 	};
 };
