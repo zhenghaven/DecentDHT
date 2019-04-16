@@ -340,6 +340,7 @@ foreach(Proj_Name IN ITEMS ${Enc_Proj_Name_List})
 		IntelSGX::SDK_Trusted_key_exchange 
 		IntelSGX::SDK_Trusted_crypto 
 		IntelSGX::SDK_Trusted_file_system 
+		IntelSGX::Trusted::switchless 
 		DecentRa_App_Enclave 
 		mbedcrypto_enclave 
 		mbedx509_enclave 
