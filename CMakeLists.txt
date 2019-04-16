@@ -331,15 +331,15 @@ foreach(Proj_Name IN ITEMS ${Enc_Proj_Name_List})
 
 	target_link_libraries(${Proj_Name}_Enclave 
 		${WHOLE_ARCHIVE_FLAG_BEGIN} 
-		IntelSGX::SDK_Trusted_Whole_lib 
+		IntelSGX::Trusted::rts 
 		${WHOLE_ARCHIVE_FLAG_END}
 		${GROUP_FLAG_BEGIN}
-		IntelSGX::SDK_Trusted_stdc 
-		IntelSGX::SDK_Trusted_cxx 
-		IntelSGX::SDK_Trusted_service 
-		IntelSGX::SDK_Trusted_key_exchange 
-		IntelSGX::SDK_Trusted_crypto 
-		IntelSGX::SDK_Trusted_file_system 
+		IntelSGX::Trusted::stdc 
+		IntelSGX::Trusted::cxx 
+		IntelSGX::Trusted::service 
+		IntelSGX::Trusted::key_exchange 
+		IntelSGX::Trusted::crypto 
+		IntelSGX::Trusted::file_system 
 		IntelSGX::Trusted::switchless 
 		DecentRa_App_Enclave 
 		mbedcrypto_enclave 
@@ -367,8 +367,7 @@ foreach(Proj_Name IN ITEMS ${Enc_Proj_Name_List})
 
 	target_link_libraries(${Proj_Name}_App 
 		${COMMON_STANDARD_LIBRARIES} 
-		IntelSGX::SDK_Untrusted
-		IntelSGX::SDK_Untrusted_file_system
+		IntelSGX::Untrusted::Libs
 		DecentRa_App_App 
 		jsoncpp_lib_static 
 		mbedcrypto 
