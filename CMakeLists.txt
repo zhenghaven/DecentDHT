@@ -331,6 +331,7 @@ foreach(Proj_Name IN ITEMS ${Enc_Proj_Name_List})
 
 	target_link_libraries(${Proj_Name}_Enclave 
 		${WHOLE_ARCHIVE_FLAG_BEGIN} 
+		IntelSGX::Trusted::switchless 
 		IntelSGX::Trusted::rts 
 		${WHOLE_ARCHIVE_FLAG_END}
 		${GROUP_FLAG_BEGIN}
@@ -340,7 +341,6 @@ foreach(Proj_Name IN ITEMS ${Enc_Proj_Name_List})
 		IntelSGX::Trusted::key_exchange 
 		IntelSGX::Trusted::crypto 
 		IntelSGX::Trusted::file_system 
-		IntelSGX::Trusted::switchless 
 		DecentRa_App_Enclave 
 		mbedcrypto_enclave 
 		mbedx509_enclave 
