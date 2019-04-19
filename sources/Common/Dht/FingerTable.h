@@ -88,11 +88,6 @@ namespace Decent
 					m_tableRecords.push_back(FingerTableRecord<IdType, AddrType>(prevEndId, nextEndId));
 					prevEndId = std::move(nextEndId);
 				}
-
-				//for (size_t i = 0; i < KeySizeByte * BITS_PER_BYTE; ++i)
-				//{
-				//	LOGI("%s | %s ", m_tableRecords[i].m_startId.ToBigEndianHexStr().c_str(), m_tableRecords[i].m_endId.ToBigEndianHexStr().c_str());
-				//}
 			}
 
 			/**
@@ -191,6 +186,7 @@ namespace Decent
 				if (m_cirRange.IsWithinCN(succ->GetNodeId(), m_tableRecords[i].m_startId, nodeIthId, false))
 				{
 					m_tableRecords[i].m_node = succ;
+					PrintTable();
 					return true;
 				}
 				return false;
@@ -212,9 +208,19 @@ namespace Decent
 				if (nodeIthId == oldId)
 				{
 					m_tableRecords[i].m_node = succ;
+					PrintTable();
 					return true;
 				}
 				return false;
+			}
+
+			void PrintTable() const
+			{
+				//for (size_t i = 0; i < KeySizeByte * BITS_PER_BYTE; ++i)
+				//{
+				//	LOGI("%s | %s ", m_tableRecords[i].m_startId.ToBigEndianHexStr().c_str(), 
+				//		m_tableRecords[i].m_node ? m_tableRecords[i].m_node->GetNodeId().ToBigEndianHexStr().c_str() : m_nodeId.ToBigEndianHexStr().c_str());
+				//}
 			}
 
 		private:

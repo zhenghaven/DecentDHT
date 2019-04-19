@@ -62,6 +62,8 @@ namespace Decent
 				GetImmediateSuccessor()->SetImmediatePredecessor(GetSelfPtr());
 
 				UpdateOthers();
+
+				PrintTable();
 			}
 
 			/**
@@ -234,6 +236,11 @@ namespace Decent
 			bool IsResponsibleFor(const IdType& key)
 			{
 				return m_cirRange.IsWithinNC(key, GetImmediatePredecessor()->GetNodeId(), m_id);
+			}
+
+			virtual void PrintTable() const
+			{
+				m_fingerTable.PrintTable();
 			}
 
 		protected:
