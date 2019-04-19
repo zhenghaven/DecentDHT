@@ -7,6 +7,7 @@
 
 #include "../../../Common/Dht/FuncNums.h"
 
+#include "../DhtConnectionPool.h"
 #include "../DhtStatesSingleton.h"
 
 using namespace Decent;
@@ -60,7 +61,10 @@ extern "C" int ecall_decent_dht_proc_msg_from_dht(void* connection)
 		std::shared_ptr<Ra::TlsConfigSameEnclave> tlsCfg = std::make_shared<Ra::TlsConfigSameEnclave>(gs_state, Ra::TlsConfig::Mode::ServerVerifyPeer);
 		Decent::Net::TlsCommLayer tls(connection, tlsCfg, true);
 
-		ProcessDhtQueries(tls);
+		do
+		{
+			ProcessDhtQueries(tls);
+		} while (gs_state.GetConnectionPool().HoldInComingConnection(tls));
 	}
 	catch (const std::exception& e)
 	{

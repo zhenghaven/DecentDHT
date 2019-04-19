@@ -11,6 +11,7 @@ namespace Decent
 		class LocalNode;
 
 		class EnclaveStore;
+		class DhtConnectionPool;
 
 		class DhtStates : public Ra::AppStates
 		{
@@ -21,10 +22,11 @@ namespace Decent
 			typedef std::shared_ptr<DhtLocalNodeType> DhtLocalNodePtrType;
 
 		public:
-			DhtStates(Ra::AppCertContainer & certCntnr, Ra::KeyContainer & keyCntnr, Ra::WhiteList::DecentServer & serverWl, GetLoadedWlFunc getLoadedFunc, EnclaveStore& dhtStore) :
+			DhtStates(Ra::AppCertContainer & certCntnr, Ra::KeyContainer & keyCntnr, Ra::WhiteList::DecentServer & serverWl, GetLoadedWlFunc getLoadedFunc, EnclaveStore& dhtStore, DhtConnectionPool& cntPool) :
 				AppStates(certCntnr, keyCntnr, serverWl, getLoadedFunc),
 				m_dhtNode(),
-				m_dhtStore(dhtStore)
+				m_dhtStore(dhtStore),
+				m_cntPool(cntPool)
 			{}
 			
 			virtual ~DhtStates()
@@ -50,9 +52,20 @@ namespace Decent
 				return m_dhtStore;
 			}
 
+			const DhtConnectionPool& GetConnectionPool() const
+			{
+				return m_cntPool;
+			}
+
+			DhtConnectionPool& GetConnectionPool()
+			{
+				return m_cntPool;
+			}
+
 		private:
 			DhtLocalNodePtrType m_dhtNode;
 			EnclaveStore& m_dhtStore;
+			DhtConnectionPool& m_cntPool;
 		};
 	}
 }

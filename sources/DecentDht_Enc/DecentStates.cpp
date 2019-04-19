@@ -9,6 +9,7 @@
 
 #include "../Common_Enc/Dht/DhtStates.h"
 #include "../Common_Enc/Dht/EnclaveStore.h"
+#include "../Common_Enc/Dht/DhtConnectionPool.h"
 #include "../Common_Enc/Dht/DhtStatesSingleton.h"
 
 using namespace Decent;
@@ -54,11 +55,17 @@ namespace
 
 		return inst;
 	}
+
+	static DhtConnectionPool& GetConnectionPool()
+	{
+		static DhtConnectionPool inst(50, 10);
+		return inst;
+	}
 }
 
 DhtStates& Decent::Dht::GetDhtStatesSingleton()
 {
-	static DhtStates state(GetCertContainer(), GetKeyContainer(), GetServerWhiteList(), &GetLoadedWhiteListImpl, GetDhtStore());
+	static DhtStates state(GetCertContainer(), GetKeyContainer(), GetServerWhiteList(), &GetLoadedWhiteListImpl, GetDhtStore(), GetConnectionPool());
 
 	return state;
 }

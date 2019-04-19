@@ -3,12 +3,10 @@
 #include <DecentApi/Common/Common.h>
 #include <DecentApi/Common/make_unique.h>
 #include <DecentApi/Common/Net/TlsCommLayer.h>
-#include <DecentApi/CommonEnclave/Ra/TlsConfigSameEnclave.h>
-#include <DecentApi/CommonEnclave/Net/EnclaveNetConnector.h>
 
 #include "../../Common/Dht/FuncNums.h"
 #include "DhtStatesSingleton.h"
-#include "ConnectionManager.h"
+#include "DhtConnectionPool.h"
 
 using namespace Decent;
 using namespace Decent::Dht;
@@ -21,12 +19,6 @@ namespace
 	DhtStates& gs_state = GetDhtStatesSingleton();
 
 	static char gsk_ack[] = "ACK";
-
-	static std::shared_ptr<Ra::TlsConfigSameEnclave> GetClientTlsConfigDhtNode()
-	{
-		static std::shared_ptr<Ra::TlsConfigSameEnclave> tlsCfg = std::make_shared<Ra::TlsConfigSameEnclave>(gs_state, Ra::TlsConfig::Mode::ClientHasCert);
-		return tlsCfg;
-	}
 }
 
 void NodeConnector::SendNode(TlsCommLayer & tls, NodeBasePtr node)
@@ -89,17 +81,19 @@ NodeConnector::~NodeConnector()
 
 NodeConnector::NodeBasePtr NodeConnector::LookupTypeFunc(const MbedTlsObj::BigNumber & key, EncFunc::Dht::NumType type)
 {
-	std::unique_ptr<EnclaveNetConnector> connection = ConnectionManager::GetConnection2DecentNode(m_address);
-	Decent::Net::TlsCommLayer tls(connection->Get(), GetClientTlsConfigDhtNode(), true);
+	DhtCntPair cntPair = gs_state.GetConnectionPool().Get(m_address, gs_state);
 
-	tls.SendStruct(type); //1. Send function type
+	cntPair.GetTlsCommLayer().SendStruct(type); //1. Send function type
 
 	std::array<uint8_t, DhtStates::sk_keySizeByte> keyBin{};
 	key.ToBinary(keyBin);
-	tls.SendRaw(keyBin.data(), keyBin.size()); //2. Send queried ID
+	cntPair.GetTlsCommLayer().SendRaw(keyBin.data(), keyBin.size()); //2. Send queried ID
 	//LOGI("Sent queried ID: %s.", key.ToBigEndianHexStr().c_str());
 
-	return ReceiveNode(tls); //3. Receive node. - Done!
+	NodeConnector::NodeBasePtr res = ReceiveNode(cntPair.GetTlsCommLayer()); //3. Receive node. - Done!
+
+	gs_state.GetConnectionPool().Put(m_address, cntPair);
+	return res;
 }
 
 NodeConnector::NodeBasePtr NodeConnector::FindSuccessor(const BigNumber & key)
@@ -121,12 +115,14 @@ NodeConnector::NodeBasePtr NodeConnector::GetImmediateSuccessor()
 	//LOGI("Node Connector: Getting Immediate Successor of Node %s...", GetNodeId().ToBigEndianHexStr().c_str());
 	using namespace EncFunc::Dht;
 
-	std::unique_ptr<EnclaveNetConnector> connection = ConnectionManager::GetConnection2DecentNode(m_address);
-	Decent::Net::TlsCommLayer tls(connection->Get(), GetClientTlsConfigDhtNode(), true);
+	DhtCntPair cntPair = gs_state.GetConnectionPool().Get(m_address, gs_state);
 
-	tls.SendStruct(k_getImmediateSuc); //1. Send function type
+	cntPair.GetTlsCommLayer().SendStruct(k_getImmediateSuc); //1. Send function type
 
-	return ReceiveNode(tls); //2. Receive node. - Done!
+	NodeConnector::NodeBasePtr res = ReceiveNode(cntPair.GetTlsCommLayer()); //2. Receive node. - Done!
+
+	gs_state.GetConnectionPool().Put(m_address, cntPair);
+	return res;
 }
 
 NodeConnector::NodeBasePtr NodeConnector::GetImmediatePredecessor()
@@ -134,12 +130,14 @@ NodeConnector::NodeBasePtr NodeConnector::GetImmediatePredecessor()
 	//LOGI("Node Connector: Getting Immediate Predecessor of Node %s...", GetNodeId().ToBigEndianHexStr().c_str());
 	using namespace EncFunc::Dht;
 
-	std::unique_ptr<EnclaveNetConnector> connection = ConnectionManager::GetConnection2DecentNode(m_address);
-	Decent::Net::TlsCommLayer tls(connection->Get(), GetClientTlsConfigDhtNode(), true);
+	DhtCntPair cntPair = gs_state.GetConnectionPool().Get(m_address, gs_state);
 
-	tls.SendStruct(k_getImmediatePre); //1. Send function type
+	cntPair.GetTlsCommLayer().SendStruct(k_getImmediatePre); //1. Send function type
 
-	return ReceiveNode(tls); //2. Receive node. - Done!
+	NodeConnector::NodeBasePtr res = ReceiveNode(cntPair.GetTlsCommLayer()); //2. Receive node. - Done!
+
+	gs_state.GetConnectionPool().Put(m_address, cntPair);
+	return res;
 
 }
 
@@ -148,15 +146,16 @@ void NodeConnector::SetImmediatePredecessor(NodeBasePtr pred)
 	//LOGI("Node Connector: Setting Immediate Predecessor of Node %s...", GetNodeId().ToBigEndianHexStr().c_str());
 	using namespace EncFunc::Dht;
 
-	std::unique_ptr<EnclaveNetConnector> connection = ConnectionManager::GetConnection2DecentNode(m_address);
-	Decent::Net::TlsCommLayer tls(connection->Get(), GetClientTlsConfigDhtNode(), true);
+	DhtCntPair cntPair = gs_state.GetConnectionPool().Get(m_address, gs_state);
 
-	tls.SendStruct(k_setImmediatePre); //1. Send function type
+	cntPair.GetTlsCommLayer().SendStruct(k_setImmediatePre); //1. Send function type
 
-	SendNode(tls, pred); //2. Send Node. - Done!
+	SendNode(cntPair.GetTlsCommLayer(), pred); //2. Send Node. - Done!
 
-	tls.ReceiveStruct(gsk_ack);
+	cntPair.GetTlsCommLayer().ReceiveStruct(gsk_ack);
 	//LOGI("");
+	
+	gs_state.GetConnectionPool().Put(m_address, cntPair);
 }
 
 void NodeConnector::UpdateFingerTable(NodeBasePtr & s, uint64_t i)
@@ -164,15 +163,16 @@ void NodeConnector::UpdateFingerTable(NodeBasePtr & s, uint64_t i)
 	//LOGI("Node Connector: Updating Finger Table of Node %s...", GetNodeId().ToBigEndianHexStr().c_str());
 	using namespace EncFunc::Dht;
 
-	std::unique_ptr<EnclaveNetConnector> connection = ConnectionManager::GetConnection2DecentNode(m_address);
-	Decent::Net::TlsCommLayer tls(connection->Get(), GetClientTlsConfigDhtNode(), true);
+	DhtCntPair cntPair = gs_state.GetConnectionPool().Get(m_address, gs_state);
 
-	tls.SendStruct(k_updFingerTable); //1. Send function type
-	SendNode(tls, s); //2. Send Node.
-	tls.SendStruct(i); //3. Send i. - Done!
+	cntPair.GetTlsCommLayer().SendStruct(k_updFingerTable); //1. Send function type
+	SendNode(cntPair.GetTlsCommLayer(), s); //2. Send Node.
+	cntPair.GetTlsCommLayer().SendStruct(i); //3. Send i. - Done!
 
-	tls.ReceiveStruct(gsk_ack);
+	cntPair.GetTlsCommLayer().ReceiveStruct(gsk_ack);
 	//LOGI("");
+
+	gs_state.GetConnectionPool().Put(m_address, cntPair);
 }
 
 void NodeConnector::DeUpdateFingerTable(const MbedTlsObj::BigNumber & oldId, NodeBasePtr & succ, uint64_t i)
@@ -180,20 +180,21 @@ void NodeConnector::DeUpdateFingerTable(const MbedTlsObj::BigNumber & oldId, Nod
 	//LOGI("Node Connector: De-Updating Finger Table of Node %s...", GetNodeId().ToBigEndianHexStr().c_str());
 	using namespace EncFunc::Dht;
 
-	std::unique_ptr<EnclaveNetConnector> connection = ConnectionManager::GetConnection2DecentNode(m_address);
-	Decent::Net::TlsCommLayer tls(connection->Get(), GetClientTlsConfigDhtNode(), true);
+	DhtCntPair cntPair = gs_state.GetConnectionPool().Get(m_address, gs_state);
 
-	tls.SendStruct(k_dUpdFingerTable); //1. Send function type
+	cntPair.GetTlsCommLayer().SendStruct(k_dUpdFingerTable); //1. Send function type
 
 	std::array<uint8_t, DhtStates::sk_keySizeByte> keyBin{};
 	oldId.ToBinary(keyBin);
-	tls.SendRaw(keyBin.data(), keyBin.size()); //2. Send oldId.
+	cntPair.GetTlsCommLayer().SendRaw(keyBin.data(), keyBin.size()); //2. Send oldId.
 
-	SendNode(tls, succ); //3. Send Node.
-	tls.SendStruct(i); //4. Send i. - Done!
+	SendNode(cntPair.GetTlsCommLayer(), succ); //3. Send Node.
+	cntPair.GetTlsCommLayer().SendStruct(i); //4. Send i. - Done!
 
-	tls.ReceiveStruct(gsk_ack);
+	cntPair.GetTlsCommLayer().ReceiveStruct(gsk_ack);
 	//LOGI("");
+
+	gs_state.GetConnectionPool().Put(m_address, cntPair);
 }
 
 const BigNumber & NodeConnector::GetNodeId()
@@ -207,17 +208,17 @@ const BigNumber & NodeConnector::GetNodeId()
 	//LOGI("Node Connector: Getting Node ID...");
 	using namespace EncFunc::Dht;
 
-	std::unique_ptr<EnclaveNetConnector> connection = ConnectionManager::GetConnection2DecentNode(m_address);
-	Decent::Net::TlsCommLayer tls(connection->Get(), GetClientTlsConfigDhtNode(), true);
+	DhtCntPair cntPair = gs_state.GetConnectionPool().Get(m_address, gs_state);
 
-	tls.SendStruct(k_getNodeId); //1. Send function type
+	cntPair.GetTlsCommLayer().SendStruct(k_getNodeId); //1. Send function type
 
 	std::array<uint8_t, DhtStates::sk_keySizeByte> keyBin{};
-	tls.ReceiveRaw(keyBin.data(), keyBin.size()); //2. Received resultant ID - Done!
+	cntPair.GetTlsCommLayer().ReceiveRaw(keyBin.data(), keyBin.size()); //2. Received resultant ID - Done!
 
 	m_Id = Tools::make_unique<BigNumber>(keyBin);
 	//LOGI("Recv result ID: %s.", m_Id->ToBigEndianHexStr().c_str());
 	//LOGI("");
 
+	gs_state.GetConnectionPool().Put(m_address, cntPair);
 	return *m_Id;
 }
