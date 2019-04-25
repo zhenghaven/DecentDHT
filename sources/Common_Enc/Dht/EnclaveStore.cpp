@@ -140,16 +140,11 @@ void EnclaveStore::GetValue(const MbedTlsObj::BigNumber & key, std::vector<uint8
 	}
 }
 
-std::vector<uint8_t> EnclaveStore::DeleteData(const MbedTlsObj::BigNumber & key)
+void EnclaveStore::DeleteDataFile(const MbedTlsObj::BigNumber & key)
 {
-	std::vector<uint8_t> res;
-	GetValue(key, res);
-
 	const std::string fileName = key.ToBigEndianHexStr();
 	Tools::FileSysDeleteFile(fileName + ".meta");
 	Tools::FileSysDeleteFile(fileName + ".data");
-	
-	return std::move(res);
 }
 
 void EnclaveStore::SaveData(const MbedTlsObj::BigNumber & key, std::vector<uint8_t>&& data)

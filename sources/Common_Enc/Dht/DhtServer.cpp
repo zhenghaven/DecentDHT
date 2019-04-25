@@ -136,7 +136,7 @@ void Dht::FindSuccessor(Decent::Net::TlsCommLayer &tls)
 	//LOGI("");
 }
 
-void Dht::ProcessDhtQueries(Decent::Net::TlsCommLayer & tls)
+void Dht::ProcessDhtQuery(Decent::Net::TlsCommLayer & tls)
 {
 	using namespace EncFunc::Dht;
 
@@ -178,6 +178,28 @@ void Dht::ProcessDhtQueries(Decent::Net::TlsCommLayer & tls)
 
 	case k_dUpdFingerTable:
 		DeUpdateFingerTable(tls);
+		break;
+
+	default:
+		break;
+	}
+}
+
+void Dht::ProcessStoreRequest(Decent::Net::TlsCommLayer & tls)
+{
+	using namespace EncFunc::Store;
+
+	NumType funcNum;
+	tls.ReceiveStruct(funcNum); //1. Received function type.
+
+	switch (funcNum)
+	{
+	case k_getMigrateData:
+		GetMigrateData(tls);
+		break;
+
+	case k_setMigrateData:
+		SetMigrateData(tls);
 		break;
 
 	default:
@@ -254,6 +276,17 @@ void Dht::GetData(Decent::Net::TlsCommLayer & tls)
 	tls.SendMsg(buffer);
 }
 
+void Dht::DelData(Decent::Net::TlsCommLayer & tls)
+{
+	std::array<uint8_t, DhtStates::sk_keySizeByte> keyBin{};
+	tls.ReceiveRaw(keyBin.data(), keyBin.size());
+	ConstBigNumber key(keyBin);
+
+	gs_state.GetDhtStore().DelValue(key);
+
+	tls.SendStruct(gsk_ack);
+}
+
 void Dht::Init(uint64_t selfAddr, int isFirstNode, uint64_t exAddr)
 {
 	std::shared_ptr<DhtStates::DhtLocalNodeType::Pow2iArrayType> pow2iArray = std::make_shared<DhtStates::DhtLocalNodeType::Pow2iArrayType>();
@@ -292,5 +325,35 @@ void Dht::DeInit()
 	if (dhtNode->GetAddress() != succAddr)
 	{
 		gs_state.GetDhtStore().MigrateTo(succAddr);
+	}
+}
+
+void Dht::ProcessAppRequest(Decent::Net::TlsCommLayer & tls)
+{
+	using namespace EncFunc::App;
+
+	NumType funcNum;
+	tls.ReceiveStruct(funcNum); //1. Received function type.
+
+	switch (funcNum)
+	{
+	case k_findSuccessor:
+		FindSuccessor(tls);
+		break;
+
+	case k_getData:
+		GetData(tls);
+		break;
+
+	case k_setData:
+		SetData(tls);
+		break;
+
+	case k_delData:
+		DelData(tls);
+		break;
+
+	default:
+		break;
 	}
 }

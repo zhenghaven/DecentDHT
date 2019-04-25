@@ -28,8 +28,7 @@ namespace Decent
 			virtual void GetValue(const MbedTlsObj::BigNumber& key, std::vector<uint8_t>& data) override;
 
 		protected:
-
-			virtual std::vector<uint8_t> DeleteData(const MbedTlsObj::BigNumber& key) override;
+			virtual void DeleteDataFile(const MbedTlsObj::BigNumber& key) override;
 
 			virtual void SaveData(MbedTlsObj::BigNumber&& key, std::vector<uint8_t>&& data) override;
 			virtual void SaveData(const MbedTlsObj::BigNumber& key, std::vector<uint8_t>&& data) override;

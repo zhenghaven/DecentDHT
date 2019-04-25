@@ -63,7 +63,7 @@ extern "C" int ecall_decent_dht_proc_msg_from_dht(void* connection)
 
 		do
 		{
-			ProcessDhtQueries(tls);
+			ProcessDhtQuery(tls);
 		} while (gs_state.GetConnectionPool().HoldInComingConnection(tls));
 	}
 	catch (const std::exception& e)
@@ -91,22 +91,7 @@ extern "C" int ecall_decent_dht_proc_msg_from_store(void* connection)
 		std::shared_ptr<Ra::TlsConfigSameEnclave> tlsCfg = std::make_shared<Ra::TlsConfigSameEnclave>(gs_state, Ra::TlsConfig::Mode::ServerVerifyPeer);
 		Decent::Net::TlsCommLayer tls(connection, tlsCfg, true);
 
-		NumType funcNum;
-		tls.ReceiveStruct(funcNum); //1. Received function type.
-
-		switch (funcNum)
-		{
-		case k_getMigrateData:
-			GetMigrateData(tls);
-			break;
-
-		case k_setMigrateData:
-			SetMigrateData(tls);
-			break;
-
-		default:
-			break;
-		}
+		ProcessStoreRequest(tls);
 	}
 	catch (const std::exception& e)
 	{
@@ -133,26 +118,7 @@ extern "C" int ecall_decent_dht_proc_msg_from_app(void* connection)
 		std::shared_ptr<Ra::TlsConfigAnyWhiteListed> tlsCfg = std::make_shared<Ra::TlsConfigAnyWhiteListed>(gs_state, Ra::TlsConfig::Mode::ServerVerifyPeer);
 		Decent::Net::TlsCommLayer tls(connection, tlsCfg, true);
 
-		NumType funcNum;
-		tls.ReceiveStruct(funcNum); //1. Received function type.
-
-		switch (funcNum)
-		{
-		case k_findSuccessor:
-			FindSuccessor(tls);
-			break;
-
-		case k_getData:
-			GetData(tls);
-			break;
-
-		case k_setData:
-			SetData(tls);
-			break;
-
-		default:
-			break;
-		}
+		ProcessAppRequest(tls);
 	}
 	catch (const std::exception& e)
 	{

@@ -67,7 +67,7 @@ namespace Decent
 				{
 					sendNumFunc(index); //2. Send Key of the data.
 
-					std::vector<uint8_t> data = DeleteData(index);
+					std::vector<uint8_t> data = GetAndDeleteDataFile(index);
 
 					uint64_t sizeOfData = static_cast<uint64_t>(data.size());
 					sendFunc(&sizeOfData, sizeof(sizeOfData)); //3. Send size of data to be sent.
@@ -133,6 +133,16 @@ namespace Decent
 				{
 					std::unique_lock<std::mutex> indexingLock(m_indexingMutex);
 					SaveData(key, std::forward<std::vector<uint8_t> >(data));
+				}
+			}
+
+			virtual void DelValue(const IdType& key)
+			{
+				if (IsResponsibleFor(key))
+				{
+					std::unique_lock<std::mutex> indexingLock(m_indexingMutex);
+					m_indexing.erase(key);
+					DeleteDataFile(key);
 				}
 			}
 
@@ -203,13 +213,31 @@ namespace Decent
 			}
 
 			/**
-			 * \brief	Deletes the data specified by key. NOTE: this doesn't delete the key from indexing.
+			 * \brief	Get the value specified by key, and then delete the data file from the file system.
+			 * 			NOTE: this doesn't delete the key from indexing.
 			 *
 			 * \param	key	The key.
 			 *
 			 * \return	The data in std::vector&lt;uint8_t&gt;
 			 */
-			virtual std::vector<uint8_t> DeleteData(const IdType& key) = 0;
+			virtual std::vector<uint8_t> GetAndDeleteDataFile(const IdType& key)
+			{
+				std::vector<uint8_t> res;
+				GetValue(key, res);
+
+				DeleteDataFile(key);
+
+				return res;
+			}
+
+			/**
+			 * \brief	Delete the data file from the file system.
+			 * 			NOTE: this doesn't delete the key from indexing.
+			 *
+			 * \param	key	The key.
+			 *
+			 */
+			virtual void DeleteDataFile(const IdType& key) = 0;
 
 			/**
 			 * \brief	Adds key to the index if it doesn't exist. Saves the data to storage. Note: this
