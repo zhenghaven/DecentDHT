@@ -121,18 +121,25 @@ namespace Decent
 					std::vector<uint8_t> data(sizeOfData);
 					recvFunc(data.data(), data.size()); //4. Receive data. - Done!
 
-					SaveData(std::move(key), std::move(data));
+					const std::string keyStr = key.ToBigEndianHexStr();
+					m_indexing.insert(std::move(key));
+					SaveDataFile(keyStr, data);
 				}
 			}
 
 			virtual bool IsResponsibleFor(const IdType& key) const = 0;
 
-			virtual void SetValue(const IdType& key, std::vector<uint8_t>&& data)
+			virtual void SetValue(const IdType& key, const std::vector<uint8_t>& data)
 			{
 				if (IsResponsibleFor(key))
 				{
-					std::unique_lock<std::mutex> indexingLock(m_indexingMutex);
-					SaveData(key, std::forward<std::vector<uint8_t> >(data));
+					const std::string keyStr = key.ToBigEndianHexStr();
+					{
+						std::unique_lock<std::mutex> indexingLock(m_indexingMutex);
+						m_indexing.insert(key);
+					}
+					
+					SaveDataFile(keyStr, data);
 				}
 			}
 
@@ -140,17 +147,17 @@ namespace Decent
 			{
 				if (IsResponsibleFor(key))
 				{
-					std::unique_lock<std::mutex> indexingLock(m_indexingMutex);
-					m_indexing.erase(key);
-					DeleteDataFile(key);
+					const std::string keyStr = key.ToBigEndianHexStr();
+					{
+						std::unique_lock<std::mutex> indexingLock(m_indexingMutex);
+						m_indexing.erase(key);
+					}
+					
+					DeleteDataFile(keyStr);
 				}
 			}
 
 			virtual void GetValue(const IdType& key, std::vector<uint8_t>& data) = 0;
-
-			//virtual void LockDataStore() = 0;
-
-			//virtual void UnlockDataStore() = 0;
 
 		protected:
 			IndexingType& GetIndexing()
@@ -225,43 +232,28 @@ namespace Decent
 				std::vector<uint8_t> res;
 				GetValue(key, res);
 
-				DeleteDataFile(key);
+				DeleteDataFile(key.ToBigEndianHexStr());
 
 				return res;
 			}
 
 			/**
 			 * \brief	Delete the data file from the file system.
-			 * 			NOTE: this doesn't delete the key from indexing.
+			 * 			NOTE: this function should only interact with file system.
 			 *
 			 * \param	key	The key.
 			 *
 			 */
-			virtual void DeleteDataFile(const IdType& key) = 0;
+			virtual void DeleteDataFile(const std::string& keyStr) = 0;
 
 			/**
-			 * \brief	Adds key to the index if it doesn't exist. Saves the data to storage. Note: this
-			 * 			function should not lock the indexing mutex.
+			 * \brief	Saves the data to storage. 
+			 * 			NOTE: this function should only interact with file system.
 			 *
-			 * \param 		  	key 	The key.
-			 * \param [in,out]	data	The data.
+			 * \param	keyStr	The key in string.
+			 * \param	data  	The data.
 			 */
-			virtual void SaveData(IdType&& key, std::vector<uint8_t>&& data)
-			{
-				m_indexing.insert(std::forward<IdType>(key));
-			}
-
-			/**
-			 * \brief	Adds key to the index if it doesn't exist. Saves the data to storage. Note: this
-			 * 			function should not lock the indexing mutex.
-			 *
-			 * \param 		  	key 	The key.
-			 * \param [in,out]	data	The data.
-			 */
-			virtual void SaveData(const IdType& key, std::vector<uint8_t>&& data)
-			{
-				m_indexing.insert(key);
-			}
+			virtual void SaveDataFile(const std::string& keyStr, const std::vector<uint8_t>& data) = 0;
 
 		private:
 			IdType m_ringStart;

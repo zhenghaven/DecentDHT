@@ -10,7 +10,7 @@ using namespace Decent::Tools;
 
 bool Tools::GetConfigurationJsonString(const std::string & filePath, std::string & outJsonStr)
 {
-	DiskFile file(filePath, FileBase::Mode::Read, FileBase::sk_deferOpen);
+	DiskFile file(filePath, FileBase::Mode::Read, false, FileBase::sk_deferOpen);
 
 	try
 	{

@@ -114,7 +114,7 @@ void EnclaveStore::GetValue(const MbedTlsObj::BigNumber & key, std::vector<uint8
 	std::vector<uint8_t> meta;
 	try
 	{
-		PlainFile metaFile(fileName + ".meta", FileBase::Mode::Read);
+		PlainFile metaFile(fileName + ".meta", FileBase::Mode::Read, true);
 		meta.resize(metaFile.GetFileSize());
 		metaFile.ReadBlockExactSize(meta);
 	}
@@ -140,28 +140,17 @@ void EnclaveStore::GetValue(const MbedTlsObj::BigNumber & key, std::vector<uint8
 	}
 }
 
-void EnclaveStore::DeleteDataFile(const MbedTlsObj::BigNumber & key)
+void EnclaveStore::DeleteDataFile(const std::string& keyStr)
 {
-	const std::string fileName = key.ToBigEndianHexStr();
-	Tools::FileSysDeleteFile(fileName + ".meta");
-	Tools::FileSysDeleteFile(fileName + ".data");
+	Tools::FileSysDeleteFile(keyStr + ".meta");
+	Tools::FileSysDeleteFile(keyStr + ".data");
 }
 
-void EnclaveStore::SaveData(const MbedTlsObj::BigNumber & key, std::vector<uint8_t>&& data)
-{
-	EnclaveStore::SaveData(BigNumber(key), std::forward<std::vector<uint8_t> >(data));
-}
-
-void EnclaveStore::SaveData(MbedTlsObj::BigNumber&& key, std::vector<uint8_t>&& data)
+void EnclaveStore::SaveDataFile(const std::string& keyStr, const std::vector<uint8_t>& data)
 {
 	using namespace Decent::Tools;
 
-	std::string fileName = key.ToBigEndianHexStr();
-	LOGI("DHT store: adding key to the index. %s", fileName.c_str());
-
-	StoreBase::SaveData(std::forward<MbedTlsObj::BigNumber>(key), std::forward<std::vector<uint8_t> >(data));
-	//NOTE: *Key* is not valid after this line!!!
-
+	LOGI("DHT store: adding key to the index. %s", keyStr.c_str());
 	LOGI("DHT store: writing value: %s", std::string(reinterpret_cast<const char*>(data.data()), data.size()).c_str());
 	
 	std::vector<uint8_t> meta;
@@ -171,12 +160,12 @@ void EnclaveStore::SaveData(MbedTlsObj::BigNumber&& key, std::vector<uint8_t>&& 
 	DeriveSealKey(KeyPolicy::ByMrEnclave, gsk_storeSealKeyLabel, sealKey, meta);
 	
 	{
-		WritablePlainFile metaFile(fileName + ".meta", WritableFileBase::WritableMode::Write);
+		WritablePlainFile metaFile(keyStr + ".meta", WritableFileBase::WritableMode::Write, true);
 		metaFile.WriteBlockExactSize(meta);
 	}
 	
 	{
-		WritableSecureFile dataFile(fileName + ".data", sealKey, WritableFileBase::WritableMode::Write);
+		WritableSecureFile dataFile(keyStr + ".data", sealKey, WritableFileBase::WritableMode::Write);
 		dataFile.WriteBlockExactSize(data);
 	}
 }
