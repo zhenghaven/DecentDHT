@@ -19,7 +19,7 @@ namespace
 
 			if (connection)
 			{
-				connection->SendPack(hsMsg);
+				connection->SendSmartMsg(hsMsg);
 			}
 			return std::move(connection);
 		}

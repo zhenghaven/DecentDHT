@@ -1,76 +1,24 @@
 #pragma once
 
-#include <DecentApi/Common/Net/TlsConnectionPool.h>
-
-#include <map>
-#include <memory>
+#include <DecentApi/Common/Net/SecureConnectionPool.h>
 
 namespace Decent
 {
-	namespace Net
-	{
-		class TlsCommLayer;
-		class EnclaveNetConnector;
-	}
-
 	namespace Dht
 	{
 		class DhtStates;
 
-		class DhtCntPair
+		class DhtConnectionPool : public Net::SecureConnectionPool<uint64_t>
 		{
 		public:
-			DhtCntPair(std::unique_ptr<Net::EnclaveNetConnector>&& cnt, std::unique_ptr<Net::TlsCommLayer>&& tls);
+			DhtConnectionPool(size_t maxInCnt, size_t maxOutCnt) :
+				SecureConnectionPool(maxInCnt, maxOutCnt)
+			{}
 
-			DhtCntPair(std::unique_ptr<Net::EnclaveNetConnector>& cnt, std::unique_ptr<Net::TlsCommLayer>& tls);
+			virtual ~DhtConnectionPool()
+			{}
 
-			//Copy is not allowed
-			DhtCntPair(const DhtCntPair&) = delete;
-
-			DhtCntPair(DhtCntPair&& rhs);
-
-			virtual ~DhtCntPair();
-
-			virtual Net::TlsCommLayer & GetTlsCommLayer();
-
-			virtual Net::EnclaveNetConnector & GetConnection();
-
-			DhtCntPair& operator=(const DhtCntPair& rhs) = delete;
-
-			DhtCntPair& operator=(DhtCntPair&& rhs);
-
-			DhtCntPair& Swap(DhtCntPair& other);
-
-		private:
-			std::unique_ptr<Net::EnclaveNetConnector> m_cnt;
-			std::unique_ptr<Net::TlsCommLayer> m_tls;
-		};
-
-		class DhtConnectionPool : public Net::TlsConnectionPool
-		{
-		public: //static member:
-			typedef std::pair<std::mutex, std::vector<DhtCntPair> > MapItemType;
-			typedef std::map<uint64_t, MapItemType> MapType;
-
-		public:
-			DhtConnectionPool(size_t maxInCnt, size_t maxOutCnt);
-
-			virtual ~DhtConnectionPool();
-
-			void Put(uint64_t addr, DhtCntPair& cntPair)
-			{
-				return Put(addr, std::move(cntPair));
-			}
-
-			void Put(uint64_t addr, DhtCntPair&& cntPair);
-
-			DhtCntPair GetNew(uint64_t addr, DhtStates& state);
-
-			DhtCntPair Get(uint64_t addr, DhtStates& state);
-
-		private:
-			std::mutex m_mapMutex;
-			MapType m_map;
+			virtual Net::CntPair GetNew(const uint64_t& addr, Ra::States& state) override;
 		};
 	}
 }

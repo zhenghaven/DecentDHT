@@ -3,6 +3,7 @@
 #include <DecentApi/Common/Common.h>
 #include <DecentApi/Common/Net/TlsCommLayer.h>
 #include <DecentApi/Common/Ra/TlsConfigAnyWhiteListed.h>
+#include <DecentApi/CommonEnclave/Net/EnclaveCntTranslator.h>
 #include <DecentApi/CommonEnclave/Ra/TlsConfigSameEnclave.h>
 
 #include "../../../Common/Dht/FuncNums.h"
@@ -54,12 +55,14 @@ extern "C" int ecall_decent_dht_proc_msg_from_dht(void* connection)
 		return false;
 	}
 
+	EnclaveCntTranslator cnt(connection);
+
 	//LOGI("Processing message from DHT node...");
 
 	try
 	{
 		std::shared_ptr<Ra::TlsConfigSameEnclave> tlsCfg = std::make_shared<Ra::TlsConfigSameEnclave>(gs_state, Ra::TlsConfig::Mode::ServerVerifyPeer);
-		Decent::Net::TlsCommLayer tls(connection, tlsCfg, true);
+		Decent::Net::TlsCommLayer tls(cnt, tlsCfg, true);
 
 		do
 		{
@@ -82,6 +85,8 @@ extern "C" int ecall_decent_dht_proc_msg_from_store(void* connection)
 		return false;
 	}
 
+	EnclaveCntTranslator cnt(connection);
+
 	using namespace EncFunc::Store;
 
 	//LOGI("Processing message from DHT store...");
@@ -89,7 +94,7 @@ extern "C" int ecall_decent_dht_proc_msg_from_store(void* connection)
 	try
 	{
 		std::shared_ptr<Ra::TlsConfigSameEnclave> tlsCfg = std::make_shared<Ra::TlsConfigSameEnclave>(gs_state, Ra::TlsConfig::Mode::ServerVerifyPeer);
-		Decent::Net::TlsCommLayer tls(connection, tlsCfg, true);
+		Decent::Net::TlsCommLayer tls(cnt, tlsCfg, true);
 
 		ProcessStoreRequest(tls);
 	}
@@ -109,6 +114,8 @@ extern "C" int ecall_decent_dht_proc_msg_from_app(void* connection)
 		return false;
 	}
 
+	EnclaveCntTranslator cnt(connection);
+
 	using namespace EncFunc::App;
 
 	LOGI("Processing message from App...");
@@ -116,7 +123,7 @@ extern "C" int ecall_decent_dht_proc_msg_from_app(void* connection)
 	try
 	{
 		std::shared_ptr<Ra::TlsConfigAnyWhiteListed> tlsCfg = std::make_shared<Ra::TlsConfigAnyWhiteListed>(gs_state, Ra::TlsConfig::Mode::ServerVerifyPeer);
-		Decent::Net::TlsCommLayer tls(connection, tlsCfg, true);
+		Decent::Net::TlsCommLayer tls(cnt, tlsCfg, true);
 
 		ProcessAppRequest(tls);
 	}

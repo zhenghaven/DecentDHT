@@ -72,7 +72,7 @@ int main(int argc, char ** argv)
 	if (isSendWlArg.getValue())
 	{
 		serverCon = std::make_unique<TCPConnection>(serverIp, decentServerItem.GetPort());
-		serverCon->SendPack(LoadWhiteList(wlKeyArg.getValue(), configManager.GetLoadedWhiteListStr()));
+		serverCon->SendSmartMsg(LoadWhiteList(wlKeyArg.getValue(), configManager.GetLoadedWhiteListStr()));
 	}
 
 	serverCon = std::make_unique<TCPConnection>(serverIp, decentServerItem.GetPort());

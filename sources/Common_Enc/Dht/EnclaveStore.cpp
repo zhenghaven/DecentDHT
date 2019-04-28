@@ -1,10 +1,10 @@
 #include "EnclaveStore.h"
 
 #include <DecentApi/Common/Common.h>
+#include <DecentApi/Common/Net/ConnectionBase.h>
 #include <DecentApi/Common/Net/TlsCommLayer.h>
 #include <DecentApi/Common/Tools/FileSystemUtil.h>
 #include <DecentApi/CommonEnclave/Ra/TlsConfigSameEnclave.h>
-#include <DecentApi/CommonEnclave/Net/EnclaveNetConnector.h>
 #include <DecentApi/CommonEnclave/Tools/Crypto.h>
 #include <DecentApi/CommonEnclave/Tools/PlainFile.h>
 #include <DecentApi/CommonEnclave/Tools/SecureFile.h>
@@ -42,8 +42,8 @@ void EnclaveStore::MigrateFrom(const uint64_t & addr, const MbedTlsObj::BigNumbe
 	LOGI("Migrating data from peer...");
 	using namespace EncFunc::Store;
 
-	std::unique_ptr<EnclaveNetConnector> connection = ConnectionManager::GetConnection2DecentStore(addr);
-	Decent::Net::TlsCommLayer tls(connection->Get(), GetClientTlsConfigDhtNode(), true);
+	std::unique_ptr<ConnectionBase> connection = ConnectionManager::GetConnection2DecentStore(addr);
+	Decent::Net::TlsCommLayer tls(*connection, GetClientTlsConfigDhtNode(), true);
 
 	tls.SendStruct(k_getMigrateData); //1. Send function type
 
@@ -80,8 +80,8 @@ void EnclaveStore::MigrateTo(const uint64_t & addr)
 	}
 
 
-	std::unique_ptr<EnclaveNetConnector> connection = ConnectionManager::GetConnection2DecentStore(addr);
-	Decent::Net::TlsCommLayer tls(connection->Get(), GetClientTlsConfigDhtNode(), true);
+	std::unique_ptr<ConnectionBase> connection = ConnectionManager::GetConnection2DecentStore(addr);
+	Decent::Net::TlsCommLayer tls(*connection, GetClientTlsConfigDhtNode(), true);
 
 	tls.SendStruct(k_setMigrateData); //1. Send function type
 

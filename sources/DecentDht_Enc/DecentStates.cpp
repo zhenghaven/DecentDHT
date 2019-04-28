@@ -58,7 +58,7 @@ namespace
 
 	static DhtConnectionPool& GetConnectionPool()
 	{
-		static DhtConnectionPool inst(50, 10);
+		static DhtConnectionPool inst(50, 50);
 		return inst;
 	}
 }
