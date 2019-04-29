@@ -5,6 +5,11 @@
 
 namespace Decent
 {
+	namespace Net
+	{
+		class SecureConnectionPoolBase;
+	}
+
 	namespace Dht
 	{
 		template<typename IdType, size_t KeySizeByte, typename AddrType>
@@ -22,11 +27,12 @@ namespace Decent
 			typedef std::shared_ptr<DhtLocalNodeType> DhtLocalNodePtrType;
 
 		public:
-			DhtStates(Ra::AppCertContainer & certCntnr, Ra::KeyContainer & keyCntnr, Ra::WhiteList::DecentServer & serverWl, GetLoadedWlFunc getLoadedFunc, EnclaveStore& dhtStore, DhtConnectionPool& cntPool) :
+			DhtStates(Ra::AppCertContainer & certCntnr, Ra::KeyContainer & keyCntnr, Ra::WhiteList::DecentServer & serverWl, GetLoadedWlFunc getLoadedFunc, EnclaveStore& dhtStore, DhtConnectionPool& cntPool, Net::SecureConnectionPoolBase& appCntPool) :
 				AppStates(certCntnr, keyCntnr, serverWl, getLoadedFunc),
 				m_dhtNode(),
 				m_dhtStore(dhtStore),
-				m_cntPool(cntPool)
+				m_cntPool(cntPool),
+				m_appCntPool(appCntPool)
 			{}
 			
 			virtual ~DhtStates()
@@ -62,10 +68,21 @@ namespace Decent
 				return m_cntPool;
 			}
 
+			const Net::SecureConnectionPoolBase& GetAppConnectionPool() const
+			{
+				return m_appCntPool;
+			}
+
+			Net::SecureConnectionPoolBase& GetAppConnectionPool()
+			{
+				return m_appCntPool;
+			}
+
 		private:
 			DhtLocalNodePtrType m_dhtNode;
 			EnclaveStore& m_dhtStore;
 			DhtConnectionPool& m_cntPool;
+			Net::SecureConnectionPoolBase& m_appCntPool;
 		};
 	}
 }

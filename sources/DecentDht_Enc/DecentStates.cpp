@@ -58,14 +58,20 @@ namespace
 
 	static DhtConnectionPool& GetConnectionPool()
 	{
-		static DhtConnectionPool inst(50, 50);
+		static DhtConnectionPool inst(5, 5);
+		return inst;
+	}
+
+	static Net::SecureConnectionPoolBase& GetAppConnectionPool()
+	{
+		static Net::SecureConnectionPoolBase inst(5);
 		return inst;
 	}
 }
 
 DhtStates& Decent::Dht::GetDhtStatesSingleton()
 {
-	static DhtStates state(GetCertContainer(), GetKeyContainer(), GetServerWhiteList(), &GetLoadedWhiteListImpl, GetDhtStore(), GetConnectionPool());
+	static DhtStates state(GetCertContainer(), GetKeyContainer(), GetServerWhiteList(), &GetLoadedWhiteListImpl, GetDhtStore(), GetConnectionPool(), GetAppConnectionPool());
 
 	return state;
 }
