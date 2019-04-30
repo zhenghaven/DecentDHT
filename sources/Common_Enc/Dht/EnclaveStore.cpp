@@ -5,7 +5,7 @@
 #include <DecentApi/Common/Net/TlsCommLayer.h>
 #include <DecentApi/Common/Tools/FileSystemUtil.h>
 #include <DecentApi/CommonEnclave/Ra/TlsConfigSameEnclave.h>
-#include <DecentApi/CommonEnclave/Tools/Crypto.h>
+#include <DecentApi/CommonEnclave/Tools/DataSealer.h>
 #include <DecentApi/CommonEnclave/Tools/PlainFile.h>
 #include <DecentApi/CommonEnclave/Tools/SecureFile.h>
 
@@ -18,6 +18,7 @@
 using namespace Decent;
 using namespace Decent::Dht;
 using namespace Decent::Net;
+using namespace Decent::Tools;
 using namespace Decent::MbedTlsObj;
 
 namespace
@@ -31,6 +32,12 @@ namespace
 	}
 
 	constexpr char const gsk_storeSealKeyLabel[] = "DecentStoreSealKey";
+
+	const std::vector<uint8_t>& GetSealKeyMetaData()
+	{
+		static std::vector<uint8_t> inst = DataSealer::GenSealKeyRecoverMeta();
+		return inst;
+	}
 }
 
 EnclaveStore::~EnclaveStore()
@@ -125,7 +132,8 @@ void EnclaveStore::GetValue(const MbedTlsObj::BigNumber & key, std::vector<uint8
 	}
 
 	General128BitKey sealKey;
-	DeriveSealKey(KeyPolicy::ByMrEnclave, gsk_storeSealKeyLabel, sealKey, meta);
+	std::vector<uint8_t> salt(16, 0); /*TODO*/
+	DataSealer::DeriveSealKey(DataSealer::KeyPolicy::ByMrEnclave, gsk_storeSealKeyLabel, sealKey, salt, meta);
 
 	try
 	{
@@ -153,15 +161,13 @@ void EnclaveStore::SaveDataFile(const std::string& keyStr, const std::vector<uin
 	LOGI("DHT store: adding key to the index. %s", keyStr.c_str());
 	LOGI("DHT store: writing value: %s", std::string(reinterpret_cast<const char*>(data.data()), data.size()).c_str());
 	
-	std::vector<uint8_t> meta;
-	GenSealKeyRecoverMeta(meta);
-	
 	General128BitKey sealKey;
-	DeriveSealKey(KeyPolicy::ByMrEnclave, gsk_storeSealKeyLabel, sealKey, meta);
+	std::vector<uint8_t> salt(16, 0); /*TODO*/
+	DataSealer::DeriveSealKey(DataSealer::KeyPolicy::ByMrEnclave, gsk_storeSealKeyLabel, sealKey, salt, GetSealKeyMetaData());
 	
 	{
 		WritablePlainFile metaFile(keyStr + ".meta", WritableFileBase::WritableMode::Write, true);
-		metaFile.WriteBlockExactSize(meta);
+		metaFile.WriteBlockExactSize(GetSealKeyMetaData());
 	}
 	
 	{
