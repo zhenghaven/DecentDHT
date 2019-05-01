@@ -132,7 +132,8 @@ void EnclaveStore::GetValue(const MbedTlsObj::BigNumber & key, std::vector<uint8
 	}
 
 	std::vector<uint8_t> meta;
-	DataSealer::UnsealData(DataSealer::KeyPolicy::ByMrEnclave, sealedData, meta, data);
+	std::vector<uint8_t> mac;
+	DataSealer::UnsealData(DataSealer::KeyPolicy::ByMrEnclave, sealedData, mac, meta, data);
 }
 
 void EnclaveStore::DeleteDataFile(const std::string& keyStr)
@@ -149,7 +150,8 @@ void EnclaveStore::SaveDataFile(const std::string& keyStr, const std::vector<uin
 	LOGI("DHT store: writing value: %s", std::string(reinterpret_cast<const char*>(data.data()), data.size()).c_str());
 	
 	std::vector<uint8_t> meta;
-	std::vector<uint8_t> sealedData = DataSealer::SealData(DataSealer::KeyPolicy::ByMrEnclave, meta, data);
+	std::vector<uint8_t> mac;
+	std::vector<uint8_t> sealedData = DataSealer::SealData(DataSealer::KeyPolicy::ByMrEnclave, mac, meta, data);
 	
 	{
 		WritablePlainFile metaFile(keyStr + ".data", WritableFileBase::WritableMode::Write, true);
