@@ -273,8 +273,7 @@ void Dht::GetData(Decent::Net::TlsCommLayer & tls)
 
 	//LOGI("Getting data for key %s.", key.Get().ToBigEndianHexStr().c_str());
 
-	std::vector<uint8_t> buffer;
-	gs_state.GetDhtStore().GetValue(key, buffer);
+	std::vector<uint8_t> buffer = gs_state.GetDhtStore().GetValue(key);
 
 	tls.SendMsg(buffer);
 }

@@ -179,7 +179,7 @@ namespace Decent
 				DeleteDataFile(key);
 			}
 
-			virtual std::vector<uint8_t> GetValue(const IdType& key, std::vector<uint8_t>& data)
+			virtual std::vector<uint8_t> GetValue(const IdType& key)
 			{
 				if (!IsResponsibleFor(key))
 				{
