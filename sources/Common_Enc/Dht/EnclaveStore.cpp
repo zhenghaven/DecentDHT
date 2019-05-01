@@ -118,34 +118,21 @@ void EnclaveStore::GetValue(const MbedTlsObj::BigNumber & key, std::vector<uint8
 
 	const std::string fileName = key.ToBigEndianHexStr();
 	
+	std::vector<uint8_t> sealedData;
+	try
+	{
+		PlainFile metaFile(fileName + ".data", FileBase::Mode::Read, true);
+		sealedData.resize(metaFile.GetFileSize());
+		metaFile.ReadBlockExactSize(sealedData);
+	}
+	catch (const Decent::RuntimeException&)
+	{
+		data.resize(0);
+		return;
+	}
+
 	std::vector<uint8_t> meta;
-	try
-	{
-		PlainFile metaFile(fileName + ".meta", FileBase::Mode::Read, true);
-		meta.resize(metaFile.GetFileSize());
-		metaFile.ReadBlockExactSize(meta);
-	}
-	catch (const Decent::RuntimeException&)
-	{
-		data.resize(0);
-		return;
-	}
-
-	General128BitKey sealKey;
-	std::vector<uint8_t> salt(16, 0); /*TODO*/
-	DataSealer::DeriveSealKey(DataSealer::KeyPolicy::ByMrEnclave, gsk_storeSealKeyLabel, sealKey, salt, meta);
-
-	try
-	{
-		SecureFile dataFile(fileName + ".data", sealKey, FileBase::Mode::Read);
-		data.resize(dataFile.GetFileSize());
-		dataFile.ReadBlockExactSize(data);
-	}
-	catch (const Decent::RuntimeException&)
-	{
-		data.resize(0);
-		return;
-	}
+	DataSealer::UnsealData(DataSealer::KeyPolicy::ByMrEnclave, sealedData, meta, data);
 }
 
 void EnclaveStore::DeleteDataFile(const std::string& keyStr)
@@ -161,17 +148,11 @@ void EnclaveStore::SaveDataFile(const std::string& keyStr, const std::vector<uin
 	LOGI("DHT store: adding key to the index. %s", keyStr.c_str());
 	LOGI("DHT store: writing value: %s", std::string(reinterpret_cast<const char*>(data.data()), data.size()).c_str());
 	
-	General128BitKey sealKey;
-	std::vector<uint8_t> salt(16, 0); /*TODO*/
-	DataSealer::DeriveSealKey(DataSealer::KeyPolicy::ByMrEnclave, gsk_storeSealKeyLabel, sealKey, salt, GetSealKeyMetaData());
+	std::vector<uint8_t> meta;
+	std::vector<uint8_t> sealedData = DataSealer::SealData(DataSealer::KeyPolicy::ByMrEnclave, meta, data);
 	
 	{
-		WritablePlainFile metaFile(keyStr + ".meta", WritableFileBase::WritableMode::Write, true);
-		metaFile.WriteBlockExactSize(GetSealKeyMetaData());
-	}
-	
-	{
-		WritableSecureFile dataFile(keyStr + ".data", sealKey, WritableFileBase::WritableMode::Write);
-		dataFile.WriteBlockExactSize(data);
+		WritablePlainFile metaFile(keyStr + ".data", WritableFileBase::WritableMode::Write, true);
+		metaFile.WriteBlockExactSize(sealedData);
 	}
 }
