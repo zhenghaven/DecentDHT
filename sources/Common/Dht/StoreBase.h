@@ -3,8 +3,10 @@
 #include <cstdint>
 
 #include <vector>
-#include <set>
+#include <map>
 #include <mutex>
+
+#include <DecentApi/Common/RuntimeException.h>
 
 namespace Decent
 {
@@ -14,7 +16,7 @@ namespace Decent
 		class StoreBase
 		{
 		public: //static member:
-			typedef std::set<IdType> IndexingType;
+			typedef std::map<IdType, std::vector<uint8_t> > IndexingType;
 
 		public:
 			StoreBase() = delete;
@@ -22,28 +24,12 @@ namespace Decent
 			StoreBase(const IdType& ringStart, const IdType& ringEnd) :
 				m_ringStart(ringStart),
 				m_ringEnd(ringEnd),
-				m_indexing(),
-				m_indexingMutex()
+				m_indexingMutex(),
+				m_indexing()
 			{}
 
 			virtual ~StoreBase()
 			{}
-
-			/**
-			 * \brief	Migrate data from remote DHT store.
-			 *
-			 * \param	addr 	The address of remote DHT store.
-			 * \param	start	The start of the ID range (smallest value, exclusive).
-			 * \param	end  	The end of the ID range (largest value, inclusive).
-			 */
-			virtual void MigrateFrom(const AddrType& addr, const IdType& start, const IdType& end) = 0;
-
-			/**
-			 * \brief	Migrate data to remote DHT store.
-			 *
-			 * \param	addr	The address of remote DHT store.
-			 */
-			virtual void MigrateTo(const AddrType& addr) = 0;
 
 			/**
 			 * \brief	Sends migrating data to remote DHT store.
@@ -59,24 +45,33 @@ namespace Decent
 			template<typename SendFuncT, typename SendNumFuncT>
 			void SendMigratingData(SendFuncT sendFunc, SendNumFuncT sendNumFunc, const IndexingType& sendIndexing)
 			{
-				uint64_t numOfData = static_cast<uint64_t>(sendIndexing.size());
+				static constexpr uint8_t hasData2Send = 1;
+				static constexpr uint8_t noData2Send = 0;
 
-				sendFunc(&numOfData, sizeof(numOfData)); //1. Send number of data to be sent.
-
-				for (const IdType& index : sendIndexing)
+				for (auto it = sendIndexing.begin(); it != sendIndexing.end(); ++it)
 				{
-					sendNumFunc(index); //2. Send Key of the data.
-
-					std::vector<uint8_t> data = GetAndDeleteDataFile(index);
-
+					std::vector<uint8_t> data;
+					try
+					{
+						data = MigrateOneDataFile(it->first, it->second);
+					}
+					catch (const std::exception&)
+					{
+						continue;
+					}
 					uint64_t sizeOfData = static_cast<uint64_t>(data.size());
-					sendFunc(&sizeOfData, sizeof(sizeOfData)); //3. Send size of data to be sent.
-					sendFunc(data.data(), data.size()); //4. Send data. - Done!
+
+					sendFunc(&hasData2Send, sizeof(hasData2Send)); //1. Yes, we have data to send.
+					sendNumFunc(it->first);                        //2. Send Key of the data.
+					sendFunc(&sizeOfData, sizeof(sizeOfData));     //3. Send size of data.
+					sendFunc(data.data(), data.size());            //4. Send data. - Done!
 				}
+
+				sendFunc(&noData2Send, sizeof(noData2Send));       //5. Stop.
 			}
 
 			/**
-			 * \brief	Sends migrating data to remote DHT store.
+			 * \brief	Migrate a range of data to send to the remote DHT store.
 			 *
 			 * \tparam	SendFuncT   	Type of the send function t. Must have the form of 
 			 * 							"void FuncName(const void* buf, size_t size)".
@@ -94,6 +89,27 @@ namespace Decent
 			}
 
 			/**
+			 * \brief	Migrates all data to send to the remote DHT store.
+			 *
+			 * \tparam	SendFuncT   	Type of the send function t. Must have the form of "void
+			 * 							FuncName(const void* buf, size_t size)".
+			 * \tparam	SendNumFuncT	Type of the send function t for sending key numbers. Must have the
+			 * 							form of "void FuncName(const IdType&amp; key)".
+			 * \param	sendFunc   	The send function for sending data.
+			 * \param	sendNumFunc	The send function for sending key number value.
+			 */
+			template<typename SendFuncT, typename SendNumFuncT>
+			void SendMigratingDataAll(SendFuncT sendFunc, SendNumFuncT sendNumFunc)
+			{
+				IndexingType indexing;
+				{
+					std::unique_lock<std::mutex> indexingLock(m_indexingMutex);
+					indexing.swap(m_indexing);
+				}
+				SendMigratingData(sendFunc, sendNumFunc, indexing);
+			}
+
+			/**
 			 * \brief	Receive migrating data from remote DHT store.
 			 *
 			 * \tparam	RecvFuncT   	Type of the receive function t. Must have the form of
@@ -106,24 +122,28 @@ namespace Decent
 			template<typename RecvFuncT, typename RecvNumFuncT>
 			void RecvMigratingData(RecvFuncT recvFunc, RecvNumFuncT recvNumFunc)
 			{
-				std::unique_lock<std::mutex> indexingLock(m_indexingMutex);
+				static constexpr uint8_t hasData2Recv = 1;
+				//static constexpr uint8_t noData2Recv = 0;
 
-				uint64_t numOfData = 0;
-				recvFunc(&numOfData, sizeof(numOfData)); //1. Receive number of data to be received.
+				uint8_t hasData = 0;
+				recvFunc(&hasData, sizeof(hasData)); //1. Do we have data to receive?
 
-				for (uint64_t i = 0; i < numOfData; ++i)
+				uint64_t sizeOfData = 0;
+				while (hasData == hasData2Recv)
 				{
-					IdType key = recvNumFunc(); //2. Receive key of the data.
-
-					uint64_t sizeOfData = 0;
-					recvFunc(&sizeOfData, sizeof(sizeOfData)); //3. Receive size of data to be sent.
-
+					IdType key = recvNumFunc();                //2. Receive key of the data.
+					recvFunc(&sizeOfData, sizeof(sizeOfData)); //3. Receive size of data.
 					std::vector<uint8_t> data(sizeOfData);
-					recvFunc(data.data(), data.size()); //4. Receive data. - Done!
+					recvFunc(data.data(), data.size());        //4. Receive data. - Done!
 
-					const std::string keyStr = key.ToBigEndianHexStr();
-					m_indexing.insert(std::move(key));
-					SaveDataFile(keyStr, data);
+					try
+					{
+						SetValue(key, data);
+					}
+					catch (const std::exception&)
+					{}
+
+					recvFunc(&hasData, sizeof(hasData));       //1. Do we have more data to receive?
 				}
 			}
 
@@ -131,49 +151,102 @@ namespace Decent
 
 			virtual void SetValue(const IdType& key, const std::vector<uint8_t>& data)
 			{
-				if (IsResponsibleFor(key))
+				if (!IsResponsibleFor(key))
 				{
-					const std::string keyStr = key.ToBigEndianHexStr();
-					{
-						std::unique_lock<std::mutex> indexingLock(m_indexingMutex);
-						m_indexing.insert(key);
-					}
-					
-					SaveDataFile(keyStr, data);
+					throw Decent::RuntimeException("This server is not resposible for queried key.");
+				}
+
+				std::vector<uint8_t> tag = SaveDataFile(key, data);
+
+				{
+					std::unique_lock<std::mutex> indexingLock(m_indexingMutex);
+					m_indexing.insert(std::make_pair(IdType(key), std::move(tag)));
 				}
 			}
 
 			virtual void DelValue(const IdType& key)
 			{
-				if (IsResponsibleFor(key))
+				if (!IsResponsibleFor(key))
 				{
-					const std::string keyStr = key.ToBigEndianHexStr();
-					{
-						std::unique_lock<std::mutex> indexingLock(m_indexingMutex);
-						m_indexing.erase(key);
-					}
-					
-					DeleteDataFile(keyStr);
+					throw Decent::RuntimeException("This server is not resposible for queried key.");
 				}
+
+				{
+					std::unique_lock<std::mutex> indexingLock(m_indexingMutex);
+					m_indexing.erase(key);
+				}
+
+				DeleteDataFile(key);
 			}
 
-			virtual void GetValue(const IdType& key, std::vector<uint8_t>& data) = 0;
+			virtual std::vector<uint8_t> GetValue(const IdType& key, std::vector<uint8_t>& data)
+			{
+				if (!IsResponsibleFor(key))
+				{
+					throw Decent::RuntimeException("This server is not resposible for queried key.");
+				}
+
+				std::vector<uint8_t> tag;
+				{
+					std::unique_lock<std::mutex> indexingLock(m_indexingMutex);
+					auto it = m_indexing.find(key);
+					if (it == m_indexing.end())
+					{
+						throw Decent::RuntimeException("Queried key-value pair is not found.");
+					}
+					tag = it->second;
+				}
+
+				return ReadDataFile(key, tag);
+			}
 
 		protected:
-			IndexingType& GetIndexing()
-			{
-				return m_indexing;
-			}
 
-			const IndexingType& GetIndexing() const
-			{
-				return m_indexing;
-			}
+			/**
+			 * \brief	Saves the data to storage. NOTE: this function should only interact with file system.
+			 *
+			 * \param	key 	The key.
+			 * \param	data	The data.
+			 *
+			 * \return	The tag for the data stored in std::vector&lt;uint8_t&gt;. The tag is generated for
+			 * 			verification later.
+			 */
+			virtual std::vector<uint8_t> SaveDataFile(const IdType& key, const std::vector<uint8_t>& data) = 0;
 
-			std::mutex& GetIndexingMutex() const
-			{
-				return m_indexingMutex;
-			}
+			/**
+			 * \brief	Delete the data file from the file system. NOTE: this function should only interact
+			 * 			with file system.
+			 *
+			 * \param	key	The key.
+			 */
+			virtual void DeleteDataFile(const IdType& key) = 0;
+
+			/**
+			 * \brief	Reads data from file system. NOTE: this function should only interact with file
+			 * 			system.
+			 *
+			 * \exception	Decent::RuntimeException	Thrown when the data read is invalid.
+			 *
+			 * \param	key	The key.
+			 * \param	tag	The tag used to verify the validity of the data.
+			 *
+			 * \return	The data.
+			 */
+			virtual std::vector<uint8_t> ReadDataFile(const IdType& key, const std::vector<uint8_t>& tag) = 0;
+
+			/**
+			 * \brief	Migrate (i.e. read and delete) one key-value pair from the file system. NOTE: this
+			 * 			function should only interact with file system.
+			 *
+			 * \exception	Decent::RuntimeException	Thrown when the data read is invalid.
+			 *
+			 * \param	key	The key.
+			 * \param	tag	The tag used to verify the validity of the data.
+			 *
+			 * \return	The data in std::vector&lt;uint8_t&gt;
+			 */
+			virtual std::vector<uint8_t> MigrateOneDataFile(const IdType& key, const std::vector<uint8_t>& tag) = 0;
+
 
 			/**
 			 * \brief	Deletes the indexing within the specified range.
@@ -213,53 +286,19 @@ namespace Decent
 			 */
 			virtual void DeleteIndexingNormalOrder(IndexingType& res, const IdType& start, const IdType& end)
 			{
-				for (auto it = m_indexing.lower_bound(start); it != m_indexing.end() && *it <= end; it = m_indexing.erase(it))
+				auto endIt = m_indexing.upper_bound(end);
+				for (auto it = m_indexing.lower_bound(start); it != endIt; it = m_indexing.erase(it))
 				{
 					res.insert(*it);
 				}
 			}
 
-			/**
-			 * \brief	Get the value specified by key, and then delete the data file from the file system.
-			 * 			NOTE: this doesn't delete the key from indexing.
-			 *
-			 * \param	key	The key.
-			 *
-			 * \return	The data in std::vector&lt;uint8_t&gt;
-			 */
-			virtual std::vector<uint8_t> GetAndDeleteDataFile(const IdType& key)
-			{
-				std::vector<uint8_t> res;
-				GetValue(key, res);
-
-				DeleteDataFile(key.ToBigEndianHexStr());
-
-				return res;
-			}
-
-			/**
-			 * \brief	Delete the data file from the file system.
-			 * 			NOTE: this function should only interact with file system.
-			 *
-			 * \param	key	The key.
-			 *
-			 */
-			virtual void DeleteDataFile(const std::string& keyStr) = 0;
-
-			/**
-			 * \brief	Saves the data to storage. 
-			 * 			NOTE: this function should only interact with file system.
-			 *
-			 * \param	keyStr	The key in string.
-			 * \param	data  	The data.
-			 */
-			virtual void SaveDataFile(const std::string& keyStr, const std::vector<uint8_t>& data) = 0;
-
 		private:
 			IdType m_ringStart;
 			IdType m_ringEnd;
-			IndexingType m_indexing;
+
 			mutable std::mutex m_indexingMutex;
+			IndexingType m_indexing;
 		};
 	}
 }

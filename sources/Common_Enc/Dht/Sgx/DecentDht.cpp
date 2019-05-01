@@ -1,3 +1,5 @@
+//#if ENCLAVE_PLATFORM_SGX
+
 #include "../DhtServer.h"
 
 #include <DecentApi/Common/Common.h>
@@ -137,3 +139,5 @@ extern "C" int ecall_decent_dht_proc_msg_from_app(void* connection)
 
 	return false;
 }
+
+//#endif //ENCLAVE_PLATFORM_SGX
