@@ -4,7 +4,7 @@
 
 #include <DecentApi/DecentAppEnclave/AppCertContainer.h>
 #include <DecentApi/Common/Ra/KeyContainer.h>
-#include <DecentApi/Common/Ra/WhiteList/Loaded.h>
+#include <DecentApi/Common/Ra/WhiteList/LoadedList.h>
 #include <DecentApi/Common/Ra/WhiteList/DecentServer.h>
 
 #include "../Common_Enc/Dht/DhtStates.h"
@@ -36,9 +36,9 @@ namespace
 		return inst;
 	}
 
-	static const WhiteList::Loaded& GetLoadedWhiteListImpl(WhiteList::Loaded* instPtr)
+	static const WhiteList::LoadedList& GetLoadedWhiteListImpl(WhiteList::LoadedList* instPtr)
 	{
-		static const WhiteList::Loaded inst(instPtr);
+		static const WhiteList::LoadedList inst(instPtr);
 		return inst;
 	}
 
