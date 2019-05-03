@@ -5,8 +5,8 @@ enclave
 	
 	from "sgx_ra_client.edl" import *;
 	from "sgx_ra_sp.edl" import *;
-	from "decent_tools.edl" import *;
-	from "decent_net.edl" import *;
+	from "decent_tools_swl.edl" import *;
+	from "decent_net_swl.edl" import *;
 	from "decent_ra_app.edl" import *;
 	from "decent_file_system.edl" import *;
 
