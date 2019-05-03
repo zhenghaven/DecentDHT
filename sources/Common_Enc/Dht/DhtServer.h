@@ -13,7 +13,7 @@ namespace Decent
     {
 		//DHT node functions:
 		
-		void ProcessDhtQueries(Decent::Net::TlsCommLayer& tls);
+		void ProcessDhtQuery(Decent::Net::TlsCommLayer& tls);
 
 		void GetNodeId(Decent::Net::TlsCommLayer &tls);
 
@@ -33,6 +33,8 @@ namespace Decent
 
 		//DHT Store functions:
 		
+		void ProcessStoreRequest(Decent::Net::TlsCommLayer & tls);
+		
 		void GetMigrateData(Decent::Net::TlsCommLayer & tls);
 
 		void SetMigrateData(Decent::Net::TlsCommLayer & tls);
@@ -41,10 +43,16 @@ namespace Decent
 
 		void GetData(Decent::Net::TlsCommLayer & tls);
 
+		void DelData(Decent::Net::TlsCommLayer & tls);
+
 		//(De-)Initialization functions:
 		
 		void Init(uint64_t selfAddr, int isFirstNode, uint64_t exAddr);
 
 		void DeInit();
+
+		//Requests from Apps:
+		
+		void ProcessAppRequest(Decent::Net::TlsCommLayer & tls);
     }
 }

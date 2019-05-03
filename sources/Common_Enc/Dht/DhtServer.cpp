@@ -1,9 +1,10 @@
 #include "DhtServer.h"
 
 #include <DecentApi/Common/Common.h>
-#include <DecentApi/Common/Ra/TlsConfig.h>
 #include <DecentApi/Common/Net/TlsCommLayer.h>
+#include <DecentApi/Common/Net/ConnectionBase.h>
 #include <DecentApi/Common/MbedTls/BigNumber.h>
+#include <DecentApi/CommonEnclave/Ra/TlsConfigSameEnclave.h>
 
 #include "../../Common/Dht/LocalNode.h"
 #include "../../Common/Dht/FuncNums.h"
@@ -11,9 +12,11 @@
 
 #include "EnclaveStore.h"
 #include "NodeConnector.h"
+#include "ConnectionManager.h"
 #include "DhtStatesSingleton.h"
 
 using namespace Decent;
+using namespace Decent::Net;
 using namespace Decent::Dht;
 using namespace Decent::MbedTlsObj;
 
@@ -136,7 +139,7 @@ void Dht::FindSuccessor(Decent::Net::TlsCommLayer &tls)
 	//LOGI("");
 }
 
-void Dht::ProcessDhtQueries(Decent::Net::TlsCommLayer & tls)
+void Dht::ProcessDhtQuery(Decent::Net::TlsCommLayer & tls)
 {
 	using namespace EncFunc::Dht;
 
@@ -185,6 +188,28 @@ void Dht::ProcessDhtQueries(Decent::Net::TlsCommLayer & tls)
 	}
 }
 
+void Dht::ProcessStoreRequest(Decent::Net::TlsCommLayer & tls)
+{
+	using namespace EncFunc::Store;
+
+	NumType funcNum;
+	tls.ReceiveStruct(funcNum); //1. Received function type.
+
+	switch (funcNum)
+	{
+	case k_getMigrateData:
+		GetMigrateData(tls);
+		break;
+
+	case k_setMigrateData:
+		SetMigrateData(tls);
+		break;
+
+	default:
+		break;
+	}
+}
+
 void Dht::GetMigrateData(Decent::Net::TlsCommLayer & tls)
 {
 	std::array<uint8_t, DhtStates::sk_keySizeByte> startKeyBin{};
@@ -196,7 +221,7 @@ void Dht::GetMigrateData(Decent::Net::TlsCommLayer & tls)
 	ConstBigNumber end(endKeyBin);
 
 	gs_state.GetDhtStore().SendMigratingData(
-		[&tls](void* buffer, const size_t size) -> void
+		[&tls](const void* buffer, const size_t size) -> void
 	{
 		tls.SendRaw(buffer, size);
 	},
@@ -248,10 +273,83 @@ void Dht::GetData(Decent::Net::TlsCommLayer & tls)
 
 	//LOGI("Getting data for key %s.", key.Get().ToBigEndianHexStr().c_str());
 
-	std::vector<uint8_t> buffer;
-	gs_state.GetDhtStore().GetValue(key, buffer);
+	std::vector<uint8_t> buffer = gs_state.GetDhtStore().GetValue(key);
 
 	tls.SendMsg(buffer);
+}
+
+void Dht::DelData(Decent::Net::TlsCommLayer & tls)
+{
+	std::array<uint8_t, DhtStates::sk_keySizeByte> keyBin{};
+	tls.ReceiveRaw(keyBin.data(), keyBin.size());
+	ConstBigNumber key(keyBin);
+
+	gs_state.GetDhtStore().DelValue(key);
+
+	tls.SendStruct(gsk_ack);
+}
+
+namespace
+{
+	static std::shared_ptr<Ra::TlsConfigSameEnclave> GetClientTlsConfigDhtNode()
+	{
+		static std::shared_ptr<Ra::TlsConfigSameEnclave> tlsCfg = std::make_shared<Ra::TlsConfigSameEnclave>(gs_state, Ra::TlsConfig::Mode::ClientHasCert);
+		return tlsCfg;
+	}
+
+	static void MigrateDataFromPeer(EnclaveStore& dhtStore, const uint64_t & addr, const MbedTlsObj::BigNumber & start, const MbedTlsObj::BigNumber & end)
+	{
+		LOGI("Migrating data from peer...");
+		using namespace EncFunc::Store;
+
+		std::unique_ptr<ConnectionBase> connection = ConnectionManager::GetConnection2DecentStore(addr);
+		Decent::Net::TlsCommLayer tls(*connection, GetClientTlsConfigDhtNode(), true);
+
+		tls.SendStruct(k_getMigrateData);         //1. Send function type
+
+		std::array<uint8_t, DhtStates::sk_keySizeByte> keyBin{};
+
+		start.ToBinary(keyBin);
+
+		tls.SendRaw(keyBin.data(), keyBin.size()); //2. Send start key.
+		end.ToBinary(keyBin);
+		tls.SendRaw(keyBin.data(), keyBin.size()); //3. Send end key.
+
+		dhtStore.RecvMigratingData(
+			[&tls](void* buffer, const size_t size) -> void
+		{
+			tls.ReceiveRaw(buffer, size);
+		},
+			[&tls]() -> BigNumber
+		{
+			std::array<uint8_t, DhtStates::sk_keySizeByte> keyBuf{};
+			tls.ReceiveRaw(keyBuf.data(), keyBuf.size());
+			return BigNumber(keyBuf);
+		}); //4. Receive data.
+	}
+
+	static void MigrateAllDataToPeer(EnclaveStore& dhtStore, const uint64_t & addr)
+	{
+		LOGI("Migrating data to peer...");
+		using namespace EncFunc::Store;
+
+		std::unique_ptr<ConnectionBase> connection = ConnectionManager::GetConnection2DecentStore(addr);
+		Decent::Net::TlsCommLayer tls(*connection, GetClientTlsConfigDhtNode(), true);
+
+		tls.SendStruct(k_setMigrateData); //1. Send function type
+
+		dhtStore.SendMigratingDataAll(
+			[&tls](const void* buffer, const size_t size) -> void
+		{
+			tls.SendRaw(buffer, size);
+		},
+			[&tls](const BigNumber& key) -> void
+		{
+			std::array<uint8_t, DhtStates::sk_keySizeByte> keyBuf{};
+			key.ToBinary(keyBuf);
+			tls.SendRaw(keyBuf.data(), keyBuf.size());
+		}); //2. Send data.
+	}
 }
 
 void Dht::Init(uint64_t selfAddr, int isFirstNode, uint64_t exAddr)
@@ -280,7 +378,7 @@ void Dht::Init(uint64_t selfAddr, int isFirstNode, uint64_t exAddr)
 
 		uint64_t succAddr = dhtNode->GetImmediateSuccessor()->GetAddress();
 		const BigNumber& predId = dhtNode->GetImmediatePredecessor()->GetNodeId();
-		gs_state.GetDhtStore().MigrateFrom(succAddr, selfId, predId);
+		MigrateDataFromPeer(gs_state.GetDhtStore(), succAddr, selfId, predId);
 	}
 }
 
@@ -291,6 +389,36 @@ void Dht::DeInit()
 	dhtNode->Leave();
 	if (dhtNode->GetAddress() != succAddr)
 	{
-		gs_state.GetDhtStore().MigrateTo(succAddr);
+		MigrateAllDataToPeer(gs_state.GetDhtStore(), succAddr);
+	}
+}
+
+void Dht::ProcessAppRequest(Decent::Net::TlsCommLayer & tls)
+{
+	using namespace EncFunc::App;
+
+	NumType funcNum;
+	tls.ReceiveStruct(funcNum); //1. Received function type.
+
+	switch (funcNum)
+	{
+	case k_findSuccessor:
+		FindSuccessor(tls);
+		break;
+
+	case k_getData:
+		GetData(tls);
+		break;
+
+	case k_setData:
+		SetData(tls);
+		break;
+
+	case k_delData:
+		DelData(tls);
+		break;
+
+	default:
+		break;
 	}
 }

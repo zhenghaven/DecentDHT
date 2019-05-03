@@ -4,11 +4,12 @@
 
 #include <DecentApi/DecentAppEnclave/AppCertContainer.h>
 #include <DecentApi/Common/Ra/KeyContainer.h>
-#include <DecentApi/Common/Ra/WhiteList/Loaded.h>
+#include <DecentApi/Common/Ra/WhiteList/LoadedList.h>
 #include <DecentApi/Common/Ra/WhiteList/DecentServer.h>
 
 #include "../Common_Enc/Dht/DhtStates.h"
 #include "../Common_Enc/Dht/EnclaveStore.h"
+#include "../Common_Enc/Dht/DhtConnectionPool.h"
 #include "../Common_Enc/Dht/DhtStatesSingleton.h"
 
 using namespace Decent;
@@ -35,9 +36,9 @@ namespace
 		return inst;
 	}
 
-	static const WhiteList::Loaded& GetLoadedWhiteListImpl(WhiteList::Loaded* instPtr)
+	static const WhiteList::LoadedList& GetLoadedWhiteListImpl(WhiteList::LoadedList* instPtr)
 	{
-		static const WhiteList::Loaded inst(instPtr);
+		static const WhiteList::LoadedList inst(instPtr);
 		return inst;
 	}
 
@@ -54,11 +55,23 @@ namespace
 
 		return inst;
 	}
+
+	static DhtConnectionPool& GetConnectionPool()
+	{
+		static DhtConnectionPool inst(5, 5);
+		return inst;
+	}
+
+	static Net::SecureConnectionPoolBase& GetAppConnectionPool()
+	{
+		static Net::SecureConnectionPoolBase inst(5);
+		return inst;
+	}
 }
 
 DhtStates& Decent::Dht::GetDhtStatesSingleton()
 {
-	static DhtStates state(GetCertContainer(), GetKeyContainer(), GetServerWhiteList(), &GetLoadedWhiteListImpl, GetDhtStore());
+	static DhtStates state(GetCertContainer(), GetKeyContainer(), GetServerWhiteList(), &GetLoadedWhiteListImpl, GetDhtStore(), GetConnectionPool(), GetAppConnectionPool());
 
 	return state;
 }

@@ -12,6 +12,7 @@
 #include <DecentApi/CommonApp/Net/TCPConnection.h>
 #include <DecentApi/CommonApp/Net/TCPServer.h>
 #include <DecentApi/CommonApp/Net/SmartServer.h>
+#include <DecentApi/CommonApp/Threading/MainThreadAsynWorker.h>
 #include <DecentApi/CommonApp/Ra/Messages.h>
 #include <DecentApi/CommonApp/Tools/ConfigManager.h>
 
@@ -21,11 +22,12 @@
 
 #include "../Common_App/Tools.h"
 #include "../Common_App/Dht/DecentDhtApp.h"
-#include "../Common/Dht/CircularRange.h"
-#include "../Common/Dht/LocalNode.h"
+
 using namespace Decent;
 using namespace Decent::Tools;
 using namespace Decent::Dht;
+using namespace Decent::Net;
+using namespace Decent::Threading;
 using namespace Decent::Ra::Message;
 
 /**
@@ -44,10 +46,12 @@ int main(int argc, char ** argv)
 
 	TCLAP::ValueArg<std::string> configPathArg("c", "config", "Path to the configuration file.", false, "Config.json", "String");
 	TCLAP::ValueArg<std::string> wlKeyArg("w", "wl-key", "Key for the loaded whitelist.", false, "WhiteListKey", "String");
+	TCLAP::ValueArg<int> selfNodePortNum("s", "self-port", "Port number for existing node.", false, 0, "[0-65535]");
 	TCLAP::ValueArg<int> exNodePortNum("p", "ex-port", "Port number for existing node.", false, 0, "[0-65535]");
-	TCLAP::SwitchArg isSendWlArg("s", "not-send-wl", "Do not send whitelist to Decent Server.", true);
+	TCLAP::SwitchArg isSendWlArg("n", "not-send-wl", "Do not send whitelist to Decent Server.", true);
 	cmd.add(configPathArg);
 	cmd.add(wlKeyArg);
+	cmd.add(selfNodePortNum);
 	cmd.add(exNodePortNum);
 	cmd.add(isSendWlArg);
 
@@ -65,22 +69,23 @@ int main(int argc, char ** argv)
 	const ConfigItem& selfItem = configManager.GetItem("DecentDHT");
 
 	uint32_t serverIp = boost::asio::ip::address_v4::from_string(decentServerItem.GetAddr()).to_uint();
-	std::unique_ptr<Net::Connection> serverCon;
+	std::unique_ptr<Connection> serverCon;
 
 	if (isSendWlArg.getValue())
 	{
-		serverCon = std::make_unique<Net::TCPConnection>(serverIp, decentServerItem.GetPort());
-		serverCon->SendPack(LoadWhiteList(wlKeyArg.getValue(), configManager.GetLoadedWhiteListStr()));
+		serverCon = std::make_unique<TCPConnection>(serverIp, decentServerItem.GetPort());
+		serverCon->SendSmartMsg(LoadWhiteList(wlKeyArg.getValue(), configManager.GetLoadedWhiteListStr()));
 	}
 
-	serverCon = std::make_unique<Net::TCPConnection>(serverIp, decentServerItem.GetPort());
+	serverCon = std::make_unique<TCPConnection>(serverIp, decentServerItem.GetPort());
 
-	uint32_t selfIp = Net::TCPConnection::GetIpAddressFromStr(selfItem.GetAddr());
-	uint64_t selfFullAddr = Net::TCPConnection::CombineIpAndPort(selfIp, selfItem.GetPort());
-	uint64_t exNodeFullAddr = exNodePortNum.getValue() == 0 ? 0 : Net::TCPConnection::CombineIpAndPort(selfIp, static_cast<uint16_t>(exNodePortNum.getValue()));
+	uint32_t selfIp = TCPConnection::GetIpAddressFromStr(selfItem.GetAddr());
+	uint64_t selfFullAddr = TCPConnection::CombineIpAndPort(selfIp, selfNodePortNum.getValue() ? selfNodePortNum.getValue() : selfItem.GetPort());
+	uint64_t exNodeFullAddr = exNodePortNum.getValue() == 0 ? 0 : TCPConnection::CombineIpAndPort(selfIp, static_cast<uint16_t>(exNodePortNum.getValue()));
 
-	Net::SmartServer smartServer;
-	std::unique_ptr<Net::Server> server(std::make_unique<Net::TCPServer>(selfIp, selfItem.GetPort()));
+	MainThreadAsynWorker mainThreadWorker;
+	SmartServer smartServer(2, mainThreadWorker);
+	std::unique_ptr<Server> server(std::make_unique<TCPServer>(selfIp, selfNodePortNum.getValue() ? selfNodePortNum.getValue() : selfItem.GetPort()));
 
 	std::shared_ptr<DecentDhtApp> enclave;
 	try
@@ -98,7 +103,7 @@ int main(int argc, char ** argv)
 		return -1;
 	}
 
-	smartServer.RunUtilUserTerminate();
+	mainThreadWorker.UpdateUntilInterrupt();
 
 
 	PRINT_I("Exit.");

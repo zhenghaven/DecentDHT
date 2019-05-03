@@ -13,7 +13,8 @@ namespace Decent
 	}
 	namespace Net
 	{
-		class TlsCommLayer;
+		class SecureCommLayer;
+		class ConnectionBase;
 	}
 
 	namespace Dht
@@ -24,11 +25,11 @@ namespace Decent
 			typedef NodeBase<MbedTlsObj::BigNumber, uint64_t> NodeBaseType;
 			typedef typename NodeBaseType::NodeBasePtr NodeBasePtr;
 
-			static void SendNode(Decent::Net::TlsCommLayer& tls, NodeBasePtr node);
-			static void SendNode(void* connection, Decent::Net::TlsCommLayer& tls, NodeBasePtr node);
+			static void SendNode(Decent::Net::SecureCommLayer& tls, NodeBasePtr node);
+			static void SendNode(Decent::Net::ConnectionBase& connection, Decent::Net::SecureCommLayer& tls, NodeBasePtr node);
 
-			static NodeBasePtr ReceiveNode(Decent::Net::TlsCommLayer& tls);
-			static NodeBasePtr ReceiveNode(void* connection, Decent::Net::TlsCommLayer& tls);
+			static NodeBasePtr ReceiveNode(Decent::Net::SecureCommLayer& tls);
+			static NodeBasePtr ReceiveNode(Decent::Net::ConnectionBase& connection, Decent::Net::SecureCommLayer& tls);
 
 		public:
 			NodeConnector() = delete;

@@ -1,12 +1,16 @@
+//#if ENCLAVE_PLATFORM_SGX
+
 #include "../DhtServer.h"
 
 #include <DecentApi/Common/Common.h>
 #include <DecentApi/Common/Net/TlsCommLayer.h>
 #include <DecentApi/Common/Ra/TlsConfigAnyWhiteListed.h>
+#include <DecentApi/CommonEnclave/Net/EnclaveCntTranslator.h>
 #include <DecentApi/CommonEnclave/Ra/TlsConfigSameEnclave.h>
 
 #include "../../../Common/Dht/FuncNums.h"
 
+#include "../DhtConnectionPool.h"
 #include "../DhtStatesSingleton.h"
 
 using namespace Decent;
@@ -53,14 +57,19 @@ extern "C" int ecall_decent_dht_proc_msg_from_dht(void* connection)
 		return false;
 	}
 
+	EnclaveCntTranslator cnt(connection);
+
 	//LOGI("Processing message from DHT node...");
 
 	try
 	{
 		std::shared_ptr<Ra::TlsConfigSameEnclave> tlsCfg = std::make_shared<Ra::TlsConfigSameEnclave>(gs_state, Ra::TlsConfig::Mode::ServerVerifyPeer);
-		Decent::Net::TlsCommLayer tls(connection, tlsCfg, true);
+		Decent::Net::TlsCommLayer tls(cnt, tlsCfg, true);
 
-		ProcessDhtQueries(tls);
+		do
+		{
+			ProcessDhtQuery(tls);
+		} while (gs_state.GetConnectionPool().HoldInComingConnection(tls));
 	}
 	catch (const std::exception& e)
 	{
@@ -78,6 +87,8 @@ extern "C" int ecall_decent_dht_proc_msg_from_store(void* connection)
 		return false;
 	}
 
+	EnclaveCntTranslator cnt(connection);
+
 	using namespace EncFunc::Store;
 
 	//LOGI("Processing message from DHT store...");
@@ -85,24 +96,9 @@ extern "C" int ecall_decent_dht_proc_msg_from_store(void* connection)
 	try
 	{
 		std::shared_ptr<Ra::TlsConfigSameEnclave> tlsCfg = std::make_shared<Ra::TlsConfigSameEnclave>(gs_state, Ra::TlsConfig::Mode::ServerVerifyPeer);
-		Decent::Net::TlsCommLayer tls(connection, tlsCfg, true);
+		Decent::Net::TlsCommLayer tls(cnt, tlsCfg, true);
 
-		NumType funcNum;
-		tls.ReceiveStruct(funcNum); //1. Received function type.
-
-		switch (funcNum)
-		{
-		case k_getMigrateData:
-			GetMigrateData(tls);
-			break;
-
-		case k_setMigrateData:
-			SetMigrateData(tls);
-			break;
-
-		default:
-			break;
-		}
+		ProcessStoreRequest(tls);
 	}
 	catch (const std::exception& e)
 	{
@@ -120,6 +116,8 @@ extern "C" int ecall_decent_dht_proc_msg_from_app(void* connection)
 		return false;
 	}
 
+	EnclaveCntTranslator cnt(connection);
+
 	using namespace EncFunc::App;
 
 	LOGI("Processing message from App...");
@@ -127,28 +125,12 @@ extern "C" int ecall_decent_dht_proc_msg_from_app(void* connection)
 	try
 	{
 		std::shared_ptr<Ra::TlsConfigAnyWhiteListed> tlsCfg = std::make_shared<Ra::TlsConfigAnyWhiteListed>(gs_state, Ra::TlsConfig::Mode::ServerVerifyPeer);
-		Decent::Net::TlsCommLayer tls(connection, tlsCfg, true);
+		Decent::Net::TlsCommLayer tls(cnt, tlsCfg, true);
 
-		NumType funcNum;
-		tls.ReceiveStruct(funcNum); //1. Received function type.
-
-		switch (funcNum)
+		do
 		{
-		case k_findSuccessor:
-			FindSuccessor(tls);
-			break;
-
-		case k_getData:
-			GetData(tls);
-			break;
-
-		case k_setData:
-			SetData(tls);
-			break;
-
-		default:
-			break;
-		}
+			ProcessAppRequest(tls);
+		} while (gs_state.GetAppConnectionPool().HoldInComingConnection(tls));
 	}
 	catch (const std::exception& e)
 	{
@@ -157,3 +139,5 @@ extern "C" int ecall_decent_dht_proc_msg_from_app(void* connection)
 
 	return false;
 }
+
+//#endif //ENCLAVE_PLATFORM_SGX

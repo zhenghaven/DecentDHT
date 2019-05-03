@@ -14,14 +14,22 @@ enclave
 	{
 		public int  ecall_decent_dht_init(uint64_t self_addr, int is_first_node, uint64_t ex_addr);
 		public void ecall_decent_dht_deinit();
-		public int  ecall_decent_dht_proc_msg_from_dht([user_check] void* connection) transition_using_threads;
-		public int  ecall_decent_dht_proc_msg_from_store([user_check] void* connection) transition_using_threads;
-		public int  ecall_decent_dht_proc_msg_from_app([user_check] void* connection) transition_using_threads;
+		public int  ecall_decent_dht_proc_msg_from_dht([user_check] void* connection);
+		public int  ecall_decent_dht_proc_msg_from_store([user_check] void* connection);
+		public int  ecall_decent_dht_proc_msg_from_app([user_check] void* connection);
 	};
 	
 	untrusted
 	{
-		void ocall_decent_dht_cnt_mgr_get_dht([out] void** out_cnt_ptr, uint64_t address) transition_using_threads;
-		void ocall_decent_dht_cnt_mgr_get_store([out] void** out_cnt_ptr, uint64_t address) transition_using_threads;
+		void ocall_decent_dht_cnt_mgr_get_dht([out] void** out_cnt_ptr, uint64_t address);
+		void ocall_decent_dht_cnt_mgr_get_store([out] void** out_cnt_ptr, uint64_t address);
+
+		void* ocall_decent_dht_mem_store_init();
+		void  ocall_decent_dht_mem_store_deinit([user_check] void* ptr);
+		
+		int      ocall_decent_dht_mem_store_save([user_check] void* obj, [in, string] const char* key, [in, size=val_size] const uint8_t* val_ptr, size_t val_size);
+		uint8_t* ocall_decent_dht_mem_store_read([user_check] void* obj, [in, string] const char* key, [out] size_t* val_size);
+		int      ocall_decent_dht_mem_store_dele([user_check] void* obj, [in, string] const char* key);
+		uint8_t* ocall_decent_dht_mem_store_migrate_one([user_check] void* obj, [in, string] const char* key, [out] size_t* val_size);
 	};
 };
