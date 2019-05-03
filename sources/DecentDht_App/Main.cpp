@@ -15,6 +15,7 @@
 #include <DecentApi/CommonApp/Threading/MainThreadAsynWorker.h>
 #include <DecentApi/CommonApp/Ra/Messages.h>
 #include <DecentApi/CommonApp/Tools/ConfigManager.h>
+#include <DecentApi/CommonApp/Tools/FileSystemUtil.h>
 
 #include <DecentApi/Common/Common.h>
 #include <DecentApi/Common/Ra/WhiteList/WhiteList.h>
@@ -90,8 +91,9 @@ int main(int argc, char ** argv)
 	std::shared_ptr<DecentDhtApp> enclave;
 	try
 	{
+		boost::filesystem::path tokenPath = GetKnownFolderPath(KnownFolderType::LocalAppDataEnclave).append(TOKEN_FILENAME);
 		enclave = std::make_shared<DecentDhtApp>(
-			ENCLAVE_FILENAME, KnownFolderType::LocalAppDataEnclave, TOKEN_FILENAME, wlKeyArg.getValue(), *serverCon);
+			ENCLAVE_FILENAME, tokenPath, wlKeyArg.getValue(), *serverCon);
 
 		smartServer.AddServer(server, enclave);
 
