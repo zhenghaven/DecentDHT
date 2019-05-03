@@ -69,7 +69,7 @@ extern "C" int ecall_decent_dht_proc_msg_from_dht(void* connection)
 		do
 		{
 			ProcessDhtQuery(tls);
-		} while (gs_state.GetConnectionPool().HoldInComingConnection(tls));
+		} while (gs_state.GetConnectionPool().HoldInComingConnection(cnt, tls));
 	}
 	catch (const std::exception& e)
 	{
@@ -130,7 +130,7 @@ extern "C" int ecall_decent_dht_proc_msg_from_app(void* connection)
 		do
 		{
 			ProcessAppRequest(tls);
-		} while (gs_state.GetAppConnectionPool().HoldInComingConnection(tls));
+		} while (gs_state.GetAppConnectionPool().HoldInComingConnection(cnt, tls));
 	}
 	catch (const std::exception& e)
 	{
