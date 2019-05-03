@@ -46,10 +46,12 @@ int main(int argc, char ** argv)
 
 	TCLAP::ValueArg<std::string> configPathArg("c", "config", "Path to the configuration file.", false, "Config.json", "String");
 	TCLAP::ValueArg<std::string> wlKeyArg("w", "wl-key", "Key for the loaded whitelist.", false, "WhiteListKey", "String");
+	TCLAP::ValueArg<int> selfNodePortNum("s", "self-port", "Port number for existing node.", false, 0, "[0-65535]");
 	TCLAP::ValueArg<int> exNodePortNum("p", "ex-port", "Port number for existing node.", false, 0, "[0-65535]");
-	TCLAP::SwitchArg isSendWlArg("s", "not-send-wl", "Do not send whitelist to Decent Server.", true);
+	TCLAP::SwitchArg isSendWlArg("n", "not-send-wl", "Do not send whitelist to Decent Server.", true);
 	cmd.add(configPathArg);
 	cmd.add(wlKeyArg);
+	cmd.add(selfNodePortNum);
 	cmd.add(exNodePortNum);
 	cmd.add(isSendWlArg);
 
@@ -78,12 +80,12 @@ int main(int argc, char ** argv)
 	serverCon = std::make_unique<TCPConnection>(serverIp, decentServerItem.GetPort());
 
 	uint32_t selfIp = TCPConnection::GetIpAddressFromStr(selfItem.GetAddr());
-	uint64_t selfFullAddr = TCPConnection::CombineIpAndPort(selfIp, selfItem.GetPort());
+	uint64_t selfFullAddr = TCPConnection::CombineIpAndPort(selfIp, selfNodePortNum.getValue() ? selfNodePortNum.getValue() : selfItem.GetPort());
 	uint64_t exNodeFullAddr = exNodePortNum.getValue() == 0 ? 0 : TCPConnection::CombineIpAndPort(selfIp, static_cast<uint16_t>(exNodePortNum.getValue()));
 
 	MainThreadAsynWorker mainThreadWorker;
 	SmartServer smartServer(2, mainThreadWorker);
-	std::unique_ptr<Server> server(std::make_unique<TCPServer>(selfIp, selfItem.GetPort()));
+	std::unique_ptr<Server> server(std::make_unique<TCPServer>(selfIp, selfNodePortNum.getValue() ? selfNodePortNum.getValue() : selfItem.GetPort()));
 
 	std::shared_ptr<DecentDhtApp> enclave;
 	try
