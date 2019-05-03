@@ -58,13 +58,13 @@ namespace
 
 	static DhtConnectionPool& GetConnectionPool()
 	{
-		static DhtConnectionPool inst(5, 5);
+		static DhtConnectionPool inst(6, 6);
 		return inst;
 	}
 
 	static Net::SecureConnectionPoolBase& GetAppConnectionPool()
 	{
-		static Net::SecureConnectionPoolBase inst(5);
+		static Net::SecureConnectionPoolBase inst(10);
 		return inst;
 	}
 }
