@@ -100,11 +100,11 @@ void EnclaveStore::DeleteDataFile(const MbedTlsObj::BigNumber& key)
 		sgx_status_t sgxRet = ocall_decent_dht_mem_store_dele(&memStoreRet, m_memStore, keyStr.c_str());
 		if (sgxRet != SGX_SUCCESS)
 		{
-			throw RuntimeException(Sgx::ConstructSimpleErrorMsg(sgxRet, "ocall_decent_dht_mem_store_save"));
+			throw RuntimeException(Sgx::ConstructSimpleErrorMsg(sgxRet, "ocall_decent_dht_mem_store_dele"));
 		}
 		if (!memStoreRet)
 		{
-			throw RuntimeException("OCall ocall_decent_dht_mem_store_save failed.");
+			throw RuntimeException("OCall ocall_decent_dht_mem_store_dele failed.");
 		}
 	}
 }
@@ -123,7 +123,7 @@ std::vector<uint8_t> EnclaveStore::ReadDataFile(const MbedTlsObj::BigNumber& key
 		sgx_status_t sgxRet = ocall_decent_dht_mem_store_read(&valPtr, m_memStore, keyStr.c_str(), &valSize);
 		if (sgxRet != SGX_SUCCESS)
 		{
-			throw RuntimeException(Sgx::ConstructSimpleErrorMsg(sgxRet, "ocall_decent_dht_mem_store_save"));
+			throw RuntimeException(Sgx::ConstructSimpleErrorMsg(sgxRet, "ocall_decent_dht_mem_store_read"));
 		}
 		if (valPtr == nullptr)
 		{
@@ -156,11 +156,11 @@ std::vector<uint8_t> EnclaveStore::MigrateOneDataFile(const MbedTlsObj::BigNumbe
 		sgx_status_t sgxRet = ocall_decent_dht_mem_store_migrate_one(&valPtr, m_memStore, keyStr.c_str(), &valSize);
 		if (sgxRet != SGX_SUCCESS)
 		{
-			throw RuntimeException(Sgx::ConstructSimpleErrorMsg(sgxRet, "ocall_decent_dht_mem_store_save"));
+			throw RuntimeException(Sgx::ConstructSimpleErrorMsg(sgxRet, "ocall_decent_dht_mem_store_migrate_one"));
 		}
 		if (valPtr == nullptr)
 		{
-			throw RuntimeException("OCall ocall_decent_dht_mem_store_read failed.");
+			throw RuntimeException("OCall ocall_decent_dht_mem_store_migrate_one failed.");
 		}
 
 		UntrustedBuffer uBuf(valPtr, valSize);
