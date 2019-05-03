@@ -19,6 +19,8 @@ using namespace Decent::Tools;
 
 namespace
 {
+	constexpr char gsk_sealKeyLabel[] = "Decent_DHT_Data";
+
 	DhtStates& gs_state = GetDhtStatesSingleton();
 
 	const std::vector<uint8_t>& GetSealKeyMetaData()
@@ -71,7 +73,7 @@ std::vector<uint8_t> EnclaveStore::SaveDataFile(const MbedTlsObj::BigNumber& key
 	
 	std::vector<uint8_t> meta;
 	std::vector<uint8_t> mac;
-	std::vector<uint8_t> sealedData = DataSealer::SealData(DataSealer::KeyPolicy::ByMrEnclave, mac, meta, data);
+	std::vector<uint8_t> sealedData = DataSealer::SealData(DataSealer::KeyPolicy::ByMrEnclave, gs_state, gsk_sealKeyLabel, mac, meta, data);
 	
 	{
 		int memStoreRet = true;
@@ -135,7 +137,7 @@ std::vector<uint8_t> EnclaveStore::ReadDataFile(const MbedTlsObj::BigNumber& key
 
 	std::vector<uint8_t> meta;
 	std::vector<uint8_t> data;
-	DataSealer::UnsealData(DataSealer::KeyPolicy::ByMrEnclave, sealedData, tag, meta, data);
+	DataSealer::UnsealData(DataSealer::KeyPolicy::ByMrEnclave, gs_state, gsk_sealKeyLabel, sealedData, tag, meta, data);
 
 	return data;
 }
@@ -168,7 +170,7 @@ std::vector<uint8_t> EnclaveStore::MigrateOneDataFile(const MbedTlsObj::BigNumbe
 
 	std::vector<uint8_t> meta;
 	std::vector<uint8_t> data;
-	DataSealer::UnsealData(DataSealer::KeyPolicy::ByMrEnclave, sealedData, tag, meta, data);
+	DataSealer::UnsealData(DataSealer::KeyPolicy::ByMrEnclave, gs_state, gsk_sealKeyLabel, sealedData, tag, meta, data);
 
 	return data;
 }
