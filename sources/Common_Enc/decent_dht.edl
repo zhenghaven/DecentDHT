@@ -21,8 +21,8 @@ enclave
 	
 	untrusted
 	{
-		void ocall_decent_dht_cnt_mgr_get_dht([out] void** out_cnt_ptr, uint64_t address);
-		void ocall_decent_dht_cnt_mgr_get_store([out] void** out_cnt_ptr, uint64_t address);
+		void* ocall_decent_dht_cnt_mgr_get_dht(uint64_t address);
+		void* ocall_decent_dht_cnt_mgr_get_store(uint64_t address);
 
 		void* ocall_decent_dht_mem_store_init();
 		void  ocall_decent_dht_mem_store_deinit([user_check] void* ptr);

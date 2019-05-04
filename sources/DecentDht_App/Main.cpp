@@ -18,11 +18,14 @@
 #include <DecentApi/CommonApp/Tools/FileSystemUtil.h>
 
 #include <DecentApi/Common/Common.h>
+#include <DecentApi/Common/Net/CntPoolConnection.h>
 #include <DecentApi/Common/Ra/WhiteList/WhiteList.h>
 #include <DecentApi/Common/MbedTls/BigNumber.h>
 
 #include "../Common_App/Tools.h"
 #include "../Common_App/Dht/DecentDhtApp.h"
+#include "../Common_App/Dht/DhtConnectionPool.h"
+#include "../Common_App/Dht/Messages.h"
 
 using namespace Decent;
 using namespace Decent::Tools;
@@ -30,6 +33,42 @@ using namespace Decent::Dht;
 using namespace Decent::Net;
 using namespace Decent::Threading;
 using namespace Decent::Ra::Message;
+
+static std::shared_ptr<DhtConnectionPool> GetTcpConnectionPool()
+{
+	static std::shared_ptr<DhtConnectionPool> tcpConnectionPool = std::make_shared<DhtConnectionPool>(1000, 1000);
+	return tcpConnectionPool;
+}
+
+extern "C" void* ocall_decent_dht_cnt_mgr_get_dht(uint64_t address)
+{
+	try
+	{
+		std::unique_ptr<ConnectionBase> cnt = GetTcpConnectionPool()->Get(address);
+		cnt->SendPack(FromDht().ToJsonString());
+
+		return new CntPoolConnection<uint64_t>(address, std::move(cnt), GetTcpConnectionPool());
+	}
+	catch (const std::exception&)
+	{
+		return nullptr;
+	}
+}
+
+extern "C" void* ocall_decent_dht_cnt_mgr_get_store(uint64_t address)
+{
+	try
+	{
+		std::unique_ptr<ConnectionBase> cnt = GetTcpConnectionPool()->Get(address);
+		cnt->SendPack(FromStore().ToJsonString());
+
+		return new CntPoolConnection<uint64_t>(address, std::move(cnt), GetTcpConnectionPool());
+	}
+	catch (const std::exception&)
+	{
+		return nullptr;
+	}
+}
 
 /**
  * \brief	Main entry-point for this application
@@ -95,7 +134,7 @@ int main(int argc, char ** argv)
 		enclave = std::make_shared<DecentDhtApp>(
 			ENCLAVE_FILENAME, tokenPath, wlKeyArg.getValue(), *serverCon);
 
-		smartServer.AddServer(server, enclave);
+		smartServer.AddServer(server, enclave, GetTcpConnectionPool(), 20);
 
 		enclave->InitDhtNode(selfFullAddr, exNodeFullAddr);
 	}

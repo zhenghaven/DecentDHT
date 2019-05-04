@@ -66,10 +66,7 @@ extern "C" int ecall_decent_dht_proc_msg_from_dht(void* connection)
 		std::shared_ptr<Ra::TlsConfigSameEnclave> tlsCfg = std::make_shared<Ra::TlsConfigSameEnclave>(gs_state, Ra::TlsConfig::Mode::ServerVerifyPeer);
 		Decent::Net::TlsCommLayer tls(cnt, tlsCfg, true);
 
-		do
-		{
-			ProcessDhtQuery(tls);
-		} while (gs_state.GetConnectionPool().HoldInComingConnection(cnt, tls));
+		ProcessDhtQuery(tls);
 	}
 	catch (const std::exception& e)
 	{
