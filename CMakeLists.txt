@@ -255,12 +255,8 @@ else()
 endif()
 
 if(MSVC)
-	set(Enclave_Prog_Prefix )
-	set(Enclave_Prog_Postfix dll)
 	set(Enclave_Bin_Path "${CMAKE_BINARY_DIR}/$<CONFIG>")
 else()
-	set(Enclave_Prog_Prefix ${CMAKE_SHARED_LIBRARY_PREFIX})
-	set(Enclave_Prog_Postfix so)
 	set(Enclave_Bin_Path "${CMAKE_BINARY_DIR}")
 endif()
 
@@ -308,8 +304,8 @@ foreach(Proj_Name IN ITEMS ${Enc_Proj_Name_List})
 	### Enclave
 	###########################################################
 
-	set(${Proj_Name}_Enclave_File "${Enclave_Prog_Prefix}${Proj_Name}_Enclave.signed.${Enclave_Prog_Postfix}")
-	set(${Proj_Name}_Enclave_Lib "${Enclave_Prog_Prefix}${Proj_Name}_Enclave$<$<CONFIG:Debug>:${CMAKE_DEBUG_POSTFIX}>.${Enclave_Prog_Postfix}")
+	set(${Proj_Name}_Enclave_File "${CMAKE_SHARED_LIBRARY_PREFIX}${Proj_Name}_Enclave$<$<CONFIG:Debug>:${CMAKE_DEBUG_POSTFIX}>.signed${CMAKE_SHARED_LIBRARY_SUFFIX}")
+	set(${Proj_Name}_Enclave_Lib "${CMAKE_SHARED_LIBRARY_PREFIX}${Proj_Name}_Enclave$<$<CONFIG:Debug>:${CMAKE_DEBUG_POSTFIX}>${CMAKE_SHARED_LIBRARY_SUFFIX}")
 
 	add_library(${Proj_Name}_Enclave SHARED ${SOURCES_Common} ${SOURCES_Common_EDL} ${SOURCES_Common_Enc} ${SOURCES_${Proj_Name}_Enc} ${SOURCES_${Proj_Name}_EDL})
 	#defines:
