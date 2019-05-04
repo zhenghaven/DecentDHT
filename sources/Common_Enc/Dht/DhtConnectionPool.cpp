@@ -17,7 +17,7 @@ namespace
 {
 	static std::shared_ptr<Ra::TlsConfigSameEnclave> GetClientTlsConfigDhtNode(Ra::States& state)
 	{
-		static std::shared_ptr<Ra::TlsConfigSameEnclave> tlsCfg = std::make_shared<Ra::TlsConfigSameEnclave>(state, Ra::TlsConfig::Mode::ClientHasCert);
+		static std::shared_ptr<Ra::TlsConfigSameEnclave> tlsCfg = std::make_shared<Ra::TlsConfigSameEnclave>(state, Ra::TlsConfig::Mode::ClientHasCert, nullptr);
 		return tlsCfg;
 	}
 }

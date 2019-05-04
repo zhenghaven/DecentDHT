@@ -5,6 +5,8 @@
 #include <DecentApi/Common/Common.h>
 #include <DecentApi/Common/Net/TlsCommLayer.h>
 #include <DecentApi/Common/Ra/TlsConfigAnyWhiteListed.h>
+#include <DecentApi/Common/MbedTls/SessionTicketMgr.h>
+
 #include <DecentApi/CommonEnclave/Net/EnclaveCntTranslator.h>
 #include <DecentApi/CommonEnclave/Ra/TlsConfigSameEnclave.h>
 
@@ -21,6 +23,18 @@ using namespace Decent::MbedTlsObj;
 namespace
 {
 	DhtStates& gs_state = Dht::GetDhtStatesSingleton();
+
+	std::shared_ptr<SessionTicketMgr> GetDhtSessionTicketMgr()
+	{
+		static const std::shared_ptr<SessionTicketMgr> inst = std::make_shared<SessionTicketMgr>();
+		return inst;
+	}
+
+	std::shared_ptr<SessionTicketMgr> GetAppSessionTicketMgr()
+	{
+		static const std::shared_ptr<SessionTicketMgr> inst = std::make_shared<SessionTicketMgr>();
+		return inst;
+	}
 }
 
 extern "C" int ecall_decent_dht_init(uint64_t self_addr, int is_first_node, uint64_t ex_addr)
@@ -63,7 +77,7 @@ extern "C" int ecall_decent_dht_proc_msg_from_dht(void* connection)
 
 	try
 	{
-		std::shared_ptr<Ra::TlsConfigSameEnclave> tlsCfg = std::make_shared<Ra::TlsConfigSameEnclave>(gs_state, Ra::TlsConfig::Mode::ServerVerifyPeer);
+		std::shared_ptr<Ra::TlsConfigSameEnclave> tlsCfg = std::make_shared<Ra::TlsConfigSameEnclave>(gs_state, Ra::TlsConfig::Mode::ServerVerifyPeer, GetDhtSessionTicketMgr());
 		Decent::Net::TlsCommLayer tls(cnt, tlsCfg, true);
 
 		ProcessDhtQuery(tls);
@@ -92,7 +106,7 @@ extern "C" int ecall_decent_dht_proc_msg_from_store(void* connection)
 
 	try
 	{
-		std::shared_ptr<Ra::TlsConfigSameEnclave> tlsCfg = std::make_shared<Ra::TlsConfigSameEnclave>(gs_state, Ra::TlsConfig::Mode::ServerVerifyPeer);
+		std::shared_ptr<Ra::TlsConfigSameEnclave> tlsCfg = std::make_shared<Ra::TlsConfigSameEnclave>(gs_state, Ra::TlsConfig::Mode::ServerVerifyPeer, GetDhtSessionTicketMgr());
 		Decent::Net::TlsCommLayer tls(cnt, tlsCfg, true);
 
 		ProcessStoreRequest(tls);
@@ -121,7 +135,7 @@ extern "C" int ecall_decent_dht_proc_msg_from_app(void* connection)
 
 	try
 	{
-		std::shared_ptr<Ra::TlsConfigAnyWhiteListed> tlsCfg = std::make_shared<Ra::TlsConfigAnyWhiteListed>(gs_state, Ra::TlsConfig::Mode::ServerVerifyPeer);
+		std::shared_ptr<Ra::TlsConfigAnyWhiteListed> tlsCfg = std::make_shared<Ra::TlsConfigAnyWhiteListed>(gs_state, Ra::TlsConfig::Mode::ServerVerifyPeer, GetAppSessionTicketMgr());
 		Decent::Net::TlsCommLayer tls(cnt, tlsCfg, true);
 
 		do
