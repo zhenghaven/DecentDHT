@@ -78,7 +78,7 @@ extern "C" int ecall_decent_dht_proc_msg_from_dht(void* connection)
 	try
 	{
 		std::shared_ptr<Ra::TlsConfigSameEnclave> tlsCfg = std::make_shared<Ra::TlsConfigSameEnclave>(gs_state, Ra::TlsConfig::Mode::ServerVerifyPeer, GetDhtSessionTicketMgr());
-		Decent::Net::TlsCommLayer tls(cnt, tlsCfg, true);
+		Decent::Net::TlsCommLayer tls(cnt, tlsCfg, true, nullptr);
 
 		ProcessDhtQuery(tls);
 	}
@@ -107,7 +107,7 @@ extern "C" int ecall_decent_dht_proc_msg_from_store(void* connection)
 	try
 	{
 		std::shared_ptr<Ra::TlsConfigSameEnclave> tlsCfg = std::make_shared<Ra::TlsConfigSameEnclave>(gs_state, Ra::TlsConfig::Mode::ServerVerifyPeer, GetDhtSessionTicketMgr());
-		Decent::Net::TlsCommLayer tls(cnt, tlsCfg, true);
+		Decent::Net::TlsCommLayer tls(cnt, tlsCfg, true, nullptr);
 
 		ProcessStoreRequest(tls);
 	}
@@ -136,7 +136,7 @@ extern "C" int ecall_decent_dht_proc_msg_from_app(void* connection)
 	try
 	{
 		std::shared_ptr<Ra::TlsConfigAnyWhiteListed> tlsCfg = std::make_shared<Ra::TlsConfigAnyWhiteListed>(gs_state, Ra::TlsConfig::Mode::ServerVerifyPeer, GetAppSessionTicketMgr());
-		Decent::Net::TlsCommLayer tls(cnt, tlsCfg, true);
+		Decent::Net::TlsCommLayer tls(cnt, tlsCfg, true, nullptr);
 
 		do
 		{

@@ -303,7 +303,7 @@ namespace
 		using namespace EncFunc::Store;
 
 		std::unique_ptr<ConnectionBase> connection = ConnectionManager::GetConnection2DecentStore(addr);
-		Decent::Net::TlsCommLayer tls(*connection, GetClientTlsConfigDhtNode(), true);
+		Decent::Net::TlsCommLayer tls(*connection, GetClientTlsConfigDhtNode(), true, nullptr);
 
 		tls.SendStruct(k_getMigrateData);         //1. Send function type
 
@@ -334,7 +334,7 @@ namespace
 		using namespace EncFunc::Store;
 
 		std::unique_ptr<ConnectionBase> connection = ConnectionManager::GetConnection2DecentStore(addr);
-		Decent::Net::TlsCommLayer tls(*connection, GetClientTlsConfigDhtNode(), true);
+		Decent::Net::TlsCommLayer tls(*connection, GetClientTlsConfigDhtNode(), true, nullptr);
 
 		tls.SendStruct(k_setMigrateData); //1. Send function type
 
