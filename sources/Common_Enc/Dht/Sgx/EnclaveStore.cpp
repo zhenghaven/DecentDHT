@@ -69,7 +69,7 @@ std::vector<uint8_t> EnclaveStore::SaveDataFile(const MbedTlsObj::BigNumber& key
 
 	const std::string keyStr = key.ToBigEndianHexStr();
 	LOGI("DHT store: adding key to the index. %s", keyStr.c_str());
-	LOGI("DHT store: writing value: %s", std::string(reinterpret_cast<const char*>(data.data()), data.size()).c_str());
+	//LOGI("DHT store: writing value: %s", std::string(reinterpret_cast<const char*>(data.data()), data.size()).c_str());
 	
 	std::vector<uint8_t> meta;
 	std::vector<uint8_t> mac;
