@@ -49,7 +49,7 @@ namespace
 
 EnclaveStore::EnclaveStore(const MbedTlsObj::BigNumber & ringStart, const MbedTlsObj::BigNumber & ringEnd) :
 	StoreBase(ringStart, ringEnd),
-	m_memStore(InitializeMemStore())
+	m_memStore(nullptr)
 {}
 
 EnclaveStore::~EnclaveStore()
@@ -61,6 +61,11 @@ bool EnclaveStore::IsResponsibleFor(const MbedTlsObj::BigNumber & key) const
 {
 	DhtStates::DhtLocalNodePtrType localNode = gs_state.GetDhtNode();
 	return localNode ? localNode->IsResponsibleFor(key) : false;
+}
+
+void EnclaveStore::Init()
+{
+	m_memStore = m_memStore ? m_memStore : InitializeMemStore();
 }
 
 std::vector<uint8_t> EnclaveStore::SaveDataFile(const MbedTlsObj::BigNumber& key, const std::vector<uint8_t>& data)

@@ -19,6 +19,8 @@ namespace Decent
 
 			virtual bool IsResponsibleFor(const MbedTlsObj::BigNumber& key) const;
 
+			virtual void Init();
+
 		protected:
 			virtual std::vector<uint8_t> SaveDataFile(const MbedTlsObj::BigNumber& key, const std::vector<uint8_t>& data) override;
 

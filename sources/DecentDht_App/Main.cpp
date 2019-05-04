@@ -93,7 +93,7 @@ int main(int argc, char ** argv)
 	{
 		boost::filesystem::path tokenPath = GetKnownFolderPath(KnownFolderType::LocalAppDataEnclave).append(TOKEN_FILENAME);
 		enclave = std::make_shared<DecentDhtApp>(
-			ENCLAVE_FILENAME, tokenPath, wlKeyArg.getValue(), *serverCon);
+			ENCLAVE_FILENAME, tokenPath, 5, 5, 0, 0, wlKeyArg.getValue(), *serverCon);
 
 		smartServer.AddServer(server, enclave);
 

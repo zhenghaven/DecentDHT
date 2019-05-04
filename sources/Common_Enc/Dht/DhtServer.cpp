@@ -354,6 +354,8 @@ namespace
 
 void Dht::Init(uint64_t selfAddr, int isFirstNode, uint64_t exAddr)
 {
+	gs_state.GetDhtStore().Init();
+
 	std::shared_ptr<DhtStates::DhtLocalNodeType::Pow2iArrayType> pow2iArray = std::make_shared<DhtStates::DhtLocalNodeType::Pow2iArrayType>();
 	for (size_t i = 0; i < pow2iArray->size(); ++i)
 	{

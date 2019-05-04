@@ -1,6 +1,6 @@
 enclave
 {
-	from "decent_dht.edl" import *;
+	from "decent_dht_swl.edl" import *;
 
 	trusted
 	{
