@@ -45,7 +45,7 @@ extern "C" void* ocall_decent_dht_cnt_mgr_get_dht(uint64_t address)
 	try
 	{
 		std::unique_ptr<ConnectionBase> cnt = GetTcpConnectionPool()->Get(address);
-		cnt->SendPack(FromDht().ToJsonString());
+		cnt->SendPack(FromDht::sk_ValueCat);
 
 		return new CntPoolConnection<uint64_t>(address, std::move(cnt), GetTcpConnectionPool());
 	}
@@ -60,7 +60,7 @@ extern "C" void* ocall_decent_dht_cnt_mgr_get_store(uint64_t address)
 	try
 	{
 		std::unique_ptr<ConnectionBase> cnt = GetTcpConnectionPool()->Get(address);
-		cnt->SendPack(FromStore().ToJsonString());
+		cnt->SendPack(FromStore::sk_ValueCat);
 
 		return new CntPoolConnection<uint64_t>(address, std::move(cnt), GetTcpConnectionPool());
 	}
