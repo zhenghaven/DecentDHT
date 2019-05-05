@@ -134,7 +134,7 @@ int main(int argc, char ** argv)
 		enclave = std::make_shared<DecentDhtApp>(
 			ENCLAVE_FILENAME, tokenPath, wlKeyArg.getValue(), *serverCon);
 
-		smartServer.AddServer(server, enclave, GetTcpConnectionPool(), 20);
+		smartServer.AddServer(server, enclave, GetTcpConnectionPool(), 10);
 
 		enclave->InitDhtNode(selfFullAddr, exNodeFullAddr);
 	}
