@@ -3,36 +3,36 @@
 #include <iostream>
 
 #include <tclap/CmdLine.h>
-#include <boost/asio/ip/address_v4.hpp>
-#include <sgx_quote.h>
+#include <boost/filesystem.hpp>
 
 #include <DecentApi/CommonApp/Common.h>
 
-#include <DecentApi/CommonApp/Net/SmartMessages.h>
 #include <DecentApi/CommonApp/Net/TCPConnection.h>
 #include <DecentApi/CommonApp/Net/TCPServer.h>
 #include <DecentApi/CommonApp/Net/SmartServer.h>
-#include <DecentApi/CommonApp/Threading/MainThreadAsynWorker.h>
-#include <DecentApi/CommonApp/Ra/Messages.h>
+#include <DecentApi/CommonApp/Tools/DiskFile.h>
 #include <DecentApi/CommonApp/Tools/ConfigManager.h>
 #include <DecentApi/CommonApp/Tools/FileSystemUtil.h>
+#include <DecentApi/CommonApp/Threading/MainThreadAsynWorker.h>
 
 #include <DecentApi/Common/Common.h>
-#include <DecentApi/Common/Net/CntPoolConnection.h>
+#include <DecentApi/Common/Ra/RequestCategory.h>
 #include <DecentApi/Common/Ra/WhiteList/WhiteList.h>
+#include <DecentApi/Common/Net/CntPoolConnection.h>
 #include <DecentApi/Common/MbedTls/BigNumber.h>
+
+#include "../Common/Dht/AppName.h"
+#include "../Common/Dht/RequestCategory.h"
 
 #include "../Common_App/Tools.h"
 #include "../Common_App/Dht/DecentDhtApp.h"
 #include "../Common_App/Dht/DhtConnectionPool.h"
-#include "../Common_App/Dht/Messages.h"
 
 using namespace Decent;
 using namespace Decent::Tools;
 using namespace Decent::Dht;
 using namespace Decent::Net;
 using namespace Decent::Threading;
-using namespace Decent::Ra::Message;
 
 static std::shared_ptr<DhtConnectionPool> GetTcpConnectionPool()
 {
@@ -45,7 +45,7 @@ extern "C" void* ocall_decent_dht_cnt_mgr_get_dht(uint64_t address)
 	try
 	{
 		std::unique_ptr<ConnectionBase> cnt = GetTcpConnectionPool()->Get(address);
-		cnt->SendPack(FromDht::sk_ValueCat);
+		cnt->SendPack(RequestCategory::sk_fromDht);
 
 		return new CntPoolConnection<uint64_t>(address, std::move(cnt), GetTcpConnectionPool());
 	}
@@ -60,7 +60,7 @@ extern "C" void* ocall_decent_dht_cnt_mgr_get_store(uint64_t address)
 	try
 	{
 		std::unique_ptr<ConnectionBase> cnt = GetTcpConnectionPool()->Get(address);
-		cnt->SendPack(FromStore::sk_ValueCat);
+		cnt->SendPack(RequestCategory::sk_fromStore);
 
 		return new CntPoolConnection<uint64_t>(address, std::move(cnt), GetTcpConnectionPool());
 	}
@@ -80,8 +80,15 @@ extern "C" void* ocall_decent_dht_cnt_mgr_get_store(uint64_t address)
  */
 int main(int argc, char ** argv)
 {
+	//------- Construct main thread worker at very first:
+	MainThreadAsynWorker mainThreadWorker;
+
 	std::cout << "================ Decent DHT ================" << std::endl;
 
+	//------- Setup Smart Server:
+	Net::SmartServer smartServer(mainThreadWorker);
+
+	//------- Setup command line argument parser:
 	TCLAP::CmdLine cmd("Decent DHT", ' ', "ver", true);
 
 	TCLAP::ValueArg<std::string> configPathArg("c", "config", "Path to the configuration file.", false, "Config.json", "String");
@@ -97,40 +104,100 @@ int main(int argc, char ** argv)
 
 	cmd.parse(argc, argv);
 
-	std::string configJsonStr;
-	if (!Decent::Dht::Tools::GetConfigurationJsonString(configPathArg.getValue(), configJsonStr))
+	//------- Read configuration file:
+	std::unique_ptr<ConfigManager> configMgr;
+	try
 	{
-		PRINT_W("Failed to load configuration file.");
+		std::string configJsonStr;
+		DiskFile file(configPathArg.getValue(), FileBase::Mode::Read, true);
+		configJsonStr.resize(file.GetFileSize());
+		file.ReadBlockExactSize(configJsonStr);
+
+		configMgr = std::make_unique<ConfigManager>(configJsonStr);
+	}
+	catch (const std::exception& e)
+	{
+		PRINT_W("Failed to load configuration file. Error Msg: %s", e.what());
 		return -1;
 	}
-	ConfigManager configManager(configJsonStr);
 
-	const ConfigItem& decentServerItem = configManager.GetItem(Ra::WhiteList::sk_nameDecentServer);
-	const ConfigItem& selfItem = configManager.GetItem("DecentDHT");
-
-	uint32_t serverIp = boost::asio::ip::address_v4::from_string(decentServerItem.GetAddr()).to_uint();
-	std::unique_ptr<Connection> serverCon;
-
-	if (isSendWlArg.getValue())
+	//------- Read Decent Server Configuration:
+	uint32_t serverIp = 0;
+	uint16_t serverPort = 0;
+	try
 	{
-		serverCon = std::make_unique<TCPConnection>(serverIp, decentServerItem.GetPort());
-		serverCon->SendSmartMsg(LoadWhiteList(wlKeyArg.getValue(), configManager.GetLoadedWhiteListStr()));
+		const ConfigItem& decentServerConfig = configMgr->GetItem(Ra::WhiteList::sk_nameDecentServer);
+
+		serverIp = Net::TCPConnection::GetIpAddressFromStr(decentServerConfig.GetAddr());
+		serverPort = decentServerConfig.GetPort();
+	}
+	catch (const std::exception& e)
+	{
+		PRINT_W("Failed to read Decent Server configuration. Error Msg: %s", e.what());
+		return -1;
 	}
 
-	serverCon = std::make_unique<TCPConnection>(serverIp, decentServerItem.GetPort());
+	//------- Read self configuration:
+	uint32_t selfIp = 0;
+	uint16_t selfPort = 0;
+	uint64_t selfFullAddr = 0;
+	uint64_t exNodeFullAddr = 0;
+	try
+	{
+		const ConfigItem& selfItem = configMgr->GetItem(AppName::sk_decentDht);
 
-	uint32_t selfIp = TCPConnection::GetIpAddressFromStr(selfItem.GetAddr());
-	uint64_t selfFullAddr = TCPConnection::CombineIpAndPort(selfIp, selfNodePortNum.getValue() ? selfNodePortNum.getValue() : selfItem.GetPort());
-	uint64_t exNodeFullAddr = exNodePortNum.getValue() == 0 ? 0 : TCPConnection::CombineIpAndPort(selfIp, static_cast<uint16_t>(exNodePortNum.getValue()));
+		selfIp = TCPConnection::GetIpAddressFromStr(selfItem.GetAddr());
+		selfPort = selfNodePortNum.getValue() ? selfNodePortNum.getValue() : selfItem.GetPort();
 
-	MainThreadAsynWorker mainThreadWorker;
-	SmartServer smartServer(2, mainThreadWorker);
-	std::unique_ptr<Server> server(std::make_unique<TCPServer>(selfIp, selfNodePortNum.getValue() ? selfNodePortNum.getValue() : selfItem.GetPort()));
+		selfFullAddr = TCPConnection::CombineIpAndPort(selfIp, selfPort);
+		exNodeFullAddr = exNodePortNum.getValue() == 0 ? 0 : TCPConnection::CombineIpAndPort(selfIp, static_cast<uint16_t>(exNodePortNum.getValue()));
+	}
+	catch (const std::exception& e)
+	{
+		PRINT_W("Failed to read self configuration. Error Msg: %s", e.what());
+		return -1;
+	}
 
+	std::unique_ptr<ConnectionBase> serverCon;
+	//------- Send loaded white list to Decent Server when needed.
+	try
+	{
+		if (isSendWlArg.getValue())
+		{
+			serverCon = std::make_unique<TCPConnection>(serverIp, serverPort);
+			serverCon->SendPack(Ra::RequestCategory::sk_loadWhiteList);
+			serverCon->SendPack(wlKeyArg.getValue());
+			serverCon->SendPack(configMgr->GetLoadedWhiteListStr());
+			char ackMsg[] = "ACK";
+			serverCon->ReceiveRawGuarantee(&ackMsg, sizeof(ackMsg));
+		}
+	}
+	catch (const std::exception& e)
+	{
+		PRINT_W("Failed to send loaded white list to Decent Server. Error Msg: %s", e.what());
+		return -1;
+	}
+
+	//------- Setup TCP server:
+	std::unique_ptr<Server> server;
+	try
+	{
+		server = std::make_unique<Net::TCPServer>(selfIp, selfPort);
+	}
+	catch (const std::exception& e)
+	{
+		PRINT_W("Failed to start TCP server. Error Message: %s", e.what());
+		return -1;
+	}
+
+	//------- Setup Enclave:
 	std::shared_ptr<DecentDhtApp> enclave;
 	try
 	{
+		serverCon = std::make_unique<TCPConnection>(serverIp, serverPort);
+
 		boost::filesystem::path tokenPath = GetKnownFolderPath(KnownFolderType::LocalAppDataEnclave).append(TOKEN_FILENAME);
+
 		enclave = std::make_shared<DecentDhtApp>(
 			ENCLAVE_FILENAME, tokenPath, wlKeyArg.getValue(), *serverCon);
 
@@ -140,12 +207,16 @@ int main(int argc, char ** argv)
 	}
 	catch (const std::exception& e)
 	{
-		PRINT_W("Failed to start enclave program! Error Msg:\n%s", e.what());
+		PRINT_W("Failed to start enclave program. Error Msg: %s", e.what());
 		return -1;
 	}
 
+	//------- keep running until an interrupt signal (Ctrl + C) is received.
 	mainThreadWorker.UpdateUntilInterrupt();
 
+	//------- Exit...
+	enclave.reset();
+	smartServer.Terminate();
 
 	PRINT_I("Exit.");
 	return 0;

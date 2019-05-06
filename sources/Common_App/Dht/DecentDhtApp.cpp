@@ -3,7 +3,7 @@
 #include <DecentApi/Common/SGX/RuntimeError.h>
 #include <DecentApi/CommonApp/Base/EnclaveException.h>
 
-#include "Messages.h"
+#include "../../Common/Dht/RequestCategory.h"
 
 extern "C" sgx_status_t ecall_decent_dht_init(sgx_enclave_id_t eid, int* retval, uint64_t self_addr, int is_first_node, uint64_t ex_addr);
 extern "C" sgx_status_t ecall_decent_dht_deinit(sgx_enclave_id_t eid);
@@ -19,7 +19,7 @@ Decent::Dht::DecentDhtApp::~DecentDhtApp()
 	ecall_decent_dht_deinit(GetEnclaveId());
 }
 
-bool DecentDhtApp::ProcessMsgFromDht(Decent::Net::Connection & connection)
+bool DecentDhtApp::ProcessMsgFromDht(Decent::Net::ConnectionBase & connection)
 {
 	int retValue = false;
 
@@ -29,7 +29,7 @@ bool DecentDhtApp::ProcessMsgFromDht(Decent::Net::Connection & connection)
 	return retValue;
 }
 
-bool DecentDhtApp::ProcessMsgFromStore(Decent::Net::Connection & connection)
+bool DecentDhtApp::ProcessMsgFromStore(Decent::Net::ConnectionBase & connection)
 {
 	int retValue = false;
 
@@ -39,7 +39,7 @@ bool DecentDhtApp::ProcessMsgFromStore(Decent::Net::Connection & connection)
 	return retValue;
 }
 
-bool DecentDhtApp::ProcessMsgFromApp(Decent::Net::Connection & connection)
+bool DecentDhtApp::ProcessMsgFromApp(Decent::Net::ConnectionBase & connection)
 {
 	int retValue = false;
 
@@ -49,23 +49,23 @@ bool DecentDhtApp::ProcessMsgFromApp(Decent::Net::Connection & connection)
 	return retValue;
 }
 
-bool DecentDhtApp::ProcessSmartMessage(const std::string & category, const Json::Value & jsonMsg, Decent::Net::Connection & connection)
+bool DecentDhtApp::ProcessSmartMessage(const std::string & category, Decent::Net::ConnectionBase & connection)
 {
-	if (category == FromDht::sk_ValueCat)
+	if (category == RequestCategory::sk_fromDht)
 	{
 		return ProcessMsgFromDht(connection);
 	}
-	else if (category == FromStore::sk_ValueCat)
+	else if (category == RequestCategory::sk_fromStore)
 	{
 		return ProcessMsgFromStore(connection);
 	}
-	else if (category == FromApp::sk_ValueCat)
+	else if (category == RequestCategory::sk_fromApp)
 	{
 		return ProcessMsgFromApp(connection);
 	}
 	else
 	{
-		return Decent::RaSgx::DecentApp::ProcessSmartMessage(category, jsonMsg, connection);
+		return Decent::RaSgx::DecentApp::ProcessSmartMessage(category, connection);
 	}
 }
 
