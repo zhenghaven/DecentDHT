@@ -362,6 +362,14 @@ void Dht::Init(uint64_t selfAddr, int isFirstNode, uint64_t exAddr)
 
 	BigNumber selfId = BigNumber::Rand(DhtStates::sk_keySizeByte); //For testing purpose, we use random ID.
 
+	//Even more randomized.
+	uint32_t randCount = (BigNumber::Rand(1) % UINT8_MAX);
+	PRINT_I("Rand Generation Count: %lu.", randCount);
+	for (size_t i = 0; i < randCount; ++i)
+	{
+		selfId = BigNumber::Rand(DhtStates::sk_keySizeByte);
+	}
+
 	std::array<uint8_t, DhtStates::sk_keySizeByte> filledArray;
 	memset_s(filledArray.data(), filledArray.size(), 0xFF, filledArray.size());
 	MbedTlsObj::ConstBigNumber largest(filledArray);
