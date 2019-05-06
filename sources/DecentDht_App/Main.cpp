@@ -24,7 +24,6 @@
 #include "../Common/Dht/AppName.h"
 #include "../Common/Dht/RequestCategory.h"
 
-#include "../Common_App/Tools.h"
 #include "../Common_App/Dht/DecentDhtApp.h"
 #include "../Common_App/Dht/DhtConnectionPool.h"
 
