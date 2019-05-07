@@ -47,7 +47,7 @@ namespace Decent
 
 		//(De-)Initialization functions:
 		
-		void Init(uint64_t selfAddr, int isFirstNode, uint64_t exAddr);
+		void Init(uint64_t selfAddr, int isFirstNode, uint64_t exAddr, size_t totalNode, size_t idx);
 
 		void DeInit();
 

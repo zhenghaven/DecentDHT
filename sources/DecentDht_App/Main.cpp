@@ -95,11 +95,15 @@ int main(int argc, char ** argv)
 	TCLAP::ValueArg<int> selfNodePortNum("s", "self-port", "Port number for existing node.", false, 0, "[0-65535]");
 	TCLAP::ValueArg<int> exNodePortNum("p", "ex-port", "Port number for existing node.", false, 0, "[0-65535]");
 	TCLAP::SwitchArg isSendWlArg("n", "not-send-wl", "Do not send whitelist to Decent Server.", true);
+	TCLAP::ValueArg<int> totalNode("t", "total-node", "Total number of nodes in the network.", true, 0, "[0-MAX_INT]");
+	TCLAP::ValueArg<int> nodeIdx("i", "node-idx", "The index of the current adding node.", true, 0, "[0-MAX_INT]");
 	cmd.add(configPathArg);
 	cmd.add(wlKeyArg);
 	cmd.add(selfNodePortNum);
 	cmd.add(exNodePortNum);
 	cmd.add(isSendWlArg);
+	cmd.add(totalNode);
+	cmd.add(nodeIdx);
 
 	cmd.parse(argc, argv);
 
@@ -202,7 +206,7 @@ int main(int argc, char ** argv)
 
 		smartServer.AddServer(server, enclave, GetTcpConnectionPool(), 10);
 
-		enclave->InitDhtNode(selfFullAddr, exNodeFullAddr);
+		enclave->InitDhtNode(selfFullAddr, exNodeFullAddr, totalNode.getValue(), nodeIdx.getValue());
 	}
 	catch (const std::exception& e)
 	{

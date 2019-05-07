@@ -37,11 +37,11 @@ namespace
 	}
 }
 
-extern "C" int ecall_decent_dht_init(uint64_t self_addr, int is_first_node, uint64_t ex_addr)
+extern "C" int ecall_decent_dht_init(uint64_t self_addr, int is_first_node, uint64_t ex_addr, size_t totalNode, size_t idx)
 {
 	try
 	{
-		Init(self_addr, is_first_node, ex_addr);
+		Init(self_addr, is_first_node, ex_addr, totalNode, idx);
 	}
 	catch (const std::exception& e)
 	{

@@ -21,7 +21,7 @@ namespace Decent
 
 			virtual bool ProcessSmartMessage(const std::string& category, Decent::Net::ConnectionBase& connection) override;
 
-			void InitDhtNode(uint64_t selfAddr, uint64_t exNodeAddr);
+			void InitDhtNode(uint64_t selfAddr, uint64_t exNodeAddr, size_t totalNode, size_t idx);
 
 		private:
 		};

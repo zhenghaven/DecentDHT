@@ -352,7 +352,7 @@ namespace
 	}
 }
 
-void Dht::Init(uint64_t selfAddr, int isFirstNode, uint64_t exAddr)
+void Dht::Init(uint64_t selfAddr, int isFirstNode, uint64_t exAddr, size_t totalNode, size_t idx)
 {
 	std::shared_ptr<DhtStates::DhtLocalNodeType::Pow2iArrayType> pow2iArray = std::make_shared<DhtStates::DhtLocalNodeType::Pow2iArrayType>();
 	for (size_t i = 0; i < pow2iArray->size(); ++i)
@@ -360,19 +360,13 @@ void Dht::Init(uint64_t selfAddr, int isFirstNode, uint64_t exAddr)
 		(*pow2iArray)[i].SetBit(i, true);
 	}
 
-	BigNumber selfId = BigNumber::Rand(DhtStates::sk_keySizeByte); //For testing purpose, we use random ID.
-
-	//Even more randomized.
-	uint32_t randCount = (BigNumber::Rand(1) % UINT8_MAX);
-	PRINT_I("Rand Generation Count: %lu.", randCount);
-	for (size_t i = 0; i < randCount; ++i)
-	{
-		selfId = BigNumber::Rand(DhtStates::sk_keySizeByte);
-	}
-
 	std::array<uint8_t, DhtStates::sk_keySizeByte> filledArray;
 	memset_s(filledArray.data(), filledArray.size(), 0xFF, filledArray.size());
 	MbedTlsObj::ConstBigNumber largest(filledArray);
+
+	BigNumber step = largest / totalNode;
+
+	BigNumber selfId = step * idx;
 
 	PRINT_I("Self Node ID: %s.", selfId.ToBigEndianHexStr().c_str());
 	DhtStates::DhtLocalNodePtrType dhtNode = std::make_shared<DhtStates::DhtLocalNodeType>(selfId, selfAddr, 0, largest, pow2iArray);
