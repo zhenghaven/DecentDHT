@@ -36,6 +36,12 @@ namespace Decent
 
 		void QueryReply(Decent::Net::TlsCommLayer &tls, void*& heldCntPtr);
 
+		void QueryForwardWorker();
+
+		void QueryReplyWorker();
+
+		void TerminateWorkers();
+
 		//DHT Store functions:
 		
 		void ProcessStoreRequest(Decent::Net::TlsCommLayer & tls);

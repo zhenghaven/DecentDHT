@@ -10,7 +10,6 @@
 #include <DecentApi/CommonApp/Net/SmartServer.h>
 #include <DecentApi/CommonApp/Net/TCPServer.h>
 #include <DecentApi/CommonApp/Net/TCPConnection.h>
-#include <DecentApi/CommonApp/Net/CntPoolConnection.h>
 #include <DecentApi/CommonApp/Tools/DiskFile.h>
 #include <DecentApi/CommonApp/Tools/ConfigManager.h>
 #include <DecentApi/CommonApp/Tools/FileSystemUtil.h>
@@ -19,6 +18,7 @@
 #include <DecentApi/Common/Common.h>
 #include <DecentApi/Common/Ra/RequestCategory.h>
 #include <DecentApi/Common/Ra/WhiteList/WhiteList.h>
+#include <DecentApi/Common/Net/CntPoolConnection.h>
 #include <DecentApi/Common/MbedTls/BigNumber.h>
 
 #include "../Common/Dht/AppName.h"
@@ -35,7 +35,7 @@ using namespace Decent::Threading;
 
 static std::shared_ptr<DhtConnectionPool> GetTcpConnectionPool()
 {
-	static std::shared_ptr<DhtConnectionPool> tcpConnectionPool = std::make_shared<DhtConnectionPool>(1000, 1000, 30);
+	static std::shared_ptr<DhtConnectionPool> tcpConnectionPool = std::make_shared<DhtConnectionPool>(1000, 1000);
 	return tcpConnectionPool;
 }
 
@@ -204,9 +204,11 @@ int main(int argc, char ** argv)
 		enclave = std::make_shared<DecentDhtApp>(
 			ENCLAVE_FILENAME, tokenPath, wlKeyArg.getValue(), *serverCon);
 
-		smartServer.AddServer(server, enclave, GetTcpConnectionPool(), 30);
+		smartServer.AddServer(server, enclave, GetTcpConnectionPool(), 3);
 
 		enclave->InitDhtNode(selfFullAddr, exNodeFullAddr, totalNode.getValue(), nodeIdx.getValue());
+
+		enclave->InitQueryWorkers(12, 12);
 	}
 	catch (const std::exception& e)
 	{

@@ -1,5 +1,7 @@
 #include "DhtServer.h"
 
+#include <queue>
+
 #include <cppcodec/base64_default_rfc4648.hpp>
 
 #include <DecentApi/Common/Common.h>
@@ -61,6 +63,52 @@ namespace
 
 		return false;
 	}
+
+	static std::atomic<bool> gs_isForwardingTerminated = false;
+
+	struct ForwardQueueItem
+	{
+		uint64_t m_nextAddr;
+		std::string m_uuid;
+		std::array<uint8_t, DhtStates::sk_keySizeByte> m_keyId;
+		uint64_t m_reAddr;
+	};
+
+	static std::mutex gs_forwardQueueMutex;
+	static std::queue<std::unique_ptr<ForwardQueueItem> > gs_forwardQueue;
+	static std::condition_variable gs_forwardQueueSignal;
+
+	static void ForwardQuery(const ForwardQueueItem& item)
+	{
+		//PRINT_I("Forward query with ID %s.", item.m_uuid.c_str());
+		CntPair peerCntPair = gs_state.GetConnectionPool().GetNew(item.m_nextAddr, gs_state);
+
+		peerCntPair.GetCommLayer().SendStruct(EncFunc::Dht::k_queryNonBlock);
+		peerCntPair.GetCommLayer().SendMsg(item.m_uuid);                              //1. Send request UUID
+		peerCntPair.GetCommLayer().SendRaw(item.m_keyId.data(), item.m_keyId.size()); //2. Forward queried key ID
+		peerCntPair.GetCommLayer().SendStruct(item.m_reAddr);                         //3. Send RE addr
+	}
+
+	struct ReplyQueueItem
+	{
+		uint64_t m_reAddr;
+		std::string m_uuid;
+		uint64_t m_resAddr;
+	};
+
+	static std::mutex gs_replyQueueMutex;
+	static std::queue<std::unique_ptr<ReplyQueueItem> > gs_replyQueue;
+	static std::condition_variable gs_replyQueueSignal;
+
+	static void ReplyQuery(const ReplyQueueItem& item)
+	{
+		//PRINT_I("Reply query with ID %s.", item.m_uuid.c_str());
+		CntPair peerCntPair = gs_state.GetConnectionPool().GetNew(item.m_reAddr, gs_state);
+
+		peerCntPair.GetCommLayer().SendStruct(EncFunc::Dht::k_queryReply);
+		peerCntPair.GetCommLayer().SendMsg(item.m_uuid);        //1. Reply request UUID
+		peerCntPair.GetCommLayer().SendStruct(item.m_resAddr);  //2. Reply result address
+	}
 }
 
 void Dht::DeUpdateFingerTable(Decent::Net::TlsCommLayer &tls)
@@ -85,15 +133,13 @@ void Dht::DeUpdateFingerTable(Decent::Net::TlsCommLayer &tls)
 
 void Dht::QueryNonBlock(Decent::Net::TlsCommLayer & tls)
 {
-	std::string requestId;
-	std::array<uint8_t, DhtStates::sk_keySizeByte> keyBin{};
-	uint64_t reAddr = 0;
+	std::unique_ptr<ForwardQueueItem> queueItem = Tools::make_unique<ForwardQueueItem>();
 
-	tls.ReceiveMsg(requestId);                    //1. Receive request UUID
-	tls.ReceiveRaw(keyBin.data(), keyBin.size()); //2. Receive queried ID
-	tls.ReceiveStruct(reAddr);                    //3. Receive RE address
+	tls.ReceiveMsg(queueItem->m_uuid);                                    //1. Receive request UUID
+	tls.ReceiveRaw(queueItem->m_keyId.data(), queueItem->m_keyId.size()); //2. Receive queried ID
+	tls.ReceiveStruct(queueItem->m_reAddr);                               //3. Receive RE address
 
-	ConstBigNumber queriedId(keyBin);
+	ConstBigNumber queriedId(queueItem->m_keyId);
 
 	DhtStates::DhtLocalNodePtrType localNode = gs_state.GetDhtNode();
 
@@ -101,31 +147,103 @@ void Dht::QueryNonBlock(Decent::Net::TlsCommLayer & tls)
 	if (TryGetQueriedAddrLocally(*localNode, queriedId, resAddr))
 	{
 		//Query can be answered immediately.
-		//PRINT_I("Reply query with ID %s.", requestId.c_str());
 
-		CntPair peerCntPair = gs_state.GetConnectionPool().GetNew(reAddr, gs_state);
+		std::unique_ptr<ReplyQueueItem> reItem = Tools::make_unique<ReplyQueueItem>();
+		reItem->m_uuid.swap(queueItem->m_uuid);
+		reItem->m_reAddr = queueItem->m_reAddr;
 
-		peerCntPair.GetCommLayer().SendStruct(EncFunc::Dht::k_queryReply);
-		peerCntPair.GetCommLayer().SendMsg(requestId);   //1. Reply request UUID
-		peerCntPair.GetCommLayer().SendStruct(resAddr);  //2. Reply result address
+		reItem->m_resAddr = resAddr;
+
+		{
+			std::unique_lock<std::mutex> replyQueueLock(gs_replyQueueMutex);
+			gs_replyQueue.push(std::move(reItem));
+			replyQueueLock.unlock();
+			gs_replyQueueSignal.notify_one();
+		}
+
 		return;
 	}
 	else
 	{
 		//Query has to be forwarded to other peer.
-		//PRINT_I("Forward query with ID %s to other peer.", requestId.c_str());
-		//Connect Peer:
+		
 		DhtStates::DhtLocalNodeType::NodeBasePtr nextHop = localNode->GetNextHop(queriedId);
 
-		CntPair peerCntPair = gs_state.GetConnectionPool().GetNew(nextHop->GetAddress(), gs_state);
+		queueItem->m_nextAddr = nextHop->GetAddress();
 
-		peerCntPair.GetCommLayer().SendStruct(EncFunc::Dht::k_queryNonBlock);
-		peerCntPair.GetCommLayer().SendMsg(requestId);                    //1. Send request UUID
-		peerCntPair.GetCommLayer().SendRaw(keyBin.data(), keyBin.size()); //2. Forward queried key ID
-		peerCntPair.GetCommLayer().SendStruct(reAddr);                    //3. Send RE addr
+		{
+			std::unique_lock<std::mutex> forwardQueueLock(gs_forwardQueueMutex);
+			gs_forwardQueue.push(std::move(queueItem));
+			forwardQueueLock.unlock();
+			gs_forwardQueueSignal.notify_one();
+		}
 
 		return;
 	}
+}
+
+void Dht::QueryForwardWorker()
+{
+	std::queue<std::unique_ptr<ForwardQueueItem> > tmpQueue;
+	while (!gs_isForwardingTerminated)
+	{
+		{
+			std::unique_lock<std::mutex> forwardQueueLock(gs_forwardQueueMutex);
+			if (gs_forwardQueue.size() == 0)
+			{
+				gs_forwardQueueSignal.wait(forwardQueueLock, []() {
+					return gs_isForwardingTerminated || gs_forwardQueue.size() > 0;
+				});
+			}
+
+			if (!gs_isForwardingTerminated && gs_forwardQueue.size() > 0)
+			{
+				tmpQueue.swap(gs_forwardQueue);
+			}
+		}
+
+		while (tmpQueue.size() > 0)
+		{
+			ForwardQuery(*tmpQueue.front());
+			tmpQueue.pop();
+		}
+	}
+}
+
+void Dht::QueryReplyWorker()
+{
+	std::queue<std::unique_ptr<ReplyQueueItem> > tmpQueue;
+	while (!gs_isForwardingTerminated)
+	{
+		{
+			std::unique_lock<std::mutex> replyQueueLock(gs_replyQueueMutex);
+			if (gs_replyQueue.size() == 0)
+			{
+				gs_replyQueueSignal.wait(replyQueueLock, []() {
+					return gs_isForwardingTerminated || gs_replyQueue.size() > 0;
+				});
+			}
+
+			if (!gs_isForwardingTerminated && gs_replyQueue.size() > 0)
+			{
+				tmpQueue.swap(gs_replyQueue);
+			}
+		}
+
+		while (tmpQueue.size() > 0)
+		{
+			ReplyQuery(*tmpQueue.front());
+			tmpQueue.pop();
+		}
+	}
+}
+
+void Dht::TerminateWorkers()
+{
+	gs_isForwardingTerminated = true;
+
+	gs_forwardQueueSignal.notify_all();
+	gs_replyQueueSignal.notify_all();
 }
 
 void Dht::QueryReply(Decent::Net::TlsCommLayer & tls, void*& heldCntPtr)
@@ -141,8 +259,6 @@ void Dht::QueryReply(Decent::Net::TlsCommLayer & tls, void*& heldCntPtr)
 	auto it = gs_clientPendingQueries.find(requestId);
 	if (it != gs_clientPendingQueries.end())
 	{
-		//Yes, it is. Reply to client.
-
 		it->second.second.GetCommLayer().SendStruct(resAddr);
 		heldCntPtr = it->second.first;
 
@@ -541,9 +657,10 @@ bool Dht::ProcessAppRequest(Decent::Net::TlsCommLayer & tls, Net::EnclaveCntTran
 
 bool Dht::AppFindSuccessor(Decent::Net::TlsCommLayer & tls, Net::EnclaveCntTranslator& cnt)
 {
-	std::array<uint8_t, DhtStates::sk_keySizeByte> keyBin{};
-	tls.ReceiveRaw(keyBin.data(), keyBin.size()); //2. Received queried ID
-	ConstBigNumber queriedId(keyBin);
+	std::unique_ptr<ForwardQueueItem> queueItem = Tools::make_unique<ForwardQueueItem>();
+
+	tls.ReceiveRaw(queueItem->m_keyId.data(), queueItem->m_keyId.size()); //2. Received queried ID
+	ConstBigNumber queriedId(queueItem->m_keyId);
 
 	//LOGI("Recv app queried ID: %s.", static_cast<const BigNumber&>(queriedId).ToBigEndianHexStr().c_str());
 
@@ -566,7 +683,7 @@ bool Dht::AppFindSuccessor(Decent::Net::TlsCommLayer & tls, Net::EnclaveCntTrans
 		Drbg drbg;
 		std::array<uint8_t, GENERAL_128BIT_16BYTE_SIZE> uuidBin{};
 		drbg.RandContainer(uuidBin);
-		std::string requestId = cppcodec::base64_rfc4648::encode(uuidBin);
+		queueItem->m_uuid = cppcodec::base64_rfc4648::encode(uuidBin);
 		//PRINT_I("Forward query with ID %s to peer.", requestId.c_str());
 
 		//Add query to pending list.
@@ -577,19 +694,24 @@ bool Dht::AppFindSuccessor(Decent::Net::TlsCommLayer & tls, Net::EnclaveCntTrans
 		{
 			std::unique_lock<std::mutex> clientPendingQueriesLock(gs_clientPendingQueriesMutex);
 			gs_clientPendingQueries.insert(
-				std::make_pair(requestId, 
+				std::make_pair(queueItem->m_uuid,
 					std::make_pair(clientCntPtr, std::move(clientCntPair))));
 		}
 		
-		//Connect Peer:
+		//Construct queue item:
 		DhtStates::DhtLocalNodeType::NodeBasePtr nextHop = localNode->GetNextHop(queriedId);
 
-		CntPair peerCntPair = gs_state.GetConnectionPool().GetNew(nextHop->GetAddress(), gs_state);
+		queueItem->m_nextAddr = nextHop->GetAddress();
+		queueItem->m_reAddr = localNode->GetAddress();
 
-		peerCntPair.GetCommLayer().SendStruct(EncFunc::Dht::k_queryNonBlock);
-		peerCntPair.GetCommLayer().SendMsg(requestId);                    //1. Send request UUID
-		peerCntPair.GetCommLayer().SendRaw(keyBin.data(), keyBin.size()); //2. Forward queried key ID
-		peerCntPair.GetCommLayer().SendStruct(localNode->GetAddress());   //3. Send RE addr
+		{
+			std::unique_lock<std::mutex> forwardQueueLock(gs_forwardQueueMutex);
+			gs_forwardQueue.push(std::move(queueItem));
+			forwardQueueLock.unlock();
+			gs_forwardQueueSignal.notify_one();
+
+			//NOTE! Don't use 'ConstBigNumber queriedId' after here!
+		}
 
 		return true;
 	}

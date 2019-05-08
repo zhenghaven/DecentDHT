@@ -148,4 +148,42 @@ extern "C" int ecall_decent_dht_proc_msg_from_app(void* connection)
 	}
 }
 
+extern "C" int ecall_decent_dht_forward_queue_worker()
+{
+	try
+	{
+		QueryForwardWorker();
+		return true;
+	}
+	catch (const std::exception& e)
+	{
+		PRINT_I("Query forward worker failed. Error Msg: %s", e.what());
+		return false;
+	}
+}
+
+extern "C" int ecall_decent_dht_reply_queue_worker()
+{
+	try
+	{
+		QueryReplyWorker();
+		return true;
+	}
+	catch (const std::exception& e)
+	{
+		PRINT_I("Query reply worker failed. Error Msg: %s", e.what());
+		return false;
+	}
+}
+
+extern "C" void ecall_decent_dht_terminate_workers()
+{
+	try
+	{
+		TerminateWorkers();
+	}
+	catch (const std::exception&)
+	{}
+}
+
 //#endif //ENCLAVE_PLATFORM_SGX

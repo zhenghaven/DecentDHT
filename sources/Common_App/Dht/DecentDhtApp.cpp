@@ -2,20 +2,28 @@
 
 #include <DecentApi/Common/SGX/RuntimeError.h>
 #include <DecentApi/CommonApp/Base/EnclaveException.h>
+#include <DecentApi/CommonApp/Threading/ThreadPool.h>
+#include <DecentApi/CommonApp/Threading/TaskSet.h>
 
 #include "../../Common/Dht/RequestCategory.h"
 
 extern "C" sgx_status_t ecall_decent_dht_init(sgx_enclave_id_t eid, int* retval, uint64_t self_addr, int is_first_node, uint64_t ex_addr, size_t totalNode, size_t idx);
 extern "C" sgx_status_t ecall_decent_dht_deinit(sgx_enclave_id_t eid);
+
 extern "C" sgx_status_t ecall_decent_dht_proc_msg_from_dht(sgx_enclave_id_t eid, int* retval, void* connection, void** prev_held_cnt);
 extern "C" sgx_status_t ecall_decent_dht_proc_msg_from_store(sgx_enclave_id_t eid, int* retval, void* connection);
 extern "C" sgx_status_t ecall_decent_dht_proc_msg_from_app(sgx_enclave_id_t eid, int* retval, void* connection);
+
+extern "C" sgx_status_t ecall_decent_dht_forward_queue_worker(sgx_enclave_id_t eid, int* retval);
+extern "C" sgx_status_t ecall_decent_dht_reply_queue_worker(sgx_enclave_id_t eid, int* retval);
+extern "C" sgx_status_t ecall_decent_dht_terminate_workers(sgx_enclave_id_t eid);
 
 using namespace Decent::Net;
 using namespace Decent::Dht;
 
 Decent::Dht::DecentDhtApp::~DecentDhtApp()
 {
+	TerminateWorkers();
 	ecall_decent_dht_deinit(GetEnclaveId());
 }
 
@@ -51,6 +59,35 @@ bool DecentDhtApp::ProcessMsgFromApp(ConnectionBase & connection)
 	return retValue;
 }
 
+void DecentDhtApp::QueryForwardWorker()
+{
+	int retVal = false;
+
+	sgx_status_t enclaveRet = ecall_decent_dht_forward_queue_worker(GetEnclaveId(), &retVal);
+	DECENT_CHECK_SGX_STATUS_ERROR(enclaveRet, ecall_decent_dht_forward_queue_worker);
+	if (!retVal)
+	{
+		throw RuntimeException("DecentDhtApp::QueryForwardWorker failed.");
+	}
+}
+
+void DecentDhtApp::QueryReplyWorker()
+{
+	int retVal = false;
+
+	sgx_status_t enclaveRet = ecall_decent_dht_reply_queue_worker(GetEnclaveId(), &retVal);
+	DECENT_CHECK_SGX_STATUS_ERROR(enclaveRet, ecall_decent_dht_reply_queue_worker);
+	if (!retVal)
+	{
+		throw RuntimeException("DecentDhtApp::QueryReplyWorker failed.");
+	}
+}
+
+void DecentDhtApp::TerminateWorkers()
+{
+	ecall_decent_dht_terminate_workers(GetEnclaveId());
+}
+
 bool DecentDhtApp::ProcessSmartMessage(const std::string & category, ConnectionBase & connection, ConnectionBase*& freeHeldCnt)
 {
 	if (category == RequestCategory::sk_fromDht)
@@ -78,4 +115,43 @@ void DecentDhtApp::InitDhtNode(uint64_t selfAddr, uint64_t exNodeAddr, size_t to
 	sgx_status_t enclaveRet = ecall_decent_dht_init(GetEnclaveId(), &retValue, selfAddr, exNodeAddr == 0, exNodeAddr, totalNode, idx);
 	DECENT_CHECK_SGX_STATUS_ERROR(enclaveRet, ecall_decent_dht_init);
 	DECENT_ASSERT_ENCLAVE_APP_RESULT(retValue, "Initialize DHT node.");
+}
+
+void DecentDhtApp::InitQueryWorkers(const size_t forwardWorkerNum, const size_t replyWorkerNum)
+{
+	using namespace Decent::Threading;
+
+	m_queryWorkerPool = std::make_unique<ThreadPool>(forwardWorkerNum + replyWorkerNum, nullptr);
+
+	for (size_t i = 0; i < forwardWorkerNum; ++i)
+	{
+		std::unique_ptr<TaskSet> task = std::make_unique<TaskSet>(
+			[this]() //Main task
+		{
+			this->QueryForwardWorker();
+		},
+			[this]() //Main task killer
+		{
+			this->TerminateWorkers();
+		}
+		);
+
+		m_queryWorkerPool->AddTaskSet(task);
+	}
+
+	for (size_t i = 0; i < replyWorkerNum; ++i)
+	{
+		std::unique_ptr<TaskSet> task = std::make_unique<TaskSet>(
+			[this]() //Main task
+		{
+			this->QueryReplyWorker();
+		},
+			[this]() //Main task killer
+		{
+			this->TerminateWorkers();
+		}
+		);
+
+		m_queryWorkerPool->AddTaskSet(task);
+	}
 }
