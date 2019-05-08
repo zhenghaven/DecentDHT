@@ -54,5 +54,7 @@ namespace Decent
 		//Requests from Apps:
 		
 		void ProcessAppRequest(Decent::Net::TlsCommLayer & tls);
+
+		void AppFindSuccessor(Decent::Net::TlsCommLayer & tls);
     }
 }

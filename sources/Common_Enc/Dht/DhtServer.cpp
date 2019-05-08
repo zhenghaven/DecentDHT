@@ -405,7 +405,7 @@ void Dht::ProcessAppRequest(Decent::Net::TlsCommLayer & tls)
 	switch (funcNum)
 	{
 	case k_findSuccessor:
-		FindSuccessor(tls);
+		AppFindSuccessor(tls);
 		break;
 
 	case k_getData:
@@ -423,4 +423,18 @@ void Dht::ProcessAppRequest(Decent::Net::TlsCommLayer & tls)
 	default:
 		break;
 	}
+}
+
+void Dht::AppFindSuccessor(Decent::Net::TlsCommLayer & tls)
+{
+	//LOGI("DHT Server: Finding Successor...");
+	std::array<uint8_t, DhtStates::sk_keySizeByte> keyBin{};
+	tls.ReceiveRaw(keyBin.data(), keyBin.size()); //2. Received queried ID
+
+	ConstBigNumber queriedId(keyBin);
+	//LOGI("Recv queried ID: %s.", static_cast<const BigNumber&>(queriedId).ToBigEndianHexStr().c_str());
+
+	DhtStates::DhtLocalNodePtrType localNode = gs_state.GetDhtNode();
+
+	NodeConnector::SendAddress(tls, localNode->FindSuccessor(queriedId)); //3. Send Node. - Done!
 }

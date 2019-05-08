@@ -39,6 +39,18 @@ void NodeConnector::SendNode(ConnectionBase& connection, SecureCommLayer & comm,
 	SendNode(comm, node);
 }
 
+void NodeConnector::SendAddress(Decent::Net::SecureCommLayer & comm, NodeBasePtr node)
+{
+	uint64_t addr = node->GetAddress();
+	comm.SendStruct(addr); //1. Sent Address - Done!
+}
+
+void NodeConnector::SendAddress(Decent::Net::ConnectionBase & connection, Decent::Net::SecureCommLayer & comm, NodeBasePtr node)
+{
+	comm.SetConnectionPtr(connection);
+	SendAddress(comm, node);
+}
+
 NodeConnector::NodeBasePtr NodeConnector::ReceiveNode(SecureCommLayer & comm)
 {
 	std::array<uint8_t, DhtStates::sk_keySizeByte> keyBin{};
