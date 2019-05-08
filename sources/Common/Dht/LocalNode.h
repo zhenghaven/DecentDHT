@@ -165,12 +165,11 @@ namespace Decent
 			 */
 			virtual NodeBasePtr FindPredecessor(const IdType& key) override
 			{
-				const IdType& immediateSucId = GetImmediateSuccessor()->GetNodeId();
-				if (m_cirRange.IsWithinNC(key, m_id, immediateSucId))
+				if (this->IsImmediatePredecessorOf(key))
 				{
 					return GetSelfPtr();
 				}
-				NodeBasePtr nextHop = m_fingerTable.GetClosetPrecFinger(key);
+				NodeBasePtr nextHop = GetNextHop(key);
 				return nextHop->FindPredecessor(key);
 			}
 
@@ -236,6 +235,17 @@ namespace Decent
 			bool IsResponsibleFor(const IdType& key)
 			{
 				return m_cirRange.IsWithinNC(key, GetImmediatePredecessor()->GetNodeId(), m_id);
+			}
+
+			NodeBasePtr GetNextHop(const IdType& key)
+			{
+				return m_fingerTable.GetClosetPrecFinger(key);
+			}
+
+			bool IsImmediatePredecessorOf(const IdType& key)
+			{
+				const IdType& immediateSucId = GetImmediateSuccessor()->GetNodeId();
+				return m_cirRange.IsWithinNC(key, m_id, immediateSucId);
 			}
 
 			virtual void PrintTable() const
