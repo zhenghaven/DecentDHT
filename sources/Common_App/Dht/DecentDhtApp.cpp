@@ -31,7 +31,7 @@ bool DecentDhtApp::ProcessMsgFromDht(ConnectionBase & connection, ConnectionBase
 	return retValue;
 }
 
-bool DecentDhtApp::ProcessMsgFromStore(Decent::Net::ConnectionBase & connection)
+bool DecentDhtApp::ProcessMsgFromStore(ConnectionBase & connection)
 {
 	int retValue = false;
 
@@ -41,7 +41,7 @@ bool DecentDhtApp::ProcessMsgFromStore(Decent::Net::ConnectionBase & connection)
 	return retValue;
 }
 
-bool DecentDhtApp::ProcessMsgFromApp(Decent::Net::ConnectionBase & connection)
+bool DecentDhtApp::ProcessMsgFromApp(ConnectionBase & connection)
 {
 	int retValue = false;
 

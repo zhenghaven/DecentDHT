@@ -80,7 +80,7 @@ extern "C" void* ocall_decent_dht_cnt_mgr_get_store(uint64_t address)
 int main(int argc, char ** argv)
 {
 	//------- Construct main thread worker at very first:
-	MainThreadAsynWorker mainThreadWorker;
+	std::shared_ptr<MainThreadAsynWorker> mainThreadWorker = std::make_shared<MainThreadAsynWorker>();
 
 	std::cout << "================ Decent DHT ================" << std::endl;
 
@@ -215,7 +215,7 @@ int main(int argc, char ** argv)
 	}
 
 	//------- keep running until an interrupt signal (Ctrl + C) is received.
-	mainThreadWorker.UpdateUntilInterrupt();
+	mainThreadWorker->UpdateUntilInterrupt();
 
 	//------- Exit...
 	enclave.reset();
