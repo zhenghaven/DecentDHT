@@ -1,9 +1,17 @@
 #include "DhtServer.h"
 
+#include <cppcodec/base64_default_rfc4648.hpp>
+
 #include <DecentApi/Common/Common.h>
+#include <DecentApi/Common/make_unique.h>
+#include <DecentApi/Common/GeneralKeyTypes.h>
 #include <DecentApi/Common/Net/TlsCommLayer.h>
 #include <DecentApi/Common/Net/ConnectionBase.h>
+#include <DecentApi/Common/Net/SecureConnectionPoolBase.h>
 #include <DecentApi/Common/MbedTls/BigNumber.h>
+#include <DecentApi/Common/MbedTls/Drbg.h>
+
+#include <DecentApi/CommonEnclave/Net/EnclaveCntTranslator.h>
 #include <DecentApi/CommonEnclave/Ra/TlsConfigSameEnclave.h>
 
 #include "../../Common/Dht/LocalNode.h"
@@ -13,6 +21,7 @@
 #include "EnclaveStore.h"
 #include "NodeConnector.h"
 #include "ConnectionManager.h"
+#include "DhtConnectionPool.h"
 #include "DhtStatesSingleton.h"
 
 using namespace Decent;
@@ -25,6 +34,33 @@ namespace
 	DhtStates& gs_state = Dht::GetDhtStatesSingleton();
 
 	static char gsk_ack[] = "ACK";
+
+	static std::mutex gs_clientPendingQueriesMutex;
+	static std::map<std::string, std::pair<void*, CntPair> > gs_clientPendingQueries;
+
+	static bool TryGetQueriedAddrLocally(DhtStates::DhtLocalNodeType& localNode, const BigNumber& queriedId, uint64_t& resAddr)
+	{
+		if (localNode.IsResponsibleFor(queriedId))
+		{
+			//Query can be answered immediately.
+
+			resAddr = localNode.GetAddress();
+
+			return true;
+		}
+		else if (localNode.IsImmediatePredecessorOf(queriedId))
+		{
+			//Query can be answered immediately.
+
+			DhtStates::DhtLocalNodeType::NodeBasePtr ImmeSucc = localNode.GetImmediateSuccessor();
+
+			resAddr = ImmeSucc->GetAddress();
+
+			return true;
+		}
+
+		return false;
+	}
 }
 
 void Dht::DeUpdateFingerTable(Decent::Net::TlsCommLayer &tls)
@@ -45,6 +81,79 @@ void Dht::DeUpdateFingerTable(Decent::Net::TlsCommLayer &tls)
 
 	tls.SendStruct(gsk_ack);
 	//LOGI("");
+}
+
+void Dht::QueryNonBlock(Decent::Net::TlsCommLayer & tls)
+{
+	std::string requestId;
+	std::array<uint8_t, DhtStates::sk_keySizeByte> keyBin{};
+	uint64_t reAddr = 0;
+
+	tls.ReceiveMsg(requestId);                    //1. Receive request UUID
+	tls.ReceiveRaw(keyBin.data(), keyBin.size()); //2. Receive queried ID
+	tls.ReceiveStruct(reAddr);                    //3. Receive RE address
+
+	ConstBigNumber queriedId(keyBin);
+
+	DhtStates::DhtLocalNodePtrType localNode = gs_state.GetDhtNode();
+
+	uint64_t resAddr = 0;
+	if (TryGetQueriedAddrLocally(*localNode, queriedId, resAddr))
+	{
+		//Query can be answered immediately.
+		//PRINT_I("Reply query with ID %s.", requestId.c_str());
+
+		CntPair peerCntPair = gs_state.GetConnectionPool().GetNew(reAddr, gs_state);
+
+		peerCntPair.GetCommLayer().SendStruct(EncFunc::Dht::k_queryReply);
+		peerCntPair.GetCommLayer().SendMsg(requestId);   //1. Reply request UUID
+		peerCntPair.GetCommLayer().SendStruct(resAddr);  //2. Reply result address
+		return;
+	}
+	else
+	{
+		//Query has to be forwarded to other peer.
+		//PRINT_I("Forward query with ID %s to other peer.", requestId.c_str());
+		//Connect Peer:
+		DhtStates::DhtLocalNodeType::NodeBasePtr nextHop = localNode->GetNextHop(queriedId);
+
+		CntPair peerCntPair = gs_state.GetConnectionPool().GetNew(nextHop->GetAddress(), gs_state);
+
+		peerCntPair.GetCommLayer().SendStruct(EncFunc::Dht::k_queryNonBlock);
+		peerCntPair.GetCommLayer().SendMsg(requestId);                    //1. Send request UUID
+		peerCntPair.GetCommLayer().SendRaw(keyBin.data(), keyBin.size()); //2. Forward queried key ID
+		peerCntPair.GetCommLayer().SendStruct(reAddr);                    //3. Send RE addr
+
+		return;
+	}
+}
+
+void Dht::QueryReply(Decent::Net::TlsCommLayer & tls, void*& heldCntPtr)
+{
+	std::string requestId;
+	uint64_t resAddr = 0;
+	tls.ReceiveMsg(requestId);   //1. Receive request UUID
+	tls.ReceiveStruct(resAddr);  //2. Receive result address
+
+	//PRINT_I("Received forwarded query reply with ID %s.", requestId.c_str());
+
+	std::unique_lock<std::mutex> clientPendingQueriesLock(gs_clientPendingQueriesMutex);
+	auto it = gs_clientPendingQueries.find(requestId);
+	if (it != gs_clientPendingQueries.end())
+	{
+		//Yes, it is. Reply to client.
+
+		it->second.second.GetCommLayer().SendStruct(resAddr);
+		heldCntPtr = it->second.first;
+
+		gs_clientPendingQueries.erase(it);
+
+		return;
+	}
+	else
+	{
+		LOGW("Pending request UUID is not found!");
+	}
 }
 
 void Dht::UpdateFingerTable(Decent::Net::TlsCommLayer &tls)
@@ -139,7 +248,7 @@ void Dht::FindSuccessor(Decent::Net::TlsCommLayer &tls)
 	//LOGI("");
 }
 
-void Dht::ProcessDhtQuery(Decent::Net::TlsCommLayer & tls)
+void Dht::ProcessDhtQuery(Decent::Net::TlsCommLayer & tls, void*& heldCntPtr)
 {
 	using namespace EncFunc::Dht;
 
@@ -181,6 +290,14 @@ void Dht::ProcessDhtQuery(Decent::Net::TlsCommLayer & tls)
 
 	case k_dUpdFingerTable:
 		DeUpdateFingerTable(tls);
+		break;
+
+	case k_queryNonBlock:
+		QueryNonBlock(tls);
+		break;
+
+	case k_queryReply:
+		QueryReply(tls, heldCntPtr);
 		break;
 
 	default:
@@ -395,7 +512,7 @@ void Dht::DeInit()
 	}
 }
 
-void Dht::ProcessAppRequest(Decent::Net::TlsCommLayer & tls)
+bool Dht::ProcessAppRequest(Decent::Net::TlsCommLayer & tls, Net::EnclaveCntTranslator& cnt)
 {
 	using namespace EncFunc::App;
 
@@ -404,23 +521,76 @@ void Dht::ProcessAppRequest(Decent::Net::TlsCommLayer & tls)
 
 	switch (funcNum)
 	{
-	case k_findSuccessor:
-		FindSuccessor(tls);
-		break;
+	case k_findSuccessor: return AppFindSuccessor(tls, cnt);
 
 	case k_getData:
 		GetData(tls);
-		break;
+		return false;
 
 	case k_setData:
 		SetData(tls);
-		break;
+		return false;
 
 	case k_delData:
 		DelData(tls);
-		break;
+		return false;
 
-	default:
-		break;
+	default: return false;
+	}
+}
+
+bool Dht::AppFindSuccessor(Decent::Net::TlsCommLayer & tls, Net::EnclaveCntTranslator& cnt)
+{
+	std::array<uint8_t, DhtStates::sk_keySizeByte> keyBin{};
+	tls.ReceiveRaw(keyBin.data(), keyBin.size()); //2. Received queried ID
+	ConstBigNumber queriedId(keyBin);
+
+	//LOGI("Recv app queried ID: %s.", static_cast<const BigNumber&>(queriedId).ToBigEndianHexStr().c_str());
+
+	DhtStates::DhtLocalNodePtrType localNode = gs_state.GetDhtNode();
+	
+	uint64_t resAddr = 0;
+	if (TryGetQueriedAddrLocally(*localNode, queriedId, resAddr))
+	{
+		//Query can be answered immediately.
+
+		tls.SendStruct(resAddr);
+
+		return false;
+	}
+	else
+	{
+		//Query should be forwarded to peer(s) and reply later.
+		
+		//UUID:
+		Drbg drbg;
+		std::array<uint8_t, GENERAL_128BIT_16BYTE_SIZE> uuidBin{};
+		drbg.RandContainer(uuidBin);
+		std::string requestId = cppcodec::base64_rfc4648::encode(uuidBin);
+		//PRINT_I("Forward query with ID %s to peer.", requestId.c_str());
+
+		//Add query to pending list.
+		void* clientCntPtr = cnt.GetPointer();
+		CntPair clientCntPair(Tools::make_unique<EnclaveCntTranslator>(std::move(cnt)), 
+			Tools::make_unique<TlsCommLayer>(std::move(tls)));
+		clientCntPair.GetCommLayer().SetConnectionPtr(clientCntPair.GetConnection());
+		{
+			std::unique_lock<std::mutex> clientPendingQueriesLock(gs_clientPendingQueriesMutex);
+			gs_clientPendingQueries.insert(
+				std::make_pair(requestId, 
+					std::make_pair(clientCntPtr, std::move(clientCntPair))));
+		}
+		
+		//Connect Peer:
+		DhtStates::DhtLocalNodeType::NodeBasePtr nextHop = localNode->GetNextHop(queriedId);
+
+		CntPair peerCntPair = gs_state.GetConnectionPool().GetNew(nextHop->GetAddress(), gs_state);
+
+		peerCntPair.GetCommLayer().SendStruct(EncFunc::Dht::k_queryNonBlock);
+		peerCntPair.GetCommLayer().SendMsg(requestId);                    //1. Send request UUID
+		peerCntPair.GetCommLayer().SendRaw(keyBin.data(), keyBin.size()); //2. Forward queried key ID
+		peerCntPair.GetCommLayer().SendStruct(localNode->GetAddress());   //3. Send RE addr
+
+		return true;
 	}
 }

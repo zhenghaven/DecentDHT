@@ -7,7 +7,7 @@
 
 extern "C" sgx_status_t ecall_decent_dht_init(sgx_enclave_id_t eid, int* retval, uint64_t self_addr, int is_first_node, uint64_t ex_addr, size_t totalNode, size_t idx);
 extern "C" sgx_status_t ecall_decent_dht_deinit(sgx_enclave_id_t eid);
-extern "C" sgx_status_t ecall_decent_dht_proc_msg_from_dht(sgx_enclave_id_t eid, int* retval, void* connection);
+extern "C" sgx_status_t ecall_decent_dht_proc_msg_from_dht(sgx_enclave_id_t eid, int* retval, void* connection, void** prev_held_cnt);
 extern "C" sgx_status_t ecall_decent_dht_proc_msg_from_store(sgx_enclave_id_t eid, int* retval, void* connection);
 extern "C" sgx_status_t ecall_decent_dht_proc_msg_from_app(sgx_enclave_id_t eid, int* retval, void* connection);
 
@@ -19,11 +19,13 @@ Decent::Dht::DecentDhtApp::~DecentDhtApp()
 	ecall_decent_dht_deinit(GetEnclaveId());
 }
 
-bool DecentDhtApp::ProcessMsgFromDht(Decent::Net::ConnectionBase & connection)
+bool DecentDhtApp::ProcessMsgFromDht(ConnectionBase & connection, ConnectionBase*& freeHeldCnt)
 {
 	int retValue = false;
 
-	sgx_status_t enclaveRet = ecall_decent_dht_proc_msg_from_dht(GetEnclaveId(), &retValue, &connection);
+	void*& prevHeldCntRef = reinterpret_cast<void*&>(freeHeldCnt);
+
+	sgx_status_t enclaveRet = ecall_decent_dht_proc_msg_from_dht(GetEnclaveId(), &retValue, &connection, &prevHeldCntRef);
 	DECENT_CHECK_SGX_STATUS_ERROR(enclaveRet, ecall_decent_dht_proc_msg_from_dht);
 
 	return retValue;
@@ -49,11 +51,11 @@ bool DecentDhtApp::ProcessMsgFromApp(Decent::Net::ConnectionBase & connection)
 	return retValue;
 }
 
-bool DecentDhtApp::ProcessSmartMessage(const std::string & category, Decent::Net::ConnectionBase & connection)
+bool DecentDhtApp::ProcessSmartMessage(const std::string & category, ConnectionBase & connection, ConnectionBase*& freeHeldCnt)
 {
 	if (category == RequestCategory::sk_fromDht)
 	{
-		return ProcessMsgFromDht(connection);
+		return ProcessMsgFromDht(connection, freeHeldCnt);
 	}
 	else if (category == RequestCategory::sk_fromStore)
 	{
@@ -65,7 +67,7 @@ bool DecentDhtApp::ProcessSmartMessage(const std::string & category, Decent::Net
 	}
 	else
 	{
-		return Decent::RaSgx::DecentApp::ProcessSmartMessage(category, connection);
+		return Decent::RaSgx::DecentApp::ProcessSmartMessage(category, connection, freeHeldCnt);
 	}
 }
 

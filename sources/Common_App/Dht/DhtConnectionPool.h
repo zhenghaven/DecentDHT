@@ -1,6 +1,6 @@
 #pragma once
 
-#include <DecentApi/Common/Net/ConnectionPool.h>
+#include <DecentApi/CommonApp/Net/ConnectionPool.h>
 
 namespace Decent
 {
@@ -9,8 +9,8 @@ namespace Decent
 		class DhtConnectionPool : public Net::ConnectionPool<uint64_t>
 		{
 		public:
-			DhtConnectionPool(size_t maxInCnt, size_t maxOutCnt) :
-				ConnectionPool(maxInCnt, maxOutCnt)
+			DhtConnectionPool(size_t maxInCnt, size_t maxOutCnt, size_t cntPoolWorker) :
+				ConnectionPool(maxInCnt, maxOutCnt, cntPoolWorker)
 			{}
 
 			virtual ~DhtConnectionPool()

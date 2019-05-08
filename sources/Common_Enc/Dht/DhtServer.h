@@ -7,13 +7,14 @@ namespace Decent
 	namespace Net
 	{
 		class TlsCommLayer;
+		class EnclaveCntTranslator;
 	}
 
     namespace Dht
     {
 		//DHT node functions:
 		
-		void ProcessDhtQuery(Decent::Net::TlsCommLayer& tls);
+		void ProcessDhtQuery(Decent::Net::TlsCommLayer& tls, void*& heldCntPtr);
 
 		void GetNodeId(Decent::Net::TlsCommLayer &tls);
 
@@ -30,6 +31,10 @@ namespace Decent
 		void UpdateFingerTable(Decent::Net::TlsCommLayer &tls);
 
 		void DeUpdateFingerTable(Decent::Net::TlsCommLayer &tls);
+
+		void QueryNonBlock(Decent::Net::TlsCommLayer &tls);
+
+		void QueryReply(Decent::Net::TlsCommLayer &tls, void*& heldCntPtr);
 
 		//DHT Store functions:
 		
@@ -53,6 +58,8 @@ namespace Decent
 
 		//Requests from Apps:
 		
-		void ProcessAppRequest(Decent::Net::TlsCommLayer & tls);
+		bool ProcessAppRequest(Decent::Net::TlsCommLayer & tls, Net::EnclaveCntTranslator& cnt);
+
+		bool AppFindSuccessor(Decent::Net::TlsCommLayer &tls, Net::EnclaveCntTranslator& cnt);
     }
 }

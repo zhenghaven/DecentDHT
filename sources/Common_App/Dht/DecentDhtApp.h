@@ -13,13 +13,13 @@ namespace Decent
 
 			virtual ~DecentDhtApp();
 
-			virtual bool ProcessMsgFromDht(Decent::Net::ConnectionBase& connection);
+			virtual bool ProcessMsgFromDht(Decent::Net::ConnectionBase& connection, Net::ConnectionBase*& freeHeldCnt);
 
 			virtual bool ProcessMsgFromStore(Decent::Net::ConnectionBase& connection);
 
 			virtual bool ProcessMsgFromApp(Decent::Net::ConnectionBase& connection);
 
-			virtual bool ProcessSmartMessage(const std::string& category, Decent::Net::ConnectionBase& connection) override;
+			virtual bool ProcessSmartMessage(const std::string& category, Net::ConnectionBase& connection, Net::ConnectionBase*& freeHeldCnt) override;
 
 			void InitDhtNode(uint64_t selfAddr, uint64_t exNodeAddr, size_t totalNode, size_t idx);
 

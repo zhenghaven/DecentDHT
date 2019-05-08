@@ -63,7 +63,7 @@ extern "C" void ecall_decent_dht_deinit()
 	}
 }
 
-extern "C" int ecall_decent_dht_proc_msg_from_dht(void* connection)
+extern "C" int ecall_decent_dht_proc_msg_from_dht(void* connection, void** prev_held_cnt)
 {
 	if (!gs_state.GetDhtNode())
 	{
@@ -71,6 +71,7 @@ extern "C" int ecall_decent_dht_proc_msg_from_dht(void* connection)
 		return false;
 	}
 
+	*prev_held_cnt = nullptr;
 	EnclaveCntTranslator cnt(connection);
 
 	//LOGI("Processing message from DHT node...");
@@ -80,11 +81,11 @@ extern "C" int ecall_decent_dht_proc_msg_from_dht(void* connection)
 		std::shared_ptr<Ra::TlsConfigSameEnclave> tlsCfg = std::make_shared<Ra::TlsConfigSameEnclave>(gs_state, Ra::TlsConfig::Mode::ServerVerifyPeer, GetDhtSessionTicketMgr());
 		Decent::Net::TlsCommLayer tls(cnt, tlsCfg, true, nullptr);
 
-		ProcessDhtQuery(tls);
+		ProcessDhtQuery(tls, *prev_held_cnt);
 	}
 	catch (const std::exception& e)
 	{
-		PRINT_W("Failed to process message from DHT node.\nError message: %s.", e.what());
+		PRINT_W("Failed to process message from DHT node. Error message: %s.", e.what());
 	}
 
 	return false;
@@ -113,7 +114,7 @@ extern "C" int ecall_decent_dht_proc_msg_from_store(void* connection)
 	}
 	catch (const std::exception& e)
 	{
-		PRINT_W("Failed to process message from DHT store.\nError message: %s.", e.what());
+		PRINT_W("Failed to process message from DHT store. Error message: %s.", e.what());
 	}
 
 	return false;
@@ -138,14 +139,13 @@ extern "C" int ecall_decent_dht_proc_msg_from_app(void* connection)
 		std::shared_ptr<Ra::TlsConfigAnyWhiteListed> tlsCfg = std::make_shared<Ra::TlsConfigAnyWhiteListed>(gs_state, Ra::TlsConfig::Mode::ServerVerifyPeer, GetAppSessionTicketMgr());
 		Decent::Net::TlsCommLayer tls(cnt, tlsCfg, true, nullptr);
 
-		ProcessAppRequest(tls);
+		return ProcessAppRequest(tls, cnt);
 	}
 	catch (const std::exception& e)
 	{
-		PRINT_W("Failed to process message from App.\nError message: %s.", e.what());
+		PRINT_W("Failed to process message from App. Error msg: %s.", e.what());
+		return false;
 	}
-
-	return false;
 }
 
 //#endif //ENCLAVE_PLATFORM_SGX

@@ -20,6 +20,8 @@ namespace Decent
 				constexpr NumType k_setImmediatePre = 5;
 				constexpr NumType k_updFingerTable  = 6;
 				constexpr NumType k_dUpdFingerTable = 7;
+				constexpr NumType k_queryNonBlock   = 8;
+				constexpr NumType k_queryReply      = 9;
 			}
 
 			namespace Store
