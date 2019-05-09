@@ -2,7 +2,7 @@
 
 #include <DecentApi/Common/SGX/RuntimeError.h>
 #include <DecentApi/CommonApp/Base/EnclaveException.h>
-#include <DecentApi/CommonApp/Threading/ThreadPool.h>
+#include <DecentApi/CommonApp/Threading/SingleTaskThreadPool.h>
 #include <DecentApi/CommonApp/Threading/TaskSet.h>
 
 #include "../../Common/Dht/RequestCategory.h"
@@ -121,7 +121,7 @@ void DecentDhtApp::InitQueryWorkers(const size_t forwardWorkerNum, const size_t 
 {
 	using namespace Decent::Threading;
 
-	m_queryWorkerPool = std::make_unique<ThreadPool>(forwardWorkerNum + replyWorkerNum, nullptr);
+	m_queryWorkerPool = std::make_unique<SingleTaskThreadPool>(nullptr);
 
 	for (size_t i = 0; i < forwardWorkerNum; ++i)
 	{

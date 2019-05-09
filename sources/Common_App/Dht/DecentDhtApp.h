@@ -6,7 +6,7 @@ namespace Decent
 {
 	namespace Threading
 	{
-		class ThreadPool;
+		class SingleTaskThreadPool;
 	}
 
 	namespace Dht
@@ -37,7 +37,7 @@ namespace Decent
 			void InitQueryWorkers(const size_t forwardWorkerNum, const size_t replyWorkerNum);
 
 		private:
-			std::unique_ptr<Threading::ThreadPool> m_queryWorkerPool;
+			std::unique_ptr<Threading::SingleTaskThreadPool> m_queryWorkerPool;
 		};
 	}
 }
