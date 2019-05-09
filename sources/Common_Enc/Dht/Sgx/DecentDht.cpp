@@ -150,29 +150,33 @@ extern "C" int ecall_decent_dht_proc_msg_from_app(void* connection)
 
 extern "C" int ecall_decent_dht_forward_queue_worker()
 {
-	try
+	while (true)
 	{
-		QueryForwardWorker();
-		return true;
-	}
-	catch (const std::exception& e)
-	{
-		PRINT_I("Query forward worker failed. Error Msg: %s", e.what());
-		return false;
+		try
+		{
+			QueryForwardWorker();
+			return true;
+		}
+		catch (const std::exception& e)
+		{
+			PRINT_I("Query forward worker failed. Error Msg: %s", e.what());
+		}
 	}
 }
 
 extern "C" int ecall_decent_dht_reply_queue_worker()
 {
-	try
+	while (true)
 	{
-		QueryReplyWorker();
-		return true;
-	}
-	catch (const std::exception& e)
-	{
-		PRINT_I("Query reply worker failed. Error Msg: %s", e.what());
-		return false;
+		try
+		{
+			QueryReplyWorker();
+			return true;
+		}
+		catch (const std::exception& e)
+		{
+			PRINT_I("Query reply worker failed. Error Msg: %s", e.what());
+		}
 	}
 }
 
