@@ -12,7 +12,7 @@ namespace Decent
 
 	namespace Dht
 	{
-		template<typename IdType, size_t KeySizeByte, typename AddrType>
+		template<typename IdType, size_t KeySizeByte, typename AddrType, bool checkCircleRange>
 		class LocalNode;
 
 		class EnclaveStore;
@@ -23,7 +23,7 @@ namespace Decent
 		public: //public member:
 			static constexpr size_t sk_keySizeByte = static_cast<size_t>(32);
 
-			typedef LocalNode<MbedTlsObj::BigNumber, sk_keySizeByte, uint64_t> DhtLocalNodeType;
+			typedef LocalNode<MbedTlsObj::BigNumber, sk_keySizeByte, uint64_t, false> DhtLocalNodeType;
 			typedef std::shared_ptr<DhtLocalNodeType> DhtLocalNodePtrType;
 
 		public:

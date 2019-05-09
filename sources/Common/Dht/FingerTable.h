@@ -48,7 +48,7 @@ namespace Decent
 			~FingerTableRecord() {}
 		};
 
-		template<typename IdType, size_t KeySizeByte, typename AddrType>
+		template<typename IdType, size_t KeySizeByte, typename AddrType, bool checkCircleRange>
 		class FingerTable
 		{
 		public: //Static members:
@@ -69,7 +69,7 @@ namespace Decent
 			 * \param	circleRange	Circular range tester object.
 			 * \param	pow2iArray 	Array of 2^i, where 0 <= i <= ([key size in bits] + 1).
 			 */
-			FingerTable(const IdType& ownerNodeId, const CircularRange<IdType>& circleRange, std::shared_ptr<const Pow2iArrayType> pow2iArray) :
+			FingerTable(const IdType& ownerNodeId, const CircularRange<IdType, checkCircleRange>& circleRange, std::shared_ptr<const Pow2iArrayType> pow2iArray) :
 				m_nodeId(ownerNodeId),
 				m_cirRange(circleRange),
 				m_tableRecords()
@@ -225,7 +225,7 @@ namespace Decent
 
 		private:
 			const IdType& m_nodeId;
-			const CircularRange<IdType>& m_cirRange;
+			const CircularRange<IdType, checkCircleRange>& m_cirRange;
 			std::vector<FingerTableRecord<IdType, AddrType> > m_tableRecords;
 			NodeBasePtr m_predecessor;
 		};

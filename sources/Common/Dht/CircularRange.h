@@ -15,10 +15,12 @@ namespace Decent
 	namespace Dht
 	{
 		/**
-		* \class CircularRange
-		* \brief A clockwise circular range.
-		*/
-		template<typename ValType>
+		 * \brief	A clockwise circular range.
+		 *
+		 * \tparam	ValType		  	Type of the value type.
+		 * \tparam	paraRangeCheck	True to check if the parameter is within the circle range.
+		 */
+		template<typename ValType, bool paraRangeCheck>
 		class CircularRange
 		{
 		private:
@@ -55,14 +57,6 @@ namespace Decent
 			static constexpr bool RangeNC(const ValType& v, const ValType& start, const ValType& end)
 			{
 				return start < v && v <= end;
-			}
-
-			/**
-			* \brief A helper function to check if the testing range is inside the circle.
-			*/
-			bool CheckTestingRangeNN(const ValType& start, const ValType& end) const
-			{
-				return (m_circleStart <= start && m_circleStart <= end) && (start <= m_circleEnd && end <= m_circleEnd);
 			}
 
 			/**
@@ -126,7 +120,7 @@ namespace Decent
 					}
 				*/
 				//Invalid case: 'start' or 'end' is out of circle range, or v is not on the circle.
-				return (!CheckTestingRangeNN(start, end) || !IsOnCircle(v)) ? (throw std::logic_error("Testing range is outside of the circle!")) : //Make sure the testing range is valid.
+				return (paraRangeCheck && !(IsOnCircle(v) && IsOnCircle(start) && IsOnCircle(end))) ? (throw std::logic_error("Testing range is outside of the circle!")) : //Make sure the testing range is valid.
 					(start == end ? comCircleSEE && (v != start) : //CASE 1: A complete circle
 					(start < end ? RangeNN(v, start, end) : //CASE 2: A simple range
 						(CircularRangeNN(v, start, end)) //CASE 3: A circular range
@@ -176,7 +170,7 @@ namespace Decent
 			*/
 			ValType Minus(const ValType& aOnCirc, const ValType& b) const
 			{
-				return IsOnCircle(aOnCirc) ? MinusChecked(aOnCirc, b % ((m_circleEnd - m_circleStart) + 1)) : (throw std::logic_error("The Value of a is not on the circle!"));
+				return (!paraRangeCheck || IsOnCircle(aOnCirc)) ? MinusChecked(aOnCirc, b % ((m_circleEnd - m_circleStart) + 1)) : (throw std::logic_error("The Value of a is not on the circle!"));
 			}
 		};
 	}

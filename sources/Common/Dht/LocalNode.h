@@ -15,8 +15,8 @@ namespace Decent
 {
 	namespace Dht
 	{
-		template<typename IdType, size_t KeySizeByte, typename AddrType>
-		class LocalNode : public NodeBase<IdType, AddrType>, public std::enable_shared_from_this<LocalNode<IdType, KeySizeByte, AddrType> >
+		template<typename IdType, size_t KeySizeByte, typename AddrType, bool checkCircleRange>
+		class LocalNode : public NodeBase<IdType, AddrType>, public std::enable_shared_from_this<LocalNode<IdType, KeySizeByte, AddrType, checkCircleRange> >
 		{
 		public: //static member:
 			typedef NodeBase<IdType, AddrType> NodeBaseType;
@@ -270,9 +270,9 @@ namespace Decent
 			AddrType m_addr;
 			IdType m_ringSmallestId;
 			IdType m_ringLargestId;
-			CircularRange<IdType> m_cirRange; 
+			CircularRange<IdType, checkCircleRange> m_cirRange;
 			std::shared_ptr<const Pow2iArrayType> m_pow2iArray;
-			FingerTable<IdType, KeySizeByte, AddrType> m_fingerTable;
+			FingerTable<IdType, KeySizeByte, AddrType, checkCircleRange> m_fingerTable;
 		};
 	}
 }
