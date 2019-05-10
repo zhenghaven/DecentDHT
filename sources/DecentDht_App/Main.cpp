@@ -204,11 +204,11 @@ int main(int argc, char ** argv)
 		enclave = std::make_shared<DecentDhtApp>(
 			ENCLAVE_FILENAME, tokenPath, wlKeyArg.getValue(), *serverCon);
 
-		smartServer.AddServer(server, enclave, GetTcpConnectionPool(), 3);
+		smartServer.AddServer(server, enclave, GetTcpConnectionPool(), 1, 1002);
 
 		enclave->InitDhtNode(selfFullAddr, exNodeFullAddr, totalNode.getValue(), nodeIdx.getValue());
 
-		enclave->InitQueryWorkers(12, 12);
+		enclave->InitQueryWorkers(1, 1);
 	}
 	catch (const std::exception& e)
 	{

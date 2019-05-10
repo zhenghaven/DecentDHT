@@ -2,6 +2,7 @@
 
 #include <cstring>
 
+//#include <DecentApi/Common/Common.h>
 #include <DecentApi/Common/make_unique.h>
 
 using namespace Decent::Dht;
@@ -29,6 +30,7 @@ void MemKeyValueStore::Store(const KeyType & key, ValueType && val)
 		//Insert:
 		m_map.insert(std::make_pair(key, std::forward<ValueType>(val)));
 	}
+	//PRINT_I("Num of value stored: %llu.", m_map.size());
 }
 
 MemKeyValueStore::ValueType MemKeyValueStore::Read(const KeyType & key)
