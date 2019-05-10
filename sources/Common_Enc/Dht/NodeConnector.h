@@ -28,6 +28,9 @@ namespace Decent
 			static void SendNode(Decent::Net::SecureCommLayer& tls, NodeBasePtr node);
 			static void SendNode(Decent::Net::ConnectionBase& connection, Decent::Net::SecureCommLayer& tls, NodeBasePtr node);
 
+			static void SendAddress(Decent::Net::SecureCommLayer& tls, NodeBasePtr node);
+			static void SendAddress(Decent::Net::ConnectionBase& connection, Decent::Net::SecureCommLayer& tls, NodeBasePtr node);
+
 			static NodeBasePtr ReceiveNode(Decent::Net::SecureCommLayer& tls);
 			static NodeBasePtr ReceiveNode(Decent::Net::ConnectionBase& connection, Decent::Net::SecureCommLayer& tls);
 
