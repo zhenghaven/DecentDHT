@@ -1,4 +1,4 @@
-//#if ENCLAVE_PLATFORM_SGX
+#ifdef ENCLAVE_PLATFORM_SGX
 
 #include "../../../Common/Dht/MemKeyValueStore.h"
 
@@ -104,4 +104,4 @@ extern "C" uint8_t* ocall_decent_dht_mem_store_migrate_one(void* obj, const char
 	}
 }
 
-//#endif //ENCLAVE_PLATFORM_SGX
+#endif //ENCLAVE_PLATFORM_SGX

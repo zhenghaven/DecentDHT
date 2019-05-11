@@ -1,4 +1,4 @@
-//#if ENCLAVE_PLATFORM_SGX
+#ifdef ENCLAVE_PLATFORM_SGX
 
 #include "../ConnectionManager.h"
 
@@ -23,4 +23,4 @@ std::unique_ptr<ConnectionBase> Decent::Dht::ConnectionManager::GetConnection2De
 	return Tools::make_unique<EnclaveConnectionOwner>(EnclaveConnectionOwner::CntBuilder(SGX_SUCCESS, &ocall_decent_dht_cnt_mgr_get_store, address));
 }
 
-//#endif //ENCLAVE_PLATFORM_SGX
+#endif //ENCLAVE_PLATFORM_SGX

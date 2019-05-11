@@ -1,4 +1,4 @@
-//#if ENCLAVE_PLATFORM_SGX
+#ifdef ENCLAVE_PLATFORM_SGX
 
 #include "../EnclaveStore.h"
 
@@ -175,4 +175,4 @@ std::vector<uint8_t> EnclaveStore::MigrateOneDataFile(const MbedTlsObj::BigNumbe
 	return data;
 }
 
-//#endif //ENCLAVE_PLATFORM_SGX
+#endif //ENCLAVE_PLATFORM_SGX

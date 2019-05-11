@@ -1,4 +1,4 @@
-//#if ENCLAVE_PLATFORM_SGX
+#ifdef ENCLAVE_PLATFORM_SGX
 
 #include "../DhtServer.h"
 
@@ -190,4 +190,4 @@ extern "C" void ecall_decent_dht_terminate_workers()
 	{}
 }
 
-//#endif //ENCLAVE_PLATFORM_SGX
+#endif //ENCLAVE_PLATFORM_SGX
