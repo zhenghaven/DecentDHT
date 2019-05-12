@@ -4,10 +4,14 @@ cmake_minimum_required(VERSION 3.11)
 #   Options for Decent DHT Project
 #==========================================================
 
-set(Enc_Proj_Name_List DecentDht)
-set(Client_Proj_Name_List )
+#Enclave project list:
+set(ENCLAVE_PROJECT_LIST DecentDht DecentDhtNonEnc)
 set(ENCLAVE_PLATFORM_SGX_PROJECT_LIST DecentDht)
-#set(ENCLAVE_PLATFORM_NON_ENCLAVE DecentDhtNonEnc)
+set(ENCLAVE_PLATFORM_NON_ENCLAVE_PROJECT_LIST DecentDhtNonEnc)
+
+#Client project list:
+set(CLIENT_PROJECT_LIST )
+
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
 set(HUNTER_BOOST_RUNTIME_STATIC ON CACHE BOOL "Switch for using boost runtime static linking." FORCE)
@@ -201,6 +205,9 @@ add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/libs/decent-ra-api)
 #Intel SGX SDK
 include(EnclavePlatformSgx)
 
+#Non-Enclave
+include(EnclavePlatformNonEnclave)
+
 #==========================================================
 #   Add files
 #==========================================================
@@ -221,7 +228,7 @@ set(SOURCEDIR_Common_Enc ${SOURCEDIR}/Common_Enc)
 file(GLOB_RECURSE SOURCES_Common_Enc ${SOURCEDIR_Common_Enc}/*.[ch]*)
 file(GLOB_RECURSE SOURCES_Common_EDL ${SOURCEDIR_Common_Enc}/*.edl)
 
-foreach(Proj_Name IN ITEMS ${Enc_Proj_Name_List})
+foreach(Proj_Name IN ITEMS ${ENCLAVE_PROJECT_LIST})
 	
 	# Enclave Project Files:
 	set(SOURCEDIR_${Proj_Name}_App ${SOURCEDIR}/${Proj_Name}_App)
@@ -232,7 +239,7 @@ foreach(Proj_Name IN ITEMS ${Enc_Proj_Name_List})
 	
 endforeach()
 
-foreach(Proj_Name IN ITEMS ${Client_Proj_Name_List})
+foreach(Proj_Name IN ITEMS ${CLIENT_PROJECT_LIST})
 	
 	# Client Project Files:
 	set(SOURCEDIR_${Proj_Name} ${SOURCEDIR}/${Proj_Name})
@@ -267,14 +274,23 @@ endif()
 #   Enclave Projects
 #==========================================================
 
-foreach(Proj_Name IN ITEMS ${Enc_Proj_Name_List})
+foreach(Proj_Name IN ITEMS ${ENCLAVE_PROJECT_LIST})
 
 	if(${Proj_Name} IN_LIST ENCLAVE_PLATFORM_SGX_PROJECT_LIST)
-		
+	
 		setup_sgx_edl_project(${Proj_Name})
 		setup_sgx_enclave_project(${Proj_Name})
 		setup_sgx_app_project(${Proj_Name})
-		
+	
+	elseif(${Proj_Name} IN_LIST ENCLAVE_PLATFORM_NON_ENCLAVE_PROJECT_LIST)
+	
+		setup_non_enclave_enclave_project(${Proj_Name})
+		setup_non_enclave_app_project(${Proj_Name})
+	
+	else()
+	
+		message(WARNING "The enclave project, ${Proj_Name}, has not been specified a enclave platform type. It will not be added to the solution.")
+	
 	endif()
 
 endforeach()
@@ -285,7 +301,7 @@ endforeach()
 #==========================================================
 
 
-foreach(Proj_Name IN ITEMS ${Client_Proj_Name_List})
+foreach(Proj_Name IN ITEMS ${CLIENT_PROJECT_LIST})
 
 	add_executable(${Proj_Name} ${SOURCES_Common} ${SOURCES_Common_App} ${SOURCES_${Proj_Name}})
 	#includes:
