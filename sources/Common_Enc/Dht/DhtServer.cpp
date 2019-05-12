@@ -615,7 +615,7 @@ void Dht::Init(uint64_t selfAddr, int isFirstNode, uint64_t exAddr, size_t total
 	}
 
 	std::array<uint8_t, DhtStates::sk_keySizeByte> filledArray;
-	memset_s(filledArray.data(), filledArray.size(), 0xFF, filledArray.size());
+	memset(filledArray.data(), 0xFF, filledArray.size());
 	MbedTlsObj::ConstBigNumber largest(filledArray);
 
 	BigNumber step = largest / totalNode;

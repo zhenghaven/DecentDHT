@@ -24,7 +24,7 @@
 #include "../Common/Dht/AppName.h"
 #include "../Common/Dht/RequestCategory.h"
 
-#include "../Common_App/Dht/SGX/DecentDhtApp.h"
+#include "../Common_App/Dht/NonEnclave/DecentDhtApp.h"
 #include "../Common_App/Dht/DhtConnectionPool.h"
 
 using namespace Decent;
@@ -82,7 +82,7 @@ int main(int argc, char ** argv)
 	//------- Construct main thread worker at very first:
 	std::shared_ptr<MainThreadAsynWorker> mainThreadWorker = std::make_shared<MainThreadAsynWorker>();
 
-	std::cout << "================ Decent DHT ================" << std::endl;
+	std::cout << "================ Decent DHT (Non-Enclave Version) ================" << std::endl;
 
 	//------- Setup Smart Server:
 	Net::SmartServer smartServer(mainThreadWorker);
@@ -124,22 +124,6 @@ int main(int argc, char ** argv)
 		return -1;
 	}
 
-	//------- Read Decent Server Configuration:
-	uint32_t serverIp = 0;
-	uint16_t serverPort = 0;
-	try
-	{
-		const ConfigItem& decentServerConfig = configMgr->GetItem(Ra::WhiteList::sk_nameDecentServer);
-
-		serverIp = Net::TCPConnection::GetIpAddressFromStr(decentServerConfig.GetAddr());
-		serverPort = decentServerConfig.GetPort();
-	}
-	catch (const std::exception& e)
-	{
-		PRINT_W("Failed to read Decent Server configuration. Error Msg: %s", e.what());
-		return -1;
-	}
-
 	//------- Read self configuration:
 	uint32_t selfIp = 0;
 	uint16_t selfPort = 0;
@@ -161,26 +145,6 @@ int main(int argc, char ** argv)
 		return -1;
 	}
 
-	std::unique_ptr<ConnectionBase> serverCon;
-	//------- Send loaded white list to Decent Server when needed.
-	try
-	{
-		if (isSendWlArg.getValue())
-		{
-			serverCon = std::make_unique<TCPConnection>(serverIp, serverPort);
-			serverCon->SendPack(Ra::RequestCategory::sk_loadWhiteList);
-			serverCon->SendPack(wlKeyArg.getValue());
-			serverCon->SendPack(configMgr->GetLoadedWhiteListStr());
-			char ackMsg[] = "ACK";
-			serverCon->ReceiveRawGuarantee(&ackMsg, sizeof(ackMsg));
-		}
-	}
-	catch (const std::exception& e)
-	{
-		PRINT_W("Failed to send loaded white list to Decent Server. Error Msg: %s", e.what());
-		return -1;
-	}
-
 	//------- Setup TCP server:
 	std::unique_ptr<Server> server;
 	try
@@ -197,12 +161,7 @@ int main(int argc, char ** argv)
 	std::shared_ptr<DecentDhtApp> enclave;
 	try
 	{
-		serverCon = std::make_unique<TCPConnection>(serverIp, serverPort);
-
-		boost::filesystem::path tokenPath = GetKnownFolderPath(KnownFolderType::LocalAppDataEnclave).append(TOKEN_FILENAME);
-
-		enclave = std::make_shared<DecentDhtApp>(
-			ENCLAVE_FILENAME, tokenPath, wlKeyArg.getValue(), *serverCon);
+		enclave = std::make_shared<DecentDhtApp>();
 
 		smartServer.AddServer(server, enclave, GetTcpConnectionPool(), 1, 1002);
 

@@ -1,3 +1,5 @@
+#ifdef ENCLAVE_PLATFORM_SGX
+
 #include "DecentDhtApp.h"
 
 #include <DecentApi/Common/SGX/RuntimeError.h>
@@ -5,7 +7,7 @@
 #include <DecentApi/CommonApp/Threading/SingleTaskThreadPool.h>
 #include <DecentApi/CommonApp/Threading/TaskSet.h>
 
-#include "../../Common/Dht/RequestCategory.h"
+#include "../../../Common/Dht/RequestCategory.h"
 
 extern "C" sgx_status_t ecall_decent_dht_init(sgx_enclave_id_t eid, int* retval, uint64_t self_addr, int is_first_node, uint64_t ex_addr, size_t totalNode, size_t idx);
 extern "C" sgx_status_t ecall_decent_dht_deinit(sgx_enclave_id_t eid);
@@ -155,3 +157,5 @@ void DecentDhtApp::InitQueryWorkers(const size_t forwardWorkerNum, const size_t 
 		m_queryWorkerPool->AddTaskSet(task);
 	}
 }
+
+#endif // ENCLAVE_PLATFORM_SGX
