@@ -6,16 +6,21 @@
 #include <DecentApi/Common/Net/TlsCommLayer.h>
 #include <DecentApi/Common/MbedTls/SessionTicketMgr.h>
 
+#include <DecentApi/Common/Ra/Crypto.h>
+#include <DecentApi/Common/Ra/KeyContainer.h>
 #include <DecentApi/Common/Ra/TlsConfigAnyWhiteListed.h>
 
 #include <DecentApi/CommonEnclave/Ra/TlsConfigSameEnclave.h>
 #include <DecentApi/CommonEnclave/Net/EnclaveCntTranslator.h>
+
+#include <DecentApi/DecentAppEnclave/AppCertContainer.h>
 
 #include "../../../Common/Dht/FuncNums.h"
 
 #include "../DhtStatesSingleton.h"
 
 using namespace Decent;
+using namespace Decent::Ra;
 using namespace Decent::Dht;
 using namespace Decent::Net;
 using namespace Decent::MbedTlsObj;
@@ -41,6 +46,14 @@ extern "C" int ecall_decent_dht_init(uint64_t self_addr, int is_first_node, uint
 {
 	try
 	{
+		AppCertContainer& certContainer = gs_state.GetAppCertContainer();
+
+		if (!certContainer.GetCert() || !*certContainer.GetCert())
+		{
+			std::shared_ptr<MbedTlsObj::X509Cert> cert = std::make_shared<ServerX509>(*gs_state.GetKeyContainer().GetSignKeyPair(), "N/A", "N/A", "N/A");
+			certContainer.SetCert(cert);
+		}
+
 		Init(self_addr, is_first_node, ex_addr, totalNode, idx);
 	}
 	catch (const std::exception& e)
