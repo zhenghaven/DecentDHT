@@ -12,7 +12,6 @@
 
 #include "../../../Common/Dht/FuncNums.h"
 
-#include "../DhtConnectionPool.h"
 #include "../DhtStatesSingleton.h"
 
 using namespace Decent;

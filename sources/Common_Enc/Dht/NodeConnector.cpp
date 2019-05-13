@@ -6,7 +6,7 @@
 
 #include "../../Common/Dht/FuncNums.h"
 #include "DhtStatesSingleton.h"
-#include "DhtConnectionPool.h"
+#include "DhtSecureConnectionMgr.h"
 
 using namespace Decent;
 using namespace Decent::Dht;
@@ -60,7 +60,7 @@ NodeConnector::NodeBasePtr NodeConnector::ReceiveNode(SecureCommLayer & comm)
 	comm.ReceiveStruct(addr); //2. Receive Address.
 
 	//LOGI("Recv result ID: %s.", BigNumber(keyBin).ToBigEndianHexStr().c_str());
-	//LOGI("");
+	
 	return std::make_shared<NodeConnector>(addr, BigNumber(keyBin));
 }
 
@@ -93,7 +93,7 @@ NodeConnector::~NodeConnector()
 
 NodeConnector::NodeBasePtr NodeConnector::LookupTypeFunc(const MbedTlsObj::BigNumber & key, EncFunc::Dht::NumType type)
 {
-	CntPair cntPair = gs_state.GetConnectionPool().GetNew(m_address, gs_state);
+	CntPair cntPair = gs_state.GetConnectionMgr().GetNew(m_address, gs_state);
 
 	cntPair.GetCommLayer().SendStruct(type); //1. Send function type
 
@@ -104,7 +104,6 @@ NodeConnector::NodeBasePtr NodeConnector::LookupTypeFunc(const MbedTlsObj::BigNu
 
 	NodeConnector::NodeBasePtr res = ReceiveNode(cntPair.GetCommLayer()); //3. Receive node. - Done!
 
-	//gs_state.GetConnectionPool().Put(m_address, std::move(cntPair));
 	return res;
 }
 
@@ -127,13 +126,12 @@ NodeConnector::NodeBasePtr NodeConnector::GetImmediateSuccessor()
 	//LOGI("Node Connector: Getting Immediate Successor of Node %s...", GetNodeId().ToBigEndianHexStr().c_str());
 	using namespace EncFunc::Dht;
 
-	CntPair cntPair = gs_state.GetConnectionPool().GetNew(m_address, gs_state);
+	CntPair cntPair = gs_state.GetConnectionMgr().GetNew(m_address, gs_state);
 
 	cntPair.GetCommLayer().SendStruct(k_getImmediateSuc); //1. Send function type
 
 	NodeConnector::NodeBasePtr res = ReceiveNode(cntPair.GetCommLayer()); //2. Receive node. - Done!
 
-	//gs_state.GetConnectionPool().Put(m_address, std::move(cntPair));
 	return res;
 }
 
@@ -142,13 +140,12 @@ NodeConnector::NodeBasePtr NodeConnector::GetImmediatePredecessor()
 	//LOGI("Node Connector: Getting Immediate Predecessor of Node %s...", GetNodeId().ToBigEndianHexStr().c_str());
 	using namespace EncFunc::Dht;
 
-	CntPair cntPair = gs_state.GetConnectionPool().GetNew(m_address, gs_state);
+	CntPair cntPair = gs_state.GetConnectionMgr().GetNew(m_address, gs_state);
 
 	cntPair.GetCommLayer().SendStruct(k_getImmediatePre); //1. Send function type
 
 	NodeConnector::NodeBasePtr res = ReceiveNode(cntPair.GetCommLayer()); //2. Receive node. - Done!
 
-	//gs_state.GetConnectionPool().Put(m_address, std::move(cntPair));
 	return res;
 
 }
@@ -158,16 +155,13 @@ void NodeConnector::SetImmediatePredecessor(NodeBasePtr pred)
 	//LOGI("Node Connector: Setting Immediate Predecessor of Node %s...", GetNodeId().ToBigEndianHexStr().c_str());
 	using namespace EncFunc::Dht;
 
-	CntPair cntPair = gs_state.GetConnectionPool().GetNew(m_address, gs_state);
+	CntPair cntPair = gs_state.GetConnectionMgr().GetNew(m_address, gs_state);
 
 	cntPair.GetCommLayer().SendStruct(k_setImmediatePre); //1. Send function type
 
 	SendNode(cntPair.GetCommLayer(), pred); //2. Send Node. - Done!
 
 	cntPair.GetCommLayer().ReceiveStruct(gsk_ack);
-	//LOGI("");
-	
-	//gs_state.GetConnectionPool().Put(m_address, std::move(cntPair));
 }
 
 void NodeConnector::UpdateFingerTable(NodeBasePtr & s, uint64_t i)
@@ -175,16 +169,13 @@ void NodeConnector::UpdateFingerTable(NodeBasePtr & s, uint64_t i)
 	//LOGI("Node Connector: Updating Finger Table of Node %s...", GetNodeId().ToBigEndianHexStr().c_str());
 	using namespace EncFunc::Dht;
 
-	CntPair cntPair = gs_state.GetConnectionPool().GetNew(m_address, gs_state);
+	CntPair cntPair = gs_state.GetConnectionMgr().GetNew(m_address, gs_state);
 
 	cntPair.GetCommLayer().SendStruct(k_updFingerTable); //1. Send function type
 	SendNode(cntPair.GetCommLayer(), s); //2. Send Node.
 	cntPair.GetCommLayer().SendStruct(i); //3. Send i. - Done!
 
 	cntPair.GetCommLayer().ReceiveStruct(gsk_ack);
-	//LOGI("");
-
-	//gs_state.GetConnectionPool().Put(m_address, std::move(cntPair));
 }
 
 void NodeConnector::DeUpdateFingerTable(const MbedTlsObj::BigNumber & oldId, NodeBasePtr & succ, uint64_t i)
@@ -192,7 +183,7 @@ void NodeConnector::DeUpdateFingerTable(const MbedTlsObj::BigNumber & oldId, Nod
 	//LOGI("Node Connector: De-Updating Finger Table of Node %s...", GetNodeId().ToBigEndianHexStr().c_str());
 	using namespace EncFunc::Dht;
 
-	CntPair cntPair = gs_state.GetConnectionPool().GetNew(m_address, gs_state);
+	CntPair cntPair = gs_state.GetConnectionMgr().GetNew(m_address, gs_state);
 
 	cntPair.GetCommLayer().SendStruct(k_dUpdFingerTable); //1. Send function type
 
@@ -204,9 +195,6 @@ void NodeConnector::DeUpdateFingerTable(const MbedTlsObj::BigNumber & oldId, Nod
 	cntPair.GetCommLayer().SendStruct(i); //4. Send i. - Done!
 
 	cntPair.GetCommLayer().ReceiveStruct(gsk_ack);
-	//LOGI("");
-
-	//gs_state.GetConnectionPool().Put(m_address, std::move(cntPair));
 }
 
 const BigNumber & NodeConnector::GetNodeId()
@@ -220,7 +208,7 @@ const BigNumber & NodeConnector::GetNodeId()
 	//LOGI("Node Connector: Getting Node ID...");
 	using namespace EncFunc::Dht;
 
-	CntPair cntPair = gs_state.GetConnectionPool().GetNew(m_address, gs_state);
+	CntPair cntPair = gs_state.GetConnectionMgr().GetNew(m_address, gs_state);
 
 	cntPair.GetCommLayer().SendStruct(k_getNodeId); //1. Send function type
 
@@ -229,8 +217,6 @@ const BigNumber & NodeConnector::GetNodeId()
 
 	m_Id = Tools::make_unique<BigNumber>(keyBin);
 	//LOGI("Recv result ID: %s.", m_Id->ToBigEndianHexStr().c_str());
-	//LOGI("");
 
-	//gs_state.GetConnectionPool().Put(m_address, std::move(cntPair));
 	return *m_Id;
 }

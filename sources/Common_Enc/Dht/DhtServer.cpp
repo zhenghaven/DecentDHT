@@ -23,7 +23,7 @@
 #include "EnclaveStore.h"
 #include "NodeConnector.h"
 #include "ConnectionManager.h"
-#include "DhtConnectionPool.h"
+#include "DhtSecureConnectionMgr.h"
 #include "DhtStatesSingleton.h"
 
 using namespace Decent;
@@ -86,7 +86,7 @@ namespace
 	static void ForwardQuery(const uint64_t& nextAddr, const ForwardQueueItem& item)
 	{
 		//PRINT_I("Forward query with ID %s.", item.m_uuid.c_str());
-		CntPair peerCntPair = gs_state.GetConnectionPool().GetNew(nextAddr, gs_state);
+		CntPair peerCntPair = gs_state.GetConnectionMgr().GetNew(nextAddr, gs_state);
 
 		peerCntPair.GetCommLayer().SendStruct(EncFunc::Dht::k_queryNonBlock);
 		peerCntPair.GetCommLayer().SendStruct(item);
@@ -105,7 +105,7 @@ namespace
 	static void ReplyQuery(const uint64_t& nextAddr, const ReplyQueueItem& item)
 	{
 		//PRINT_I("Reply query with ID %s.", item.m_uuid.c_str());
-		CntPair peerCntPair = gs_state.GetConnectionPool().GetNew(nextAddr, gs_state);
+		CntPair peerCntPair = gs_state.GetConnectionMgr().GetNew(nextAddr, gs_state);
 
 		peerCntPair.GetCommLayer().SendStruct(EncFunc::Dht::k_queryReply);
 		peerCntPair.GetCommLayer().SendStruct(item);
