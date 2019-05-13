@@ -58,7 +58,7 @@ extern "C" int ecall_decent_dht_init(uint64_t self_addr, int is_first_node, uint
 	}
 	catch (const std::exception& e)
 	{
-		PRINT_I("Failed to initialize DHT node. Error msg: %s.", e.what());
+		PRINT_I("Failed to initialize DHT node. Error msg: %s", e.what());
 		return false;
 	}
 	return true;
@@ -72,7 +72,7 @@ extern "C" void ecall_decent_dht_deinit()
 	}
 	catch (const std::exception& e)
 	{
-		PRINT_I("Failed to de-initialize DHT node. Error msg: %s.", e.what());
+		PRINT_I("Failed to de-initialize DHT node. Error msg: %s", e.what());
 	}
 }
 
@@ -98,7 +98,7 @@ extern "C" int ecall_decent_dht_proc_msg_from_dht(void* connection, void** prev_
 	}
 	catch (const std::exception& e)
 	{
-		PRINT_W("Failed to process message from DHT node. Error msg: %s.", e.what());
+		PRINT_W("Failed to process message from DHT node. Error msg: %s", e.what());
 	}
 
 	return false;
@@ -127,7 +127,7 @@ extern "C" int ecall_decent_dht_proc_msg_from_store(void* connection)
 	}
 	catch (const std::exception& e)
 	{
-		PRINT_W("Failed to process message from DHT store. Error msg: %s.", e.what());
+		PRINT_W("Failed to process message from DHT store. Error msg: %s", e.what());
 	}
 
 	return false;
@@ -156,7 +156,7 @@ extern "C" int ecall_decent_dht_proc_msg_from_app(void* connection)
 	}
 	catch (const std::exception& e)
 	{
-		PRINT_W("Failed to process message from App. Error msg: %s.", e.what());
+		PRINT_W("Failed to process message from App. Error msg: %s", e.what());
 		return false;
 	}
 }
