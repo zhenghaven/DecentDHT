@@ -1,8 +1,9 @@
 #pragma once
 
+#include "ItemBase.h"
+
 #include <vector>
 
-#include <DecentApi/Common/consttime_memequal.h>
 #include <DecentApi/Common/general_key_types.h>
 
 namespace Decent
@@ -11,7 +12,7 @@ namespace Decent
 	{
 		namespace AccessCtrl
 		{
-			class AbAttributeItem
+			class AbAttributeItem : public ItemBase
 			{
 			public: //static member:
 				static constexpr size_t Size()
@@ -47,27 +48,14 @@ namespace Decent
 
 				const general_256bit_hash& GetAttrHash() const;
 
-				bool operator==(const AbAttributeItem& rhs) const;
+				virtual size_t GetSize() const override;
 
-				bool operator>(const AbAttributeItem& rhs) const;
+			protected:
+				virtual const uint8_t* ByteBegin() const override;
 
-				bool operator>=(const AbAttributeItem& rhs) const;
-
-				bool operator<(const AbAttributeItem& rhs) const;
-
-				bool operator<=(const AbAttributeItem& rhs) const;
-
-				template<typename DestIt>
-				DestIt Serialize(DestIt it) const
-				{
-					return std::copy(ByteBegin(), ByteEnd(), it);
-				}
+				virtual const uint8_t* ByteEnd() const override;
 
 			private:
-				const uint8_t* ByteBegin() const;
-
-				const uint8_t* ByteEnd() const;
-
 				BufferType m_hashes;
 			};
 		}

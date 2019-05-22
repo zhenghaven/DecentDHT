@@ -69,33 +69,9 @@ const general_256bit_hash & AbAttributeItem::GetAttrHash() const
 	return m_hashes[1];
 }
 
-bool AbAttributeItem::operator==(const AbAttributeItem & rhs) const
+size_t AbAttributeItem::GetSize() const
 {
-	return std::equal(reinterpret_cast<const uint8_t*>(m_hashes),
-		reinterpret_cast<const uint8_t*>(m_hashes) + sizeof(m_hashes),
-		reinterpret_cast<const uint8_t*>(rhs.m_hashes));
-}
-
-bool AbAttributeItem::operator>(const AbAttributeItem & rhs) const
-{
-	return (rhs < *this);
-}
-
-bool AbAttributeItem::operator>=(const AbAttributeItem & rhs) const
-{
-	return !(*this < rhs);
-}
-
-bool AbAttributeItem::operator<(const AbAttributeItem & rhs) const
-{
-	return std::lexicographical_compare(
-		ByteBegin(), ByteEnd(),
-		rhs.ByteBegin(), rhs.ByteEnd());
-}
-
-bool AbAttributeItem::operator<=(const AbAttributeItem & rhs) const
-{
-	return !(*this > rhs);
+	return AbAttributeItem::Size();
 }
 
 const uint8_t * AbAttributeItem::ByteBegin() const
