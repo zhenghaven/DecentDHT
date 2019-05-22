@@ -57,10 +57,10 @@ namespace Decent
 
 				bool operator<=(const AbAttributeItem& rhs) const;
 
-				template<typename OutputIt>
-				void Serialize(OutputIt it) const
+				template<typename DestIt>
+				DestIt Serialize(DestIt it) const
 				{
-					std::copy(ByteBegin(), ByteEnd(), it);
+					return std::copy(ByteBegin(), ByteEnd(), it);
 				}
 
 			private:

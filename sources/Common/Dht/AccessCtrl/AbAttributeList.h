@@ -35,13 +35,15 @@ namespace Decent
 
 				size_t GetSerializedSize() const;
 
-				template<typename OutputIt>
-				void Serialize(OutputIt it) const
+				template<typename DestIt>
+				DestIt Serialize(DestIt it) const
 				{
+					DestIt resIt = it;
 					for (const auto& item : m_list)
 					{
-						item.Serialize(it);
+						resIt = item.Serialize(resIt);
 					}
+					return resIt;
 				}
 
 			private:
