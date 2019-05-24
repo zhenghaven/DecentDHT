@@ -23,7 +23,7 @@ namespace Decent
 				* \param	it 	The iterator.
 				* \param	end	The end.
 				*/
-				EntityList(std::vector<uint8_t>::const_iterator& it, const std::vector<uint8_t>::const_iterator& end);
+				EntityList(std::vector<uint8_t>::const_iterator& it, std::vector<uint8_t>::const_iterator end);
 
 				virtual ~EntityList();
 

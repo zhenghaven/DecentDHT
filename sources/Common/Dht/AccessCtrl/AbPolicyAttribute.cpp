@@ -23,7 +23,7 @@ AbPolicyAttribute::AbPolicyAttribute(AbPolicyAttribute && rhs) :
 {
 }
 
-AbPolicyAttribute::AbPolicyAttribute(std::vector<uint8_t>::const_iterator & it, const std::vector<uint8_t>::const_iterator & end)
+AbPolicyAttribute::AbPolicyAttribute(std::vector<uint8_t>::const_iterator & it, std::vector<uint8_t>::const_iterator end)
 {
 	if (it == end || *it != sk_flag)
 	{
@@ -49,10 +49,15 @@ size_t AbPolicyAttribute::GetSerializedSize() const
 	return sk_seralizedSize;
 }
 
-void AbPolicyAttribute::Serialize(std::vector<uint8_t>& output) const
+std::vector<uint8_t>::iterator AbPolicyAttribute::Serialize(std::vector<uint8_t>::iterator destIt, std::vector<uint8_t>::iterator end) const
 {
-	output.push_back(sk_flag);
-	m_attr->Serialize(std::back_inserter(output));
+	if (std::distance(destIt, end) < static_cast<int64_t>(sizeof(sk_flag)))
+	{
+		throw RuntimeException("No enough binary block space to serialize AbPolicy.");
+	}
+
+	*destIt++ = sk_flag;
+	return m_attr->Serialize(destIt);
 }
 
 void AbPolicyAttribute::GetRelatedAttributes(AbAttributeList & outputList) const

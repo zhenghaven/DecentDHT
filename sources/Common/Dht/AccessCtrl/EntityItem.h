@@ -32,7 +32,7 @@ namespace Decent
 				* \param	it 	The iterator.
 				* \param	end	The end.
 				*/
-				EntityItem(std::vector<uint8_t>::const_iterator& it, const std::vector<uint8_t>::const_iterator& end);
+				EntityItem(std::vector<uint8_t>::const_iterator& it, std::vector<uint8_t>::const_iterator end);
 
 				EntityItem(const EntityItem& rhs);
 

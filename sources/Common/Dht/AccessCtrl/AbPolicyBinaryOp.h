@@ -30,7 +30,15 @@ namespace Decent
 
 				virtual FlagType GetFlagByte() const = 0;
 
-				virtual void Serialize(std::vector<uint8_t>& output) const override;
+				/**
+				* \brief	Serialize this object to the given stream
+				*
+				* \param [out]	destIt	The iterator point to the begin of the binary block to insert the data.
+				* \param 	   	end   	The end of the binary block.
+				*
+				* \return	A std::vector&lt;uint8_t&gt;::iterator, which points to the end of inserted data.
+				*/
+				virtual std::vector<uint8_t>::iterator Serialize(std::vector<uint8_t>::iterator destIt, std::vector<uint8_t>::iterator end) const override;
 
 				virtual void GetRelatedAttributes(AbAttributeList& outputList) const override;
 

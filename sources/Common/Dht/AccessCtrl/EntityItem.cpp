@@ -9,7 +9,7 @@ EntityItem::EntityItem(const general_256bit_hash & entityHash)
 	std::copy(std::begin(entityHash), std::end(entityHash), m_hash);
 }
 
-EntityItem::EntityItem(std::vector<uint8_t>::const_iterator & it, const std::vector<uint8_t>::const_iterator & end)
+EntityItem::EntityItem(std::vector<uint8_t>::const_iterator & it, std::vector<uint8_t>::const_iterator end)
 {
 	auto leftDist = std::distance(it, end);
 	if (leftDist < 0 || static_cast<size_t>(leftDist) < Size())

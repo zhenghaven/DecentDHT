@@ -29,13 +29,14 @@ namespace Decent
 				virtual size_t GetSerializedSize() const = 0;
 
 				/**
-				 * \brief	Serialize this object to the given stream
-				 *
-				 * \param [out]	output	The output. Please note that the serialized data will be pushed back
-				 * 							to the vector, so that any existing data in the vector will be kept at
-				 * 							the front.
-				 */
-				virtual void Serialize(std::vector<uint8_t>& output) const = 0;
+				* \brief	Serialize this object to the given stream
+				*
+				* \param [out]	destIt	The iterator point to the begin of the binary block to insert the data.
+				* \param 	   	end   	The end of the binary block.
+				*
+				* \return	A std::vector&lt;uint8_t&gt;::iterator, which points to the end of inserted data.
+				*/
+				virtual std::vector<uint8_t>::iterator Serialize(std::vector<uint8_t>::iterator destIt, std::vector<uint8_t>::iterator end) const = 0;
 
 				/**
 				 * \brief	Gets related attributes

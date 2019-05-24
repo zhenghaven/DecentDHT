@@ -11,7 +11,7 @@ EntityList::EntityList()
 {
 }
 
-EntityList::EntityList(std::vector<uint8_t>::const_iterator & it, const std::vector<uint8_t>::const_iterator & end)
+EntityList::EntityList(std::vector<uint8_t>::const_iterator & it, std::vector<uint8_t>::const_iterator end)
 {
 	auto leftDist = std::distance(it, end);
 	if (leftDist < 0 || (leftDist % EntityItem::Size() != 0))

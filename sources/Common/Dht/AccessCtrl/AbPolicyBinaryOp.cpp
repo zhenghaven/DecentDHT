@@ -1,5 +1,7 @@
 #include "AbPolicyBinaryOp.h"
 
+#include "ParseError.h"
+
 using namespace Decent::Dht::AccessCtrl;
 
 AbPolicyBinaryOp::AbPolicyBinaryOp(std::unique_ptr<AbPolicyBase>&& left, std::unique_ptr<AbPolicyBase>&& right) :
@@ -23,11 +25,17 @@ size_t AbPolicyBinaryOp::GetSerializedSize() const
 	return sizeof(FlagType) + m_left->GetSerializedSize() + m_right->GetSerializedSize();
 }
 
-void AbPolicyBinaryOp::Serialize(std::vector<uint8_t>& output) const
+std::vector<uint8_t>::iterator AbPolicyBinaryOp::Serialize(std::vector<uint8_t>::iterator destIt, std::vector<uint8_t>::iterator end) const
 {
-	output.push_back(GetFlagByte());
-	m_left->Serialize(output);
-	m_right->Serialize(output);
+	if (std::distance(destIt, end) < static_cast<int64_t>(sizeof(FlagType)))
+	{
+		throw RuntimeException("No enough binary block space to serialize AbPolicy.");
+	}
+
+	*destIt++ = GetFlagByte();
+	destIt = m_left->Serialize(destIt, end);
+	destIt = m_right->Serialize(destIt, end);
+	return destIt;
 }
 
 void AbPolicyBinaryOp::GetRelatedAttributes(AbAttributeList & outputList) const

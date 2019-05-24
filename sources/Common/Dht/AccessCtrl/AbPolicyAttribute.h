@@ -30,7 +30,7 @@ namespace Decent
 				* \param	it 	The iterator.
 				* \param	end	The end.
 				*/
-				AbPolicyAttribute(std::vector<uint8_t>::const_iterator& it, const std::vector<uint8_t>::const_iterator& end);
+				AbPolicyAttribute(std::vector<uint8_t>::const_iterator& it, std::vector<uint8_t>::const_iterator end);
 
 				virtual ~AbPolicyAttribute();
 
@@ -38,7 +38,15 @@ namespace Decent
 
 				virtual size_t GetSerializedSize() const override;
 
-				virtual void Serialize(std::vector<uint8_t>& output) const override;
+				/**
+				* \brief	Serialize this object to the given stream
+				*
+				* \param [out]	destIt	The iterator point to the begin of the binary block to insert the data.
+				* \param 	   	end   	The end of the binary block.
+				*
+				* \return	A std::vector&lt;uint8_t&gt;::iterator, which points to the end of inserted data.
+				*/
+				virtual std::vector<uint8_t>::iterator Serialize(std::vector<uint8_t>::iterator destIt, std::vector<uint8_t>::iterator end) const override;
 
 				virtual void GetRelatedAttributes(AbAttributeList& outputList) const override;
 

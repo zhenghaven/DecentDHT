@@ -4,7 +4,7 @@
 
 using namespace Decent::Dht::AccessCtrl;
 
-AbPolicyAny::AbPolicyAny(std::vector<uint8_t>::const_iterator & it, const std::vector<uint8_t>::const_iterator & end)
+AbPolicyAny::AbPolicyAny(std::vector<uint8_t>::const_iterator & it, std::vector<uint8_t>::const_iterator end)
 {
 	if (it == end || *it != sk_flag)
 	{
@@ -27,9 +27,15 @@ size_t AbPolicyAny::GetSerializedSize() const
 	return sk_seralizedSize;
 }
 
-void AbPolicyAny::Serialize(std::vector<uint8_t>& output) const
+std::vector<uint8_t>::iterator AbPolicyAny::Serialize(std::vector<uint8_t>::iterator destIt, std::vector<uint8_t>::iterator end) const
 {
-	output.push_back(sk_flag);
+	if (std::distance(destIt, end) < static_cast<int64_t>(sizeof(sk_flag)))
+	{
+		throw RuntimeException("No enough binary block space to serialize AbPolicy.");
+	}
+
+	*destIt++ = sk_flag;
+	return destIt;
 }
 
 void AbPolicyAny::GetRelatedAttributes(AbAttributeList & outputList) const

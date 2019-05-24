@@ -7,7 +7,7 @@
 using namespace Decent::Dht;
 using namespace Decent::Dht::AccessCtrl;
 
-std::unique_ptr<AbPolicyBase> AccessCtrl::Parse(std::vector<uint8_t>::const_iterator& it, const std::vector<uint8_t>::const_iterator& end)
+std::unique_ptr<AbPolicyBase> AccessCtrl::Parse(std::vector<uint8_t>::const_iterator& it, std::vector<uint8_t>::const_iterator end)
 {
 	if (it == end)
 	{
