@@ -51,7 +51,7 @@ size_t AbPolicyAttribute::GetSerializedSize() const
 
 std::vector<uint8_t>::iterator AbPolicyAttribute::Serialize(std::vector<uint8_t>::iterator destIt, std::vector<uint8_t>::iterator end) const
 {
-	if (std::distance(destIt, end) < static_cast<int64_t>(sizeof(sk_flag)))
+	if (std::distance(destIt, end) < static_cast<int64_t>(GetSerializedSize()))
 	{
 		throw RuntimeException("No enough binary block space to serialize AbPolicy.");
 	}

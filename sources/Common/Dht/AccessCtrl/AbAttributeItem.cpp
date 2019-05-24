@@ -16,8 +16,7 @@ AbAttributeItem::AbAttributeItem(const general_256bit_hash & userHash, const gen
 
 AbAttributeItem::AbAttributeItem(std::vector<uint8_t>::const_iterator& it, const std::vector<uint8_t>::const_iterator& end)
 {
-	auto leftDist = std::distance(it, end);
-	if (leftDist < 0 || static_cast<size_t>(leftDist) < Size())
+	if (std::distance(it, end) < static_cast<int64_t>(AbAttributeItem::Size()))
 	{
 		throw ParseError("Failed to parse attributed-based policy - Attribute.");
 	}

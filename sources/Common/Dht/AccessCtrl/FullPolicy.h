@@ -2,6 +2,7 @@
 
 #include <vector>
 
+#include "EntityItem.h"
 #include "EntityBasedControl.h"
 #include "AttributeBasedControl.h"
 
@@ -31,7 +32,7 @@ namespace Decent
 				 * \param [in]	enclavePolicy	The enclave policy.
 				 * \param [in]	clientPolicy 	The client policy.
 				 */
-				FullPolicy(EntityBasedControl&& enclavePolicy, AttributeBasedControl&& clientPolicy);
+				FullPolicy(const EntityItem& owner, EntityBasedControl&& enclavePolicy, AttributeBasedControl&& clientPolicy);
 
 				/** \brief	Destructor */
 				virtual ~FullPolicy();
@@ -81,7 +82,17 @@ namespace Decent
 				 */
 				const AttributeBasedControl& GetClientPolicy() const;
 
+				/**
+				 * \brief	Query if 'testee' is owner
+				 *
+				 * \param	testee	The entity to be tested.
+				 *
+				 * \return	True if owner, false if not.
+				 */
+				virtual bool IsOwner(const EntityItem& testee) const;
+
 			private:
+				EntityItem m_owner;
 				EntityBasedControl m_enclavePolicy;
 				AttributeBasedControl m_clientPolicy;
 			};
