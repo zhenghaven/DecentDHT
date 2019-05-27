@@ -7,11 +7,11 @@
 #include <DecentApi/Common/Common.h>
 #include <DecentApi/Common/make_unique.h>
 #include <DecentApi/Common/GeneralKeyTypes.h>
+#include <DecentApi/Common/MbedTls/BigNumber.h>
 #include <DecentApi/Common/Net/TlsCommLayer.h>
 #include <DecentApi/Common/Net/ConnectionBase.h>
-#include <DecentApi/Common/Net/SecureConnectionPoolBase.h>
-#include <DecentApi/Common/MbedTls/BigNumber.h>
-#include <DecentApi/Common/MbedTls/Drbg.h>
+#include <DecentApi/Common/Net/RpcParser.h>
+#include <DecentApi/Common/Net/RpcWriter.h>
 
 #include <DecentApi/CommonEnclave/Net/EnclaveCntTranslator.h>
 #include <DecentApi/CommonEnclave/Ra/TlsConfigSameEnclave.h>
@@ -36,6 +36,21 @@ namespace
 	DhtStates& gs_state = Dht::GetDhtStatesSingleton();
 
 	static char gsk_ack[] = "ACK";
+
+	static void ReturnNode(SecureCommLayer & comm, DhtStates::DhtLocalNodeType::NodeBasePtr node)
+	{
+		constexpr size_t rpcSize = RpcWriter::CalcSizePrim<uint8_t[DhtStates::sk_keySizeByte]>() +
+			RpcWriter::CalcSizePrim<uint64_t>();
+
+		RpcWriter rpc(rpcSize, 2);
+
+		auto keyBin = rpc.AddPrimitiveArg<uint8_t[DhtStates::sk_keySizeByte]>();
+		node->GetNodeId().ToBinary(keyBin.Get(), sk_struct);
+
+		rpc.AddPrimitiveArg<uint64_t>().Get() = node->GetAddress();
+
+		comm.SendRpc(rpc);
+	}
 
 	struct PendingQueryItem
 	{
@@ -72,13 +87,6 @@ namespace
 
 	static std::atomic<bool> gs_isForwardingTerminated = false;
 
-	struct ForwardQueueItem
-	{
-		uint64_t m_reqId;
-		uint8_t m_keyId[DhtStates::sk_keySizeByte];
-		uint64_t m_reAddr;
-	};
-
 	static std::mutex gs_forwardQueueMutex;
 	static std::queue<std::pair<uint64_t, std::unique_ptr<ForwardQueueItem> > > gs_forwardQueue;
 	static std::condition_variable gs_forwardQueueSignal;
@@ -88,15 +96,15 @@ namespace
 		//PRINT_I("Forward query with ID %s.", item.m_uuid.c_str());
 		CntPair peerCntPair = gs_state.GetConnectionMgr().GetNew(nextAddr, gs_state);
 
-		peerCntPair.GetCommLayer().SendStruct(EncFunc::Dht::k_queryNonBlock);
-		peerCntPair.GetCommLayer().SendStruct(item);
-	}
+		constexpr size_t rpcSize = RpcWriter::CalcSizePrim<EncFunc::Dht::NumType>() +
+			RpcWriter::CalcSizePrim<ForwardQueueItem>();
 
-	struct ReplyQueueItem
-	{
-		uint64_t m_reqId;
-		uint64_t m_resAddr;
-	};
+		RpcWriter rpc(rpcSize, 2);
+		rpc.AddPrimitiveArg<EncFunc::Dht::NumType>().Get() = EncFunc::Dht::k_queryNonBlock;
+		rpc.AddPrimitiveArg<ForwardQueueItem>().Get() = item;
+
+		peerCntPair.GetCommLayer().SendRpc(rpc);
+	}
 
 	static std::mutex gs_replyQueueMutex;
 	static std::queue<std::pair< uint64_t, std::unique_ptr<ReplyQueueItem> > > gs_replyQueue;
@@ -107,73 +115,14 @@ namespace
 		//PRINT_I("Reply query with ID %s.", item.m_uuid.c_str());
 		CntPair peerCntPair = gs_state.GetConnectionMgr().GetNew(nextAddr, gs_state);
 
-		peerCntPair.GetCommLayer().SendStruct(EncFunc::Dht::k_queryReply);
-		peerCntPair.GetCommLayer().SendStruct(item);
-	}
-}
+		constexpr size_t rpcSize = RpcWriter::CalcSizePrim<EncFunc::Dht::NumType>() +
+			RpcWriter::CalcSizePrim<ReplyQueueItem>();
 
-void Dht::DeUpdateFingerTable(Decent::Net::TlsCommLayer &tls)
-{
-	//LOGI("DHT Server: De-Updating FingerTable...");
-	std::array<uint8_t, DhtStates::sk_keySizeByte> oldIdBin{};
-	uint64_t i;
+		RpcWriter rpc(rpcSize, 2);
+		rpc.AddPrimitiveArg<EncFunc::Dht::NumType>().Get() = EncFunc::Dht::k_queryReply;
+		rpc.AddPrimitiveArg<ReplyQueueItem>().Get() = item;
 
-	tls.ReceiveRaw(oldIdBin.data(), oldIdBin.size()); //2. Receive old ID.
-
-	DhtStates::DhtLocalNodeType::NodeBasePtr s = NodeConnector::ReceiveNode(tls); //3. Receive node.
-	tls.ReceiveStruct(i); //3. Receive i. - Done!
-	PRINT_I("De-updating finger table; i = %llu.", i);
-
-	DhtStates::DhtLocalNodePtrType localNode = gs_state.GetDhtNode();
-
-	localNode->DeUpdateFingerTable(ConstBigNumber(oldIdBin), s, i);
-
-	tls.SendStruct(gsk_ack);
-	//LOGI("");
-}
-
-void Dht::QueryNonBlock(Decent::Net::TlsCommLayer & tls)
-{
-	std::unique_ptr<ForwardQueueItem> forwardItem = Tools::make_unique<ForwardQueueItem>();
-
-	tls.ReceiveStruct(*forwardItem);
-
-	ConstBigNumber queriedId(forwardItem->m_keyId, sk_struct);
-
-	DhtStates::DhtLocalNodePtrType localNode = gs_state.GetDhtNode();
-
-	uint64_t resAddr = 0;
-	if (TryGetQueriedAddrLocally(*localNode, queriedId, resAddr))
-	{
-		//Query can be answered immediately.
-
-		std::unique_ptr<ReplyQueueItem> reItem = Tools::make_unique<ReplyQueueItem>();
-		reItem->m_reqId = forwardItem->m_reqId;
-		reItem->m_resAddr = resAddr;
-
-		{
-			std::unique_lock<std::mutex> replyQueueLock(gs_replyQueueMutex);
-			gs_replyQueue.push(std::make_pair(forwardItem->m_reAddr, std::move(reItem)));
-			replyQueueLock.unlock();
-			gs_replyQueueSignal.notify_one();
-		}
-
-		return;
-	}
-	else
-	{
-		//Query has to be forwarded to other peer.
-		
-		DhtStates::DhtLocalNodeType::NodeBasePtr nextHop = localNode->GetNextHop(queriedId);
-
-		{
-			std::unique_lock<std::mutex> forwardQueueLock(gs_forwardQueueMutex);
-			gs_forwardQueue.push(std::make_pair(nextHop->GetAddress(), std::move(forwardItem)));
-			forwardQueueLock.unlock();
-			gs_forwardQueueSignal.notify_one();
-		}
-
-		return;
+		peerCntPair.GetCommLayer().SendRpc(rpc);
 	}
 }
 
@@ -263,19 +212,148 @@ void Dht::TerminateWorkers()
 	gs_replyQueueSignal.notify_all();
 }
 
-void Dht::QueryReply(Decent::Net::TlsCommLayer & tls, void*& heldCntPtr)
+void Dht::GetNodeId(Decent::Net::TlsCommLayer &tls)
 {
-	ReplyQueueItem replyItem;
+    //LOGI("DHT Server: Getting the NodeId...");
+	DhtStates::DhtLocalNodePtrType localNode = gs_state.GetDhtNode();
 
-	tls.ReceiveStruct(replyItem);
+	constexpr size_t rpcSize = RpcWriter::CalcSizePrim<uint8_t[DhtStates::sk_keySizeByte]>();
 
+	RpcWriter rpc(rpcSize, 1);
+
+	auto keyBin = rpc.AddPrimitiveArg<uint8_t[DhtStates::sk_keySizeByte]>();
+	localNode->GetNodeId().ToBinary(keyBin.Get(), sk_struct);
+
+	tls.SendRpc(rpc);
+}
+
+void Dht::FindSuccessor(Decent::Net::TlsCommLayer &tls, const uint8_t(&keyId)[DhtStates::sk_keySizeByte])
+{
+	ConstBigNumber queriedId(keyId);
+	//LOGI("Recv queried ID: %s.", static_cast<const BigNumber&>(queriedId).ToBigEndianHexStr().c_str());
+
+	DhtStates::DhtLocalNodePtrType localNode = gs_state.GetDhtNode();
+
+	ReturnNode(tls, localNode->FindSuccessor(queriedId));
+}
+
+void Dht::FindPredecessor(Decent::Net::TlsCommLayer &tls, const uint8_t(&keyId)[DhtStates::sk_keySizeByte])
+{
+	ConstBigNumber queriedId(keyId);
+    //LOGI("Recv queried ID: %s.", static_cast<const BigNumber&>(queriedId).ToBigEndianHexStr().c_str());
+
+	DhtStates::DhtLocalNodePtrType localNode = gs_state.GetDhtNode();
+
+	ReturnNode(tls, localNode->FindPredecessor(queriedId));
+}
+
+void Dht::GetImmediateSucessor(Decent::Net::TlsCommLayer &tls)
+{
+    //LOGI("DHT Server: Finding Immediate Successor...");
+
+    DhtStates::DhtLocalNodePtrType localNode = gs_state.GetDhtNode();
+
+	ReturnNode(tls, localNode->GetImmediateSuccessor());
+}
+
+void Dht::GetImmediatePredecessor(Decent::Net::TlsCommLayer &tls)
+{
+	//LOGI("DHT Server: Getting Immediate Predecessor...");
+
+	DhtStates::DhtLocalNodePtrType localNode = gs_state.GetDhtNode();
+
+	ReturnNode(tls, localNode->GetImmediatePredecessor());
+}
+
+void Dht::SetImmediatePredecessor(Decent::Net::TlsCommLayer &tls, const uint8_t(&keyId)[DhtStates::sk_keySizeByte], uint64_t addr)
+{
+	//LOGI("DHT Server: Setting Immediate Predecessor...");
+
+	DhtStates::DhtLocalNodePtrType localNode = gs_state.GetDhtNode();
+
+	localNode->SetImmediatePredecessor(std::make_shared<NodeConnector>(addr, BigNumber(keyId, true))); //2. Receive Node. - Done!
+
+	tls.SendRpc(RpcWriter(0, 0));
+}
+
+void Dht::UpdateFingerTable(Decent::Net::TlsCommLayer &tls, const uint8_t(&keyId)[DhtStates::sk_keySizeByte], uint64_t addr, uint64_t i)
+{
+	PRINT_I("Updating finger table; i = %llu.", i);
+
+	DhtStates::DhtLocalNodeType::NodeBasePtr s = std::make_shared<NodeConnector>(addr, BigNumber(keyId, true));
+
+	DhtStates::DhtLocalNodePtrType localNode = gs_state.GetDhtNode();
+
+	localNode->UpdateFingerTable(s, i);
+
+	tls.SendRpc(RpcWriter(0, 0));
+}
+
+void Dht::DeUpdateFingerTable(Decent::Net::TlsCommLayer &tls, const uint8_t(&oldId)[DhtStates::sk_keySizeByte], const uint8_t(&keyId)[DhtStates::sk_keySizeByte], uint64_t addr, uint64_t i)
+{
+	PRINT_I("De-updating finger table; i = %llu.", i);
+
+	DhtStates::DhtLocalNodeType::NodeBasePtr s = std::make_shared<NodeConnector>(addr, BigNumber(keyId, true));
+
+	DhtStates::DhtLocalNodePtrType localNode = gs_state.GetDhtNode();
+
+	localNode->DeUpdateFingerTable(ConstBigNumber(oldId), s, i);
+
+	tls.SendRpc(RpcWriter(0, 0));
+}
+
+void Dht::QueryNonBlock(const ForwardQueueItem& item)
+{
+	std::unique_ptr<ForwardQueueItem> forwardItem = Tools::make_unique<ForwardQueueItem>(item);
+
+	ConstBigNumber queriedId(forwardItem->m_keyId);
+
+	DhtStates::DhtLocalNodePtrType localNode = gs_state.GetDhtNode();
+
+	uint64_t resAddr = 0;
+	if (TryGetQueriedAddrLocally(*localNode, queriedId, resAddr))
+	{
+		//Query can be answered immediately.
+
+		std::unique_ptr<ReplyQueueItem> reItem = Tools::make_unique<ReplyQueueItem>();
+		reItem->m_reqId = forwardItem->m_reqId;
+		reItem->m_resAddr = resAddr;
+
+		{
+			std::unique_lock<std::mutex> replyQueueLock(gs_replyQueueMutex);
+			gs_replyQueue.push(std::make_pair(forwardItem->m_reAddr, std::move(reItem)));
+			replyQueueLock.unlock();
+			gs_replyQueueSignal.notify_one();
+		}
+
+		return;
+	}
+	else
+	{
+		//Query has to be forwarded to other peer.
+
+		DhtStates::DhtLocalNodeType::NodeBasePtr nextHop = localNode->GetNextHop(queriedId);
+
+		{
+			std::unique_lock<std::mutex> forwardQueueLock(gs_forwardQueueMutex);
+			gs_forwardQueue.push(std::make_pair(nextHop->GetAddress(), std::move(forwardItem)));
+			forwardQueueLock.unlock();
+			gs_forwardQueueSignal.notify_one();
+		}
+
+		return;
+	}
+}
+
+void Dht::QueryReply(const ReplyQueueItem& item, void*& heldCntPtr)
+{
 	//PRINT_I("Received forwarded query reply with ID %s.", requestId.c_str());
-	
+
 	std::unique_ptr<PendingQueryItem> pendingItem;
 
 	{
 		std::unique_lock<std::mutex> clientPendingQueriesLock(gs_clientPendingQueriesMutex);
-		auto it = gs_clientPendingQueries.find(replyItem.m_reqId);
+		auto it = gs_clientPendingQueries.find(item.m_reqId);
 		if (it != gs_clientPendingQueries.end())
 		{
 			pendingItem = std::move(it->second);
@@ -289,100 +367,8 @@ void Dht::QueryReply(Decent::Net::TlsCommLayer & tls, void*& heldCntPtr)
 		}
 	}
 
-	pendingItem->m_tls->SendStruct(replyItem.m_resAddr);
+	pendingItem->m_tls->SendStruct(item.m_resAddr);
 	heldCntPtr = pendingItem->m_cnt->GetPointer();
-}
-
-void Dht::UpdateFingerTable(Decent::Net::TlsCommLayer &tls)
-{
-	//LOGI("DHT Server: Updating FingerTable...");
-	DhtStates::DhtLocalNodeType::NodeBasePtr s = NodeConnector::ReceiveNode(tls); //2. Receive node.
-
-	uint64_t i;
-	tls.ReceiveStruct(i); //3. Receive i. - Done!
-	PRINT_I("Updating finger table; i = %llu.", i);
-
-	DhtStates::DhtLocalNodePtrType localNode = gs_state.GetDhtNode();
-
-	localNode->UpdateFingerTable(s, i);
-
-	tls.SendStruct(gsk_ack);
-	//LOGI("");
-}
-
-void Dht::GetImmediatePredecessor(Decent::Net::TlsCommLayer &tls)
-{
-	//LOGI("DHT Server: Getting Immediate Predecessor...");
-
-	DhtStates::DhtLocalNodePtrType localNode = gs_state.GetDhtNode();
-
-	NodeConnector::SendNode(tls, localNode->GetImmediatePredecessor()); //2. Send Node. - Done!
-	//LOGI("");
-}
-
-void Dht::SetImmediatePredecessor(Decent::Net::TlsCommLayer &tls)
-{
-	//LOGI("DHT Server: Setting Immediate Predecessor...");
-
-	DhtStates::DhtLocalNodePtrType localNode = gs_state.GetDhtNode();
-
-	localNode->SetImmediatePredecessor(NodeConnector::ReceiveNode(tls)); //2. Receive Node. - Done!
-
-	tls.SendStruct(gsk_ack);
-	//LOGI("");
-}
-
-void Dht::GetImmediateSucessor(Decent::Net::TlsCommLayer &tls)
-{
-    //LOGI("DHT Server: Finding Immediate Successor...");
-
-    DhtStates::DhtLocalNodePtrType localNode = gs_state.GetDhtNode();
-
-	NodeConnector::SendNode(tls, localNode->GetImmediateSuccessor()); //2. Send Node. - Done!
-	//LOGI("");
-}
-
-void Dht::GetNodeId(Decent::Net::TlsCommLayer &tls)
-{
-    //LOGI("DHT Server: Getting the NodeId...");
-	DhtStates::DhtLocalNodePtrType localNode = gs_state.GetDhtNode();
-    std::array<uint8_t, DhtStates::sk_keySizeByte> keyBin{};
-    localNode->GetNodeId().ToBinary(keyBin);
-
-    tls.SendRaw(keyBin.data(), keyBin.size()); //2. Sent nodeId ID
-
-    //LOGI("Sent result ID: %s.", localNode->GetNodeId().ToBigEndianHexStr().c_str());
-	//LOGI("");
-}
-
-void Dht::FindPredecessor(Decent::Net::TlsCommLayer &tls)
-{
-    //LOGI("DHT Server: Finding Predecessor...");
-    std::array<uint8_t, DhtStates::sk_keySizeByte> keyBin{};
-    tls.ReceiveRaw(keyBin.data(), keyBin.size()); //2. Received queried ID
-
-    ConstBigNumber queriedId(keyBin);
-    //LOGI("Recv queried ID: %s.", static_cast<const BigNumber&>(queriedId).ToBigEndianHexStr().c_str());
-
-	DhtStates::DhtLocalNodePtrType localNode = gs_state.GetDhtNode();
-
-	NodeConnector::SendNode(tls, localNode->FindPredecessor(queriedId)); //3. Send Node. - Done!
-	//LOGI("");
-}
-
-void Dht::FindSuccessor(Decent::Net::TlsCommLayer &tls)
-{
-	//LOGI("DHT Server: Finding Successor...");
-	std::array<uint8_t, DhtStates::sk_keySizeByte> keyBin{};
-	tls.ReceiveRaw(keyBin.data(), keyBin.size()); //2. Received queried ID
-
-	ConstBigNumber queriedId(keyBin);
-	//LOGI("Recv queried ID: %s.", static_cast<const BigNumber&>(queriedId).ToBigEndianHexStr().c_str());
-
-	DhtStates::DhtLocalNodePtrType localNode = gs_state.GetDhtNode();
-
-	NodeConnector::SendNode(tls, localNode->FindSuccessor(queriedId)); //3. Send Node. - Done!
-	//LOGI("");
 }
 
 void Dht::ProcessDhtQuery(Decent::Net::TlsCommLayer & tls, void*& heldCntPtr)
@@ -391,50 +377,133 @@ void Dht::ProcessDhtQuery(Decent::Net::TlsCommLayer & tls, void*& heldCntPtr)
 
 	//LOGI("DHT Server: Processing DHT queries...");
 
-	NumType funcNum;
-	tls.ReceiveStruct(funcNum); //1. Received function type.
+	RpcParser rpc(tls.ReceiveBinary());
+	const NumType& funcNum = rpc.GetPrimitiveArg<NumType>();
 
 	switch (funcNum)
 	{
 
+	case k_getNodeId:
+		if (rpc.GetArgCount() == 1)
+		{
+			GetNodeId(tls);
+		}
+		else
+		{
+			throw RuntimeException("Number of arguments for function k_getNodeId doesn't match.");
+		}
+		break;
+
 	case k_findSuccessor:
-		FindSuccessor(tls);
+		if (rpc.GetArgCount() == 2)
+		{
+			const auto& keyId = rpc.GetPrimitiveArg<uint8_t[DhtStates::sk_keySizeByte]>();
+			FindSuccessor(tls, keyId);
+		}
+		else
+		{
+			throw RuntimeException("Number of arguments for function k_findSuccessor doesn't match.");
+		}
 		break;
 
 	case k_findPredecessor:
-        FindPredecessor(tls);
+		if (rpc.GetArgCount() == 2)
+		{
+			const auto& keyId = rpc.GetPrimitiveArg<uint8_t[DhtStates::sk_keySizeByte]>();
+			FindPredecessor(tls, keyId);
+		}
+		else
+		{
+			throw RuntimeException("Number of arguments for function k_findPredecessor doesn't match.");
+		}
 		break;
 
 	case k_getImmediateSuc:
-        GetImmediateSucessor(tls);
-		break;
-
-	case k_getNodeId:
-	    GetNodeId(tls);
-		break;
-
-	case k_setImmediatePre:
-		SetImmediatePredecessor(tls);
+		if (rpc.GetArgCount() == 1)
+		{
+			GetImmediateSucessor(tls);
+		}
+		else
+		{
+			throw RuntimeException("Number of arguments for function k_getImmediateSuc doesn't match.");
+		}
 		break;
 
 	case k_getImmediatePre:
-		GetImmediatePredecessor(tls);
+		if (rpc.GetArgCount() == 1)
+		{
+			GetImmediatePredecessor(tls);
+		}
+		else
+		{
+			throw RuntimeException("Number of arguments for function k_getImmediatePre doesn't match.");
+		}
+		break;
+
+	case k_setImmediatePre:
+		if (rpc.GetArgCount() == 3)
+		{
+			const auto& keyId = rpc.GetPrimitiveArg<uint8_t[DhtStates::sk_keySizeByte]>();
+			const auto& addr = rpc.GetPrimitiveArg<uint64_t>();
+			SetImmediatePredecessor(tls, keyId, addr);
+		}
+		else
+		{
+			throw RuntimeException("Number of arguments for function k_setImmediatePre doesn't match.");
+		}
 		break;
 
 	case k_updFingerTable:
-		UpdateFingerTable(tls);
+		if (rpc.GetArgCount() == 4)
+		{
+			const auto& keyId = rpc.GetPrimitiveArg<uint8_t[DhtStates::sk_keySizeByte]>();
+			const auto& addr = rpc.GetPrimitiveArg<uint64_t>();
+			const auto& i = rpc.GetPrimitiveArg<uint64_t>();
+			UpdateFingerTable(tls, keyId, addr, i);
+		}
+		else
+		{
+			throw RuntimeException("Number of arguments for function k_updFingerTable doesn't match.");
+		}
 		break;
 
 	case k_dUpdFingerTable:
-		DeUpdateFingerTable(tls);
+		if (rpc.GetArgCount() == 5)
+		{
+			const auto& oldId = rpc.GetPrimitiveArg<uint8_t[DhtStates::sk_keySizeByte]>();
+			const auto& keyId = rpc.GetPrimitiveArg<uint8_t[DhtStates::sk_keySizeByte]>();
+			const auto& addr = rpc.GetPrimitiveArg<uint64_t>();
+			const auto& i = rpc.GetPrimitiveArg<uint64_t>();
+			DeUpdateFingerTable(tls, oldId, keyId, addr, i);
+		}
+		else
+		{
+			throw RuntimeException("Number of arguments for function k_dUpdFingerTable doesn't match.");
+		}
 		break;
 
 	case k_queryNonBlock:
-		QueryNonBlock(tls);
+		if (rpc.GetArgCount() == 2)
+		{
+			const auto& item = rpc.GetPrimitiveArg<ForwardQueueItem>();
+			QueryNonBlock(item);
+		}
+		else
+		{
+			throw RuntimeException("Number of arguments for function k_queryNonBlock doesn't match.");
+		}
 		break;
 
 	case k_queryReply:
-		QueryReply(tls, heldCntPtr);
+		if (rpc.GetArgCount() == 2)
+		{
+			const auto& item = rpc.GetPrimitiveArg<ReplyQueueItem>();
+			QueryReply(item, heldCntPtr);
+		}
+		else
+		{
+			throw RuntimeException("Number of arguments for function k_queryReply doesn't match.");
+		}
 		break;
 
 	default:
@@ -511,8 +580,7 @@ void Dht::SetData(Decent::Net::TlsCommLayer & tls)
 
 	//LOGI("Setting data for key %s.", key.Get().ToBigEndianHexStr().c_str());
 
-	std::vector<uint8_t> buffer;
-	tls.ReceiveMsg(buffer);
+	std::vector<uint8_t> buffer = tls.ReceiveBinary();
 
 	gs_state.GetDhtStore().SetValue(key, std::move(buffer));
 
@@ -681,7 +749,7 @@ bool Dht::AppFindSuccessor(Decent::Net::TlsCommLayer & tls, Net::EnclaveCntTrans
 	std::unique_ptr<ForwardQueueItem> queueItem = Tools::make_unique<ForwardQueueItem>();
 
 	tls.ReceiveStruct(queueItem->m_keyId); //2. Received queried ID
-	ConstBigNumber queriedId(queueItem->m_keyId, sk_struct);
+	ConstBigNumber queriedId(queueItem->m_keyId);
 
 	//LOGI("Recv app queried ID: %s.", static_cast<const BigNumber&>(queriedId).ToBigEndianHexStr().c_str());
 

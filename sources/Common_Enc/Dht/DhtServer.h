@@ -2,6 +2,8 @@
 
 #include <cstdint>
 
+#include "DhtStates.h"
+
 namespace Decent
 {
 	namespace Net
@@ -12,29 +14,43 @@ namespace Decent
 
     namespace Dht
     {
+
+		struct ForwardQueueItem
+		{
+			uint64_t m_reqId;
+			uint8_t m_keyId[DhtStates::sk_keySizeByte];
+			uint64_t m_reAddr;
+		};
+
+		struct ReplyQueueItem
+		{
+			uint64_t m_reqId;
+			uint64_t m_resAddr;
+		};
+
 		//DHT node functions:
 		
 		void ProcessDhtQuery(Decent::Net::TlsCommLayer& tls, void*& heldCntPtr);
 
 		void GetNodeId(Decent::Net::TlsCommLayer &tls);
 
-		void FindSuccessor(Decent::Net::TlsCommLayer &tls);
+		void FindSuccessor(Decent::Net::TlsCommLayer &tls, const uint8_t(&keyId)[DhtStates::sk_keySizeByte]);
 
-		void FindPredecessor(Decent::Net::TlsCommLayer &tls);
+		void FindPredecessor(Decent::Net::TlsCommLayer &tls, const uint8_t(&keyId)[DhtStates::sk_keySizeByte]);
 
 		void GetImmediateSucessor(Decent::Net::TlsCommLayer &tls);
 
 		void GetImmediatePredecessor(Decent::Net::TlsCommLayer &tls);
 
-		void SetImmediatePredecessor(Decent::Net::TlsCommLayer &tls);
+		void SetImmediatePredecessor(Decent::Net::TlsCommLayer &tls, const uint8_t(&keyId)[DhtStates::sk_keySizeByte], uint64_t addr);
 
-		void UpdateFingerTable(Decent::Net::TlsCommLayer &tls);
+		void UpdateFingerTable(Decent::Net::TlsCommLayer &tls, const uint8_t(&keyId)[DhtStates::sk_keySizeByte], uint64_t addr, uint64_t i);
 
-		void DeUpdateFingerTable(Decent::Net::TlsCommLayer &tls);
+		void DeUpdateFingerTable(Decent::Net::TlsCommLayer &tls, const uint8_t(&oldIdBin)[DhtStates::sk_keySizeByte], const uint8_t(&keyId)[DhtStates::sk_keySizeByte], uint64_t addr, uint64_t i);
 
-		void QueryNonBlock(Decent::Net::TlsCommLayer &tls);
+		void QueryNonBlock(const ForwardQueueItem& item);
 
-		void QueryReply(Decent::Net::TlsCommLayer &tls, void*& heldCntPtr);
+		void QueryReply(const ReplyQueueItem& item, void*& heldCntPtr);
 
 		void QueryForwardWorker();
 

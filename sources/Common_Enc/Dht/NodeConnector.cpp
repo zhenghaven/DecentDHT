@@ -2,6 +2,8 @@
 
 #include <DecentApi/Common/Common.h>
 #include <DecentApi/Common/make_unique.h>
+#include <DecentApi/Common/Net/RpcWriter.h>
+#include <DecentApi/Common/Net/RpcParser.h>
 #include <DecentApi/Common/Net/SecureCommLayer.h>
 
 #include "../../Common/Dht/FuncNums.h"
@@ -19,6 +21,16 @@ namespace
 	DhtStates& gs_state = GetDhtStatesSingleton();
 
 	static char gsk_ack[] = "ACK";
+
+	static NodeConnector::NodeBasePtr ReturnedNode(SecureCommLayer & comm)
+	{
+		RpcParser rpcReturned(comm.ReceiveBinary());
+		
+		const auto& keyBin = rpcReturned.GetPrimitiveArg<uint8_t[DhtStates::sk_keySizeByte]>();
+		const auto& addr = rpcReturned.GetPrimitiveArg<uint64_t>();
+
+		return std::make_shared<NodeConnector>(addr, BigNumber(keyBin, true));
+	}
 }
 
 void NodeConnector::SendNode(SecureCommLayer & comm, NodeBasePtr node)
@@ -95,14 +107,20 @@ NodeConnector::NodeBasePtr NodeConnector::LookupTypeFunc(const MbedTlsObj::BigNu
 {
 	CntPair cntPair = gs_state.GetConnectionMgr().GetNew(m_address, gs_state);
 
-	cntPair.GetCommLayer().SendStruct(type); //1. Send function type
+	constexpr size_t rpcSize = RpcWriter::CalcSizePrim<EncFunc::Dht::NumType>() +
+		RpcWriter::CalcSizePrim<uint8_t[DhtStates::sk_keySizeByte]>();
 
-	std::array<uint8_t, DhtStates::sk_keySizeByte> keyBin{};
-	key.ToBinary(keyBin);
-	cntPair.GetCommLayer().SendRaw(keyBin.data(), keyBin.size()); //2. Send queried ID
-	//LOGI("Sent queried ID: %s.", key.ToBigEndianHexStr().c_str());
+	RpcWriter rpc(rpcSize, 2);
 
-	NodeConnector::NodeBasePtr res = ReceiveNode(cntPair.GetCommLayer()); //3. Receive node. - Done!
+	auto funcNum = rpc.AddPrimitiveArg<EncFunc::Dht::NumType>();
+	auto keyBin = rpc.AddPrimitiveArg<uint8_t[DhtStates::sk_keySizeByte]>();
+
+	funcNum.Get() = type;
+	key.ToBinary(keyBin.Get(), sk_struct);
+
+	cntPair.GetCommLayer().SendRpc(rpc);
+
+	NodeConnector::NodeBasePtr res = ReturnedNode(cntPair.GetCommLayer());
 
 	return res;
 }
@@ -128,11 +146,11 @@ NodeConnector::NodeBasePtr NodeConnector::GetImmediateSuccessor()
 
 	CntPair cntPair = gs_state.GetConnectionMgr().GetNew(m_address, gs_state);
 
-	cntPair.GetCommLayer().SendStruct(k_getImmediateSuc); //1. Send function type
+	RpcWriter rpc(RpcWriter::CalcSizePrim<EncFunc::Dht::NumType>(), 1);
+	rpc.AddPrimitiveArg<EncFunc::Dht::NumType>().Get() = k_getImmediateSuc;
+	cntPair.GetCommLayer().SendRpc(rpc);
 
-	NodeConnector::NodeBasePtr res = ReceiveNode(cntPair.GetCommLayer()); //2. Receive node. - Done!
-
-	return res;
+	return ReturnedNode(cntPair.GetCommLayer());
 }
 
 NodeConnector::NodeBasePtr NodeConnector::GetImmediatePredecessor()
@@ -142,12 +160,11 @@ NodeConnector::NodeBasePtr NodeConnector::GetImmediatePredecessor()
 
 	CntPair cntPair = gs_state.GetConnectionMgr().GetNew(m_address, gs_state);
 
-	cntPair.GetCommLayer().SendStruct(k_getImmediatePre); //1. Send function type
+	RpcWriter rpc(RpcWriter::CalcSizePrim<EncFunc::Dht::NumType>(), 1);
+	rpc.AddPrimitiveArg<EncFunc::Dht::NumType>().Get() = k_getImmediatePre;
+	cntPair.GetCommLayer().SendRpc(rpc);
 
-	NodeConnector::NodeBasePtr res = ReceiveNode(cntPair.GetCommLayer()); //2. Receive node. - Done!
-
-	return res;
-
+	return ReturnedNode(cntPair.GetCommLayer());
 }
 
 void NodeConnector::SetImmediatePredecessor(NodeBasePtr pred)
@@ -157,11 +174,21 @@ void NodeConnector::SetImmediatePredecessor(NodeBasePtr pred)
 
 	CntPair cntPair = gs_state.GetConnectionMgr().GetNew(m_address, gs_state);
 
-	cntPair.GetCommLayer().SendStruct(k_setImmediatePre); //1. Send function type
+	RpcWriter rpc(RpcWriter::CalcSizePrim<EncFunc::Dht::NumType>() +
+		RpcWriter::CalcSizePrim<uint8_t[DhtStates::sk_keySizeByte]>() +
+		RpcWriter::CalcSizePrim<uint64_t>(), 3);
+	
+	auto funcNum = rpc.AddPrimitiveArg<EncFunc::Dht::NumType>();
+	auto keyBin = rpc.AddPrimitiveArg<uint8_t[DhtStates::sk_keySizeByte]>();
+	auto addr = rpc.AddPrimitiveArg<uint64_t>();
 
-	SendNode(cntPair.GetCommLayer(), pred); //2. Send Node. - Done!
+	funcNum = k_setImmediatePre;
+	pred->GetNodeId().ToBinary(keyBin.Get(), sk_struct);
+	addr = pred->GetAddress();
 
-	cntPair.GetCommLayer().ReceiveStruct(gsk_ack);
+	cntPair.GetCommLayer().SendRpc(rpc);
+
+	RpcParser rpcReturned(cntPair.GetCommLayer().ReceiveBinary());
 }
 
 void NodeConnector::UpdateFingerTable(NodeBasePtr & s, uint64_t i)
@@ -171,11 +198,24 @@ void NodeConnector::UpdateFingerTable(NodeBasePtr & s, uint64_t i)
 
 	CntPair cntPair = gs_state.GetConnectionMgr().GetNew(m_address, gs_state);
 
-	cntPair.GetCommLayer().SendStruct(k_updFingerTable); //1. Send function type
-	SendNode(cntPair.GetCommLayer(), s); //2. Send Node.
-	cntPair.GetCommLayer().SendStruct(i); //3. Send i. - Done!
+	RpcWriter rpc(RpcWriter::CalcSizePrim<EncFunc::Dht::NumType>() +
+		RpcWriter::CalcSizePrim<uint8_t[DhtStates::sk_keySizeByte]>() +
+		RpcWriter::CalcSizePrim<uint64_t>() +
+		RpcWriter::CalcSizePrim<uint64_t>(), 4);
 
-	cntPair.GetCommLayer().ReceiveStruct(gsk_ack);
+	auto funcNum = rpc.AddPrimitiveArg<EncFunc::Dht::NumType>();
+	auto keyBin = rpc.AddPrimitiveArg<uint8_t[DhtStates::sk_keySizeByte]>();
+	auto addr = rpc.AddPrimitiveArg<uint64_t>();
+	auto i2BeSend = rpc.AddPrimitiveArg<uint64_t>();
+
+	funcNum = k_updFingerTable;
+	s->GetNodeId().ToBinary(keyBin.Get(), sk_struct);
+	addr = s->GetAddress();
+	i2BeSend = i;
+
+	cntPair.GetCommLayer().SendRpc(rpc);
+
+	RpcParser rpcReturned(cntPair.GetCommLayer().ReceiveBinary());
 }
 
 void NodeConnector::DeUpdateFingerTable(const MbedTlsObj::BigNumber & oldId, NodeBasePtr & succ, uint64_t i)
@@ -185,16 +225,27 @@ void NodeConnector::DeUpdateFingerTable(const MbedTlsObj::BigNumber & oldId, Nod
 
 	CntPair cntPair = gs_state.GetConnectionMgr().GetNew(m_address, gs_state);
 
-	cntPair.GetCommLayer().SendStruct(k_dUpdFingerTable); //1. Send function type
+	RpcWriter rpc(RpcWriter::CalcSizePrim<EncFunc::Dht::NumType>() +
+		RpcWriter::CalcSizePrim<uint8_t[DhtStates::sk_keySizeByte]>() +
+		RpcWriter::CalcSizePrim<uint8_t[DhtStates::sk_keySizeByte]>() +
+		RpcWriter::CalcSizePrim<uint64_t>() +
+		RpcWriter::CalcSizePrim<uint64_t>(), 5);
 
-	std::array<uint8_t, DhtStates::sk_keySizeByte> keyBin{};
-	oldId.ToBinary(keyBin);
-	cntPair.GetCommLayer().SendRaw(keyBin.data(), keyBin.size()); //2. Send oldId.
+	auto funcNum = rpc.AddPrimitiveArg<EncFunc::Dht::NumType>();
+	auto oldKeyBin = rpc.AddPrimitiveArg<uint8_t[DhtStates::sk_keySizeByte]>();
+	auto keyBin = rpc.AddPrimitiveArg<uint8_t[DhtStates::sk_keySizeByte]>();
+	auto addr = rpc.AddPrimitiveArg<uint64_t>();
+	auto i2BeSend = rpc.AddPrimitiveArg<uint64_t>();
 
-	SendNode(cntPair.GetCommLayer(), succ); //3. Send Node.
-	cntPair.GetCommLayer().SendStruct(i); //4. Send i. - Done!
+	funcNum = k_dUpdFingerTable;
+	oldId.ToBinary(oldKeyBin.Get(), sk_struct);
+	succ->GetNodeId().ToBinary(keyBin.Get(), sk_struct);
+	addr = succ->GetAddress();
+	i2BeSend = i;
 
-	cntPair.GetCommLayer().ReceiveStruct(gsk_ack);
+	cntPair.GetCommLayer().SendRpc(rpc);
+
+	RpcParser rpcReturned(cntPair.GetCommLayer().ReceiveBinary());
 }
 
 const BigNumber & NodeConnector::GetNodeId()
@@ -210,12 +261,24 @@ const BigNumber & NodeConnector::GetNodeId()
 
 	CntPair cntPair = gs_state.GetConnectionMgr().GetNew(m_address, gs_state);
 
-	cntPair.GetCommLayer().SendStruct(k_getNodeId); //1. Send function type
+	constexpr size_t rpcSize = RpcWriter::CalcSizePrim<EncFunc::Dht::NumType>();
 
-	std::array<uint8_t, DhtStates::sk_keySizeByte> keyBin{};
-	cntPair.GetCommLayer().ReceiveRaw(keyBin.data(), keyBin.size()); //2. Received resultant ID - Done!
+	//Send RPC:
+	{
+		RpcWriter rpc(rpcSize, 1);
 
-	m_Id = Tools::make_unique<BigNumber>(keyBin);
+		auto funcType = rpc.AddPrimitiveArg<EncFunc::Dht::NumType>();
+		funcType.Get() = k_getNodeId;
+
+		cntPair.GetCommLayer().SendRpc(rpc);
+	}
+	
+	//RPC return:
+	RpcParser rpcReturn(cntPair.GetCommLayer().ReceiveBinary());
+
+	const auto& keyBin = rpcReturn.GetPrimitiveArg<uint8_t[DhtStates::sk_keySizeByte]>();
+
+	m_Id = Tools::make_unique<BigNumber>(keyBin, true);
 	//LOGI("Recv result ID: %s.", m_Id->ToBigEndianHexStr().c_str());
 
 	return *m_Id;
