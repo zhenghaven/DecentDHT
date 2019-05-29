@@ -63,7 +63,7 @@ bool EnclaveStore::IsResponsibleFor(const MbedTlsObj::BigNumber & key) const
 	return localNode ? localNode->IsResponsibleFor(key) : false;
 }
 
-std::vector<uint8_t> EnclaveStore::SaveDataFile(const MbedTlsObj::BigNumber& key, const std::vector<uint8_t>& data)
+std::vector<uint8_t> EnclaveStore::SaveDataFile(const MbedTlsObj::BigNumber& key, const std::vector<uint8_t>& meta, const std::vector<uint8_t>& data)
 {
 	using namespace Decent::Tools;
 
@@ -71,7 +71,6 @@ std::vector<uint8_t> EnclaveStore::SaveDataFile(const MbedTlsObj::BigNumber& key
 	LOGI("DHT store: adding key to the index. %s", keyStr.c_str());
 	//LOGI("DHT store: writing value: %s", std::string(reinterpret_cast<const char*>(data.data()), data.size()).c_str());
 	
-	std::vector<uint8_t> meta;
 	std::vector<uint8_t> mac;
 	std::vector<uint8_t> sealedData = DataSealer::SealData(DataSealer::KeyPolicy::ByMrEnclave, gs_state, gsk_sealKeyLabel, mac, meta, data);
 	
@@ -109,7 +108,7 @@ void EnclaveStore::DeleteDataFile(const MbedTlsObj::BigNumber& key)
 	}
 }
 
-std::vector<uint8_t> EnclaveStore::ReadDataFile(const MbedTlsObj::BigNumber& key, const std::vector<uint8_t>& tag)
+std::vector<uint8_t> EnclaveStore::ReadDataFile(const MbedTlsObj::BigNumber& key, const std::vector<uint8_t>& tag, std::vector<uint8_t>& meta)
 {
 	using namespace Decent::Tools;
 	
@@ -135,14 +134,13 @@ std::vector<uint8_t> EnclaveStore::ReadDataFile(const MbedTlsObj::BigNumber& key
 		sealedData = uBuf.Read();
 	}
 
-	std::vector<uint8_t> meta;
 	std::vector<uint8_t> data;
 	DataSealer::UnsealData(DataSealer::KeyPolicy::ByMrEnclave, gs_state, gsk_sealKeyLabel, sealedData, tag, meta, data);
 
 	return data;
 }
 
-std::vector<uint8_t> EnclaveStore::MigrateOneDataFile(const MbedTlsObj::BigNumber& key, const std::vector<uint8_t>& tag)
+std::vector<uint8_t> EnclaveStore::MigrateOneDataFile(const MbedTlsObj::BigNumber& key, const std::vector<uint8_t>& tag, std::vector<uint8_t>& meta)
 {
 	using namespace Decent::Tools;
 
@@ -168,7 +166,6 @@ std::vector<uint8_t> EnclaveStore::MigrateOneDataFile(const MbedTlsObj::BigNumbe
 		sealedData = uBuf.Read();
 	}
 
-	std::vector<uint8_t> meta;
 	std::vector<uint8_t> data;
 	DataSealer::UnsealData(DataSealer::KeyPolicy::ByMrEnclave, gs_state, gsk_sealKeyLabel, sealedData, tag, meta, data);
 

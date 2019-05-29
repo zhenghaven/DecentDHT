@@ -2,6 +2,8 @@
 
 #include <cstdint>
 
+#include <DecentApi/Common/general_key_types.h>
+
 #include "DhtStates.h"
 
 namespace Decent
@@ -15,10 +17,18 @@ namespace Decent
     namespace Dht
     {
 
-		struct ForwardQueueItem
+		struct AddrForwardQueueItem
 		{
 			uint64_t m_reqId;
 			uint8_t m_keyId[DhtStates::sk_keySizeByte];
+			uint64_t m_reAddr;
+		};
+
+		struct AttrListForwardQueueItem
+		{
+			uint64_t m_reqId;
+			uint8_t m_keyId[DhtStates::sk_keySizeByte];
+			general_256bit_hash m_userId;
 			uint64_t m_reAddr;
 		};
 
@@ -48,9 +58,11 @@ namespace Decent
 
 		void DeUpdateFingerTable(Decent::Net::TlsCommLayer &tls, const uint8_t(&oldIdBin)[DhtStates::sk_keySizeByte], const uint8_t(&keyId)[DhtStates::sk_keySizeByte], uint64_t addr, uint64_t i);
 
-		void QueryNonBlock(const ForwardQueueItem& item);
+		void QueryNonBlock(const AddrForwardQueueItem& item);
 
 		void QueryReply(const ReplyQueueItem& item, void*& heldCntPtr);
+
+		void ListQueryNonBlock(const AttrListForwardQueueItem& item);
 
 		void QueryForwardWorker();
 

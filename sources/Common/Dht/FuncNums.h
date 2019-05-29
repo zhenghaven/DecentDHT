@@ -22,6 +22,7 @@ namespace Decent
 				constexpr NumType k_dUpdFingerTable = 7;
 				constexpr NumType k_queryNonBlock   = 8;
 				constexpr NumType k_queryReply      = 9;
+				constexpr NumType k_listQueryNonBlock = 10;
 			}
 
 			namespace Store

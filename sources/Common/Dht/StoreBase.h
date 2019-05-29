@@ -50,21 +50,27 @@ namespace Decent
 
 				for (auto it = sendIndexing.begin(); it != sendIndexing.end(); ++it)
 				{
+					std::vector<uint8_t> meta;
 					std::vector<uint8_t> data;
 					try
 					{
-						data = MigrateOneDataFile(it->first, it->second);
+						data = MigrateOneDataFile(it->first, it->second, meta);
 					}
 					catch (const std::exception&)
 					{
 						continue;
 					}
+					uint64_t sizeOfMeta = static_cast<uint64_t>(meta.size());
 					uint64_t sizeOfData = static_cast<uint64_t>(data.size());
 
 					sendFunc(&hasData2Send, sizeof(hasData2Send)); //1. Yes, we have data to send.
 					sendNumFunc(it->first);                        //2. Send Key of the data.
-					sendFunc(&sizeOfData, sizeof(sizeOfData));     //3. Send size of data.
-					sendFunc(data.data(), data.size());            //4. Send data. - Done!
+
+					sendFunc(&sizeOfMeta, sizeof(sizeOfMeta));     //3. Send size of metadata.
+					sendFunc(meta.data(), meta.size());            //4. Send metadata.
+
+					sendFunc(&sizeOfData, sizeof(sizeOfData));     //5. Send size of data.
+					sendFunc(data.data(), data.size());            //6. Send data. - Done!
 				}
 
 				sendFunc(&noData2Send, sizeof(noData2Send));       //5. Stop.
@@ -129,16 +135,22 @@ namespace Decent
 				recvFunc(&hasData, sizeof(hasData)); //1. Do we have data to receive?
 
 				uint64_t sizeOfData = 0;
+				uint64_t sizeOfMeta = 0;
 				while (hasData == hasData2Recv)
 				{
 					IdType key = recvNumFunc();                //2. Receive key of the data.
-					recvFunc(&sizeOfData, sizeof(sizeOfData)); //3. Receive size of data.
+
+					recvFunc(&sizeOfMeta, sizeof(sizeOfMeta)); //3. Receive size of metadata.
+					std::vector<uint8_t> meta(sizeOfMeta);
+					recvFunc(meta.data(), meta.size());        //4. Receive metadata.
+
+					recvFunc(&sizeOfData, sizeof(sizeOfData)); //5. Receive size of data.
 					std::vector<uint8_t> data(sizeOfData);
-					recvFunc(data.data(), data.size());        //4. Receive data. - Done!
+					recvFunc(data.data(), data.size());        //6. Receive data. - Done!
 
 					try
 					{
-						SetValue(key, data);
+						SetValue(key, meta, data);
 					}
 					catch (const std::exception&)
 					{}
@@ -149,18 +161,27 @@ namespace Decent
 
 			virtual bool IsResponsibleFor(const IdType& key) const = 0;
 
-			virtual void SetValue(const IdType& key, const std::vector<uint8_t>& data)
+			virtual void SetValue(const IdType& key, const std::vector<uint8_t>& meta, const std::vector<uint8_t>& data, bool allowOverride = true)
 			{
 				if (!IsResponsibleFor(key))
 				{
 					throw Decent::RuntimeException("This server is not resposible for queried key.");
 				}
 
-				std::vector<uint8_t> tag = SaveDataFile(key, data);
+				if (!allowOverride)
+				{
+					std::unique_lock<std::mutex> indexingLock(m_indexingMutex);
+					if (m_indexing.find(key) != m_indexing.end())
+					{
+						throw Decent::RuntimeException("Data is already exist in DHT store, and override is not allowed.");
+					}
+				}
+
+				std::vector<uint8_t> tag = SaveDataFile(key, meta, data);
 
 				{
 					std::unique_lock<std::mutex> indexingLock(m_indexingMutex);
-					m_indexing.insert(std::make_pair(IdType(key), std::move(tag)));
+					m_indexing[key] = std::move(tag);
 				}
 			}
 
@@ -179,7 +200,7 @@ namespace Decent
 				DeleteDataFile(key);
 			}
 
-			virtual std::vector<uint8_t> GetValue(const IdType& key)
+			virtual std::vector<uint8_t> GetValue(const IdType& key, std::vector<uint8_t>& meta)
 			{
 				if (!IsResponsibleFor(key))
 				{
@@ -197,7 +218,7 @@ namespace Decent
 					tag = it->second;
 				}
 
-				return ReadDataFile(key, tag);
+				return ReadDataFile(key, tag, meta);
 			}
 
 		protected:
@@ -211,7 +232,7 @@ namespace Decent
 			 * \return	The tag for the data stored in std::vector&lt;uint8_t&gt;. The tag is generated for
 			 * 			verification later.
 			 */
-			virtual std::vector<uint8_t> SaveDataFile(const IdType& key, const std::vector<uint8_t>& data) = 0;
+			virtual std::vector<uint8_t> SaveDataFile(const IdType& key, const std::vector<uint8_t>& meta, const std::vector<uint8_t>& data) = 0;
 
 			/**
 			 * \brief	Delete the data file from the file system. NOTE: this function should only interact
@@ -232,7 +253,7 @@ namespace Decent
 			 *
 			 * \return	The data.
 			 */
-			virtual std::vector<uint8_t> ReadDataFile(const IdType& key, const std::vector<uint8_t>& tag) = 0;
+			virtual std::vector<uint8_t> ReadDataFile(const IdType& key, const std::vector<uint8_t>& tag, std::vector<uint8_t>& meta) = 0;
 
 			/**
 			 * \brief	Migrate (i.e. read and delete) one key-value pair from the file system. NOTE: this
@@ -245,7 +266,7 @@ namespace Decent
 			 *
 			 * \return	The data in std::vector&lt;uint8_t&gt;
 			 */
-			virtual std::vector<uint8_t> MigrateOneDataFile(const IdType& key, const std::vector<uint8_t>& tag) = 0;
+			virtual std::vector<uint8_t> MigrateOneDataFile(const IdType& key, const std::vector<uint8_t>& tag, std::vector<uint8_t>& meta) = 0;
 
 
 			/**
