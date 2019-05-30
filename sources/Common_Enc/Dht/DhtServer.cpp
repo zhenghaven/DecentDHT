@@ -8,6 +8,7 @@
 #include <DecentApi/Common/Common.h>
 #include <DecentApi/Common/make_unique.h>
 #include <DecentApi/Common/GeneralKeyTypes.h>
+#include <DecentApi/Common/MbedTls/Hasher.h>
 #include <DecentApi/Common/MbedTls/BigNumber.h>
 #include <DecentApi/Common/Net/TlsCommLayer.h>
 #include <DecentApi/Common/Net/ConnectionBase.h>
@@ -36,7 +37,7 @@ namespace
 {
 	DhtStates& gs_state = Dht::GetDhtStatesSingleton();
 
-	static char gsk_ack[] = "ACK";
+	static char gsk_appKeyIdPrefix[] = "App::";
 
 	static void ReturnNode(SecureCommLayer & comm, DhtStates::DhtLocalNodeType::NodeBasePtr node)
 	{
@@ -806,35 +807,54 @@ bool Dht::ProcessAppRequest(Decent::Net::TlsCommLayer & tls, Net::EnclaveCntTran
 {
 	using namespace EncFunc::App;
 
-	NumType funcNum;
-	tls.ReceiveStruct(funcNum); //1. Received function type.
+	RpcParser rpc(tls.ReceiveBinary());
+
+	const auto& funcNum = rpc.GetPrimitiveArg<NumType>();
 
 	switch (funcNum)
 	{
-	case k_findSuccessor: return AppFindSuccessor(tls, cnt);
+	case k_findSuccessor:
+		if (rpc.GetArgCount() == 2)
+		{
+			const auto& keyId = rpc.GetPrimitiveArg<uint8_t[DhtStates::sk_keySizeByte]>();
+
+			uint8_t appKeyId[DhtStates::sk_keySizeByte] = { 0 };
+			Hasher::ArrayBatchedCalc<HashType::SHA256>(appKeyId, gsk_appKeyIdPrefix, keyId);
+
+			return AppFindSuccessor(tls, cnt, appKeyId);
+		}
+		else
+		{
+			throw RuntimeException("Number of arguments for function k_findSuccessor doesn't match.");
+		}
 
 	case k_getData:
-		GetData(tls);
+		//GetData(tls);
 		return false;
 
 	case k_setData:
-		SetData(tls);
+		//SetData(tls);
 		return false;
 
 	case k_delData:
-		DelData(tls);
+		//DelData(tls);
+		return false;
+
+	case k_findAtListSuc:
+
+		return false;
+
+	case k_insertAttList:
+
 		return false;
 
 	default: return false;
 	}
 }
 
-bool Dht::AppFindSuccessor(Decent::Net::TlsCommLayer & tls, Net::EnclaveCntTranslator& cnt)
+bool Dht::AppFindSuccessor(Decent::Net::TlsCommLayer & tls, Net::EnclaveCntTranslator& cnt, const uint8_t(&keyId)[DhtStates::sk_keySizeByte])
 {
-	std::unique_ptr<AddrForwardQueueItem> queueItem = Tools::make_unique<AddrForwardQueueItem>();
-
-	tls.ReceiveStruct(queueItem->m_keyId); //2. Received queried ID
-	ConstBigNumber queriedId(queueItem->m_keyId);
+	ConstBigNumber queriedId(keyId);
 
 	//LOGI("Recv app queried ID: %s.", static_cast<const BigNumber&>(queriedId).ToBigEndianHexStr().c_str());
 
@@ -879,6 +899,9 @@ bool Dht::AppFindSuccessor(Decent::Net::TlsCommLayer & tls, Net::EnclaveCntTrans
 			}
 		};
 
+		std::unique_ptr<AddrForwardQueueItem> queueItem = Tools::make_unique<AddrForwardQueueItem>();
+
+		std::copy(std::begin(keyId), std::end(keyId), std::begin(queueItem->m_keyId));
 		queueItem->m_reAddr = localNode->GetAddress();
 		queueItem->m_reqId = reinterpret_cast<uint64_t>((*pendingTlsPtr).get());
 
