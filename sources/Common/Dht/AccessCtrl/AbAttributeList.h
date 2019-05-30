@@ -25,11 +25,29 @@ namespace Decent
 				 */
 				AbAttributeList(std::vector<uint8_t>::const_iterator& it, const std::vector<uint8_t>::const_iterator& end);
 
+				AbAttributeList(AbAttributeList&& rhs);
+
 				virtual ~AbAttributeList();
+
+				void Swap(AbAttributeList& rhs);
 
 				void Insert(const AbAttributeItem& item);
 
+				AbAttributeList Merge2New(const AbAttributeList& rhs) const;
+
 				void Merge(const AbAttributeList& rhs);
+
+				AbAttributeList Difference2New(const AbAttributeList& rhs) const;
+
+				void Difference(const AbAttributeList& rhs);
+
+				AbAttributeList operator+(const AbAttributeList& rhs) const;
+
+				AbAttributeList operator-(const AbAttributeList& rhs) const;
+
+				AbAttributeList& operator+=(const AbAttributeList& rhs);
+
+				AbAttributeList& operator-=(const AbAttributeList& rhs);
 
 				bool Search(const AbAttributeItem& item) const;
 

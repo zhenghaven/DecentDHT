@@ -25,8 +25,18 @@ AbAttributeList::AbAttributeList(std::vector<uint8_t>::const_iterator& it, const
 	}
 }
 
+AbAttributeList::AbAttributeList(AbAttributeList && rhs) :
+	m_list(std::forward<std::set<AbAttributeItem> >(rhs.m_list))
+{
+}
+
 AbAttributeList::~AbAttributeList()
 {
+}
+
+void AbAttributeList::Swap(AbAttributeList & rhs)
+{
+	m_list.swap(rhs.m_list);
 }
 
 void AbAttributeList::Insert(const AbAttributeItem & item)
@@ -34,16 +44,64 @@ void AbAttributeList::Insert(const AbAttributeItem & item)
 	m_list.insert(item);
 }
 
-void AbAttributeList::Merge(const AbAttributeList & rhs)
+AbAttributeList AbAttributeList::Merge2New(const AbAttributeList & rhs) const
 {
-	decltype(m_list) tmpList;
+	AbAttributeList res;
 
 	std::set_union(m_list.begin(), m_list.end(),
 		rhs.m_list.begin(), rhs.m_list.end(),
-		std::inserter(tmpList, tmpList.end())
+		std::inserter(res.m_list, res.m_list.end())
 	);
-	
-	m_list.swap(tmpList);
+
+	return res;
+}
+
+void AbAttributeList::Merge(const AbAttributeList & rhs)
+{
+	auto tmpRes = Merge2New(rhs);
+
+	Swap(tmpRes);
+}
+
+AbAttributeList AbAttributeList::Difference2New(const AbAttributeList & rhs) const
+{
+	AbAttributeList res;
+
+	std::set_difference(m_list.begin(), m_list.end(),
+		rhs.m_list.begin(), rhs.m_list.end(),
+		std::inserter(res.m_list, res.m_list.end())
+	);
+
+	return res;
+}
+
+void AbAttributeList::Difference(const AbAttributeList & rhs)
+{
+	auto tmpRes = Difference2New(rhs);
+
+	Swap(tmpRes);
+}
+
+AbAttributeList AbAttributeList::operator+(const AbAttributeList & rhs) const
+{
+	return Merge2New(rhs);
+}
+
+AbAttributeList AbAttributeList::operator-(const AbAttributeList & rhs) const
+{
+	return Difference2New(rhs);
+}
+
+AbAttributeList & AbAttributeList::operator+=(const AbAttributeList & rhs)
+{
+	Merge(rhs);
+	return *this;
+}
+
+AbAttributeList & AbAttributeList::operator-=(const AbAttributeList & rhs)
+{
+	Difference(rhs);
+	return *this;
 }
 
 bool AbAttributeList::Search(const AbAttributeItem & item) const
