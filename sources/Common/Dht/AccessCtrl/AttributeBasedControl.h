@@ -14,17 +14,33 @@ namespace Decent
 
 			class AttributeBasedControl
 			{
+			public: //static member:
+
+				/**
+				 * \brief	Construct an entity based control that allows all accesses
+				 *
+				 * \return	An AttributeBasedControl.
+				 */
+				AttributeBasedControl AllowAll();
+
+				/**
+				 * \brief	Construct an entity based control that denies all accesses
+				 *
+				 * \return	An AttributeBasedControl.
+				 */
+				AttributeBasedControl DenyAll();
+
 			public:
 				AttributeBasedControl() = delete;
 
 				/**
 				 * \brief	Constructor
 				 *
-				 * \param [in,out]	r	A std::unique_ptr&lt;AbPolicyBase&gt;, read policy.
-				 * \param [in,out]	w	A std::unique_ptr&lt;AbPolicyBase&gt;, write policy.
-				 * \param [in,out]	x	A std::unique_ptr&lt;AbPolicyBase&gt;, execute policy.
+				 * \param	r	A std::unique_ptr&lt;AbPolicyBase&gt;, read policy.
+				 * \param	w	A std::unique_ptr&lt;AbPolicyBase&gt;, write policy.
+				 * \param	x	A std::unique_ptr&lt;AbPolicyBase&gt;, execute policy.
 				 */
-				AttributeBasedControl(std::unique_ptr<AbPolicyBase>&& r, std::unique_ptr<AbPolicyBase>&& w, std::unique_ptr<AbPolicyBase>&& x);
+				AttributeBasedControl(std::unique_ptr<AbPolicyBase> r, std::unique_ptr<AbPolicyBase> w, std::unique_ptr<AbPolicyBase> x);
 
 				/**
 				 * \brief	Constructor for parsing policy stored in binary. Note: Parsing in here is not simply

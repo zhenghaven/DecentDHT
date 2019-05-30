@@ -13,10 +13,10 @@ FullPolicy::FullPolicy(std::vector<uint8_t>::const_iterator & it, std::vector<ui
 {
 }
 
-FullPolicy::FullPolicy(const EntityItem& owner, EntityBasedControl && enclavePolicy, AttributeBasedControl && clientPolicy) :
+FullPolicy::FullPolicy(const EntityItem& owner, EntityBasedControl enclavePolicy, AttributeBasedControl clientPolicy) :
 	m_owner(owner),
-	m_enclavePolicy(std::forward<EntityBasedControl>(enclavePolicy)),
-	m_clientPolicy(std::forward<AttributeBasedControl>(clientPolicy))
+	m_enclavePolicy(std::move(enclavePolicy)),
+	m_clientPolicy(std::move(clientPolicy))
 {
 }
 

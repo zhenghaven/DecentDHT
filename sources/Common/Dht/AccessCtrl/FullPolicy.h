@@ -32,7 +32,7 @@ namespace Decent
 				 * \param [in]	enclavePolicy	The enclave policy.
 				 * \param [in]	clientPolicy 	The client policy.
 				 */
-				FullPolicy(const EntityItem& owner, EntityBasedControl&& enclavePolicy, AttributeBasedControl&& clientPolicy);
+				FullPolicy(const EntityItem& owner, EntityBasedControl enclavePolicy, AttributeBasedControl clientPolicy);
 
 				/** \brief	Destructor */
 				virtual ~FullPolicy();
