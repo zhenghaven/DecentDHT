@@ -22,6 +22,9 @@
 #include "../../Common/Dht/FuncNums.h"
 #include "../../Common/Dht/NodeBase.h"
 
+#include "../../Common/Dht/AccessCtrl/FullPolicy.h"
+#include "../../Common/Dht/AccessCtrl/AbAttributeList.h"
+
 #include "EnclaveStore.h"
 #include "NodeConnector.h"
 #include "ConnectionManager.h"
@@ -31,6 +34,7 @@
 using namespace Decent;
 using namespace Decent::Net;
 using namespace Decent::Dht;
+using namespace Decent::Dht::AccessCtrl;
 using namespace Decent::MbedTlsObj;
 
 namespace
@@ -38,6 +42,7 @@ namespace
 	DhtStates& gs_state = Dht::GetDhtStatesSingleton();
 
 	static char gsk_appKeyIdPrefix[] = "App::";
+	static char gsk_atListKeyIdPrefix[] = "AttrList::";
 
 	static void ReturnNode(SecureCommLayer & comm, DhtStates::DhtLocalNodeType::NodeBasePtr node)
 	{
@@ -170,6 +175,112 @@ namespace
 		gs_replyQueue.push(std::make_pair(reAddr, std::move(reItem)));
 		replyQueueLock.unlock();
 		gs_replyQueueSignal.notify_one();
+	}
+}
+
+namespace
+{
+	static std::shared_ptr<Ra::TlsConfigSameEnclave> GetClientTlsConfigDhtNode()
+	{
+		static std::shared_ptr<Ra::TlsConfigSameEnclave> tlsCfg = std::make_shared<Ra::TlsConfigSameEnclave>(gs_state, Ra::TlsConfig::Mode::ClientHasCert, nullptr);
+		return tlsCfg;
+	}
+
+	static void MigrateDataFromPeer(EnclaveStore& dhtStore, const uint64_t & addr, const MbedTlsObj::BigNumber & start, const MbedTlsObj::BigNumber & end)
+	{
+		LOGI("Migrating data from peer...");
+		using namespace EncFunc::Store;
+
+		std::unique_ptr<ConnectionBase> connection = ConnectionManager::GetConnection2DecentStore(addr);
+		Decent::Net::TlsCommLayer tls(*connection, GetClientTlsConfigDhtNode(), true, nullptr);
+
+		tls.SendStruct(k_getMigrateData);         //1. Send function type
+
+		std::array<uint8_t, DhtStates::sk_keySizeByte> keyBin{};
+
+		start.ToBinary(keyBin);
+
+		tls.SendRaw(keyBin.data(), keyBin.size()); //2. Send start key.
+		end.ToBinary(keyBin);
+		tls.SendRaw(keyBin.data(), keyBin.size()); //3. Send end key.
+
+		dhtStore.RecvMigratingData(
+			[&tls](void* buffer, const size_t size) -> void
+		{
+			tls.ReceiveRaw(buffer, size);
+		},
+			[&tls]() -> BigNumber
+		{
+			std::array<uint8_t, DhtStates::sk_keySizeByte> keyBuf{};
+			tls.ReceiveRaw(keyBuf.data(), keyBuf.size());
+			return BigNumber(keyBuf);
+		}); //4. Receive data.
+	}
+
+	static void MigrateAllDataToPeer(EnclaveStore& dhtStore, const uint64_t & addr)
+	{
+		LOGI("Migrating data to peer...");
+		using namespace EncFunc::Store;
+
+		std::unique_ptr<ConnectionBase> connection = ConnectionManager::GetConnection2DecentStore(addr);
+		Decent::Net::TlsCommLayer tls(*connection, GetClientTlsConfigDhtNode(), true, nullptr);
+
+		tls.SendStruct(k_setMigrateData); //1. Send function type
+
+		dhtStore.SendMigratingDataAll(
+			[&tls](const void* buffer, const size_t size) -> void
+		{
+			tls.SendRaw(buffer, size);
+		},
+			[&tls](const BigNumber& key) -> void
+		{
+			std::array<uint8_t, DhtStates::sk_keySizeByte> keyBuf{};
+			key.ToBinary(keyBuf);
+			tls.SendRaw(keyBuf.data(), keyBuf.size());
+		}); //2. Send data.
+	}
+}
+
+void Dht::Init(uint64_t selfAddr, int isFirstNode, uint64_t exAddr, size_t totalNode, size_t idx)
+{
+	std::shared_ptr<DhtStates::DhtLocalNodeType::Pow2iArrayType> pow2iArray = std::make_shared<DhtStates::DhtLocalNodeType::Pow2iArrayType>();
+	for (size_t i = 0; i < pow2iArray->size(); ++i)
+	{
+		(*pow2iArray)[i].SetBit(i, true);
+	}
+
+	std::array<uint8_t, DhtStates::sk_keySizeByte> filledArray;
+	memset(filledArray.data(), 0xFF, filledArray.size());
+	MbedTlsObj::ConstBigNumber largest(filledArray);
+
+	BigNumber step = largest / totalNode;
+
+	BigNumber selfId = step * idx;
+
+	PRINT_I("Self Node ID: %s.", selfId.ToBigEndianHexStr().c_str());
+	DhtStates::DhtLocalNodePtrType dhtNode = std::make_shared<DhtStates::DhtLocalNodeType>(selfId, selfAddr, 0, largest, pow2iArray);
+
+	gs_state.GetDhtNode() = dhtNode;
+
+	if (!isFirstNode)
+	{
+		NodeConnector nodeCnt(exAddr);
+		dhtNode->Join(nodeCnt);
+
+		uint64_t succAddr = dhtNode->GetImmediateSuccessor()->GetAddress();
+		const BigNumber& predId = dhtNode->GetImmediatePredecessor()->GetNodeId();
+		MigrateDataFromPeer(gs_state.GetDhtStore(), succAddr, selfId, predId);
+	}
+}
+
+void Dht::DeInit()
+{
+	DhtStates::DhtLocalNodePtrType dhtNode = gs_state.GetDhtNode();
+	uint64_t succAddr = dhtNode->GetImmediateSuccessor()->GetAddress();
+	dhtNode->Leave();
+	if (dhtNode->GetAddress() != succAddr)
+	{
+		MigrateAllDataToPeer(gs_state.GetDhtStore(), succAddr);
 	}
 }
 
@@ -656,167 +767,222 @@ void Dht::SetMigrateData(Decent::Net::TlsCommLayer & tls)
 	});
 }
 
-void Dht::SetData(Decent::Net::TlsCommLayer & tls)
+uint8_t Dht::InsertData(const uint8_t(&keyId)[DhtStates::sk_keySizeByte],
+	std::vector<uint8_t>::const_iterator metaSrcIt, std::vector<uint8_t>::const_iterator metaEnd,
+	std::vector<uint8_t>::const_iterator dataSrcIt, std::vector<uint8_t>::const_iterator dataEnd)
 {
-	std::array<uint8_t, DhtStates::sk_keySizeByte> keyBin{};
-	tls.ReceiveRaw(keyBin.data(), keyBin.size());
-	ConstBigNumber key(keyBin);
+	ConstBigNumber key(keyId);
 
-	//LOGI("Setting data for key %s.", key.Get().ToBigEndianHexStr().c_str());
+	try
+	{
+		gs_state.GetDhtStore().SetValue(key, std::vector<uint8_t>(metaSrcIt, metaEnd), std::vector<uint8_t>(dataSrcIt, dataEnd), false);
+	}
+	catch (const DataAlreadyExist&)
+	{
+		return EncFunc::FileOpRet::k_denied;
+	}
 
-	std::vector<uint8_t> data = tls.ReceiveBinary();
-	std::vector<uint8_t> meta;// = tls.ReceiveBinary();
-	
-	gs_state.GetDhtStore().SetValue(key, meta, data);
-
-	tls.SendStruct(gsk_ack);
+	return EncFunc::FileOpRet::k_success;
 }
 
-void Dht::GetData(Decent::Net::TlsCommLayer & tls)
+uint8_t Dht::UpdateData(const uint8_t(&keyId)[DhtStates::sk_keySizeByte],
+	const AccessCtrl::EntityItem & entity,
+	std::vector<uint8_t>::const_iterator dataSrcIt, std::vector<uint8_t>::const_iterator dataEnd)
 {
-	std::array<uint8_t, DhtStates::sk_keySizeByte> keyBin{};
-	tls.ReceiveRaw(keyBin.data(), keyBin.size());
-	ConstBigNumber key(keyBin);
+	ConstBigNumber key(keyId);
 
-	//LOGI("Getting data for key %s.", key.Get().ToBigEndianHexStr().c_str());
-	
 	std::vector<uint8_t> meta;
-	std::vector<uint8_t> data = gs_state.GetDhtStore().GetValue(key, meta);
-
-	tls.SendMsg(data);
-}
-
-void Dht::DelData(Decent::Net::TlsCommLayer & tls)
-{
-	std::array<uint8_t, DhtStates::sk_keySizeByte> keyBin{};
-	tls.ReceiveRaw(keyBin.data(), keyBin.size());
-	ConstBigNumber key(keyBin);
-
-	gs_state.GetDhtStore().DelValue(key);
-
-	tls.SendStruct(gsk_ack);
-}
-
-namespace
-{
-	static std::shared_ptr<Ra::TlsConfigSameEnclave> GetClientTlsConfigDhtNode()
+	try
 	{
-		static std::shared_ptr<Ra::TlsConfigSameEnclave> tlsCfg = std::make_shared<Ra::TlsConfigSameEnclave>(gs_state, Ra::TlsConfig::Mode::ClientHasCert, nullptr);
-		return tlsCfg;
-	}
+		std::vector<uint8_t> data = gs_state.GetDhtStore().GetValue(key, meta);
 
-	static void MigrateDataFromPeer(EnclaveStore& dhtStore, const uint64_t & addr, const MbedTlsObj::BigNumber & start, const MbedTlsObj::BigNumber & end)
-	{
-		LOGI("Migrating data from peer...");
-		using namespace EncFunc::Store;
+		auto it = meta.cbegin();
+		FullPolicy fullPolicy(it, meta.cend());
 
-		std::unique_ptr<ConnectionBase> connection = ConnectionManager::GetConnection2DecentStore(addr);
-		Decent::Net::TlsCommLayer tls(*connection, GetClientTlsConfigDhtNode(), true, nullptr);
-
-		tls.SendStruct(k_getMigrateData);         //1. Send function type
-
-		std::array<uint8_t, DhtStates::sk_keySizeByte> keyBin{};
-
-		start.ToBinary(keyBin);
-
-		tls.SendRaw(keyBin.data(), keyBin.size()); //2. Send start key.
-		end.ToBinary(keyBin);
-		tls.SendRaw(keyBin.data(), keyBin.size()); //3. Send end key.
-
-		dhtStore.RecvMigratingData(
-			[&tls](void* buffer, const size_t size) -> void
+		if (!fullPolicy.GetEnclavePolicy().ExamineWrite(entity))
 		{
-			tls.ReceiveRaw(buffer, size);
-		},
-			[&tls]() -> BigNumber
-		{
-			std::array<uint8_t, DhtStates::sk_keySizeByte> keyBuf{};
-			tls.ReceiveRaw(keyBuf.data(), keyBuf.size());
-			return BigNumber(keyBuf);
-		}); //4. Receive data.
+			return EncFunc::FileOpRet::k_denied;
+		}
 	}
-
-	static void MigrateAllDataToPeer(EnclaveStore& dhtStore, const uint64_t & addr)
+	catch (const DataNotExist&)
 	{
-		LOGI("Migrating data to peer...");
-		using namespace EncFunc::Store;
-
-		std::unique_ptr<ConnectionBase> connection = ConnectionManager::GetConnection2DecentStore(addr);
-		Decent::Net::TlsCommLayer tls(*connection, GetClientTlsConfigDhtNode(), true, nullptr);
-
-		tls.SendStruct(k_setMigrateData); //1. Send function type
-
-		dhtStore.SendMigratingDataAll(
-			[&tls](const void* buffer, const size_t size) -> void
-		{
-			tls.SendRaw(buffer, size);
-		},
-			[&tls](const BigNumber& key) -> void
-		{
-			std::array<uint8_t, DhtStates::sk_keySizeByte> keyBuf{};
-			key.ToBinary(keyBuf);
-			tls.SendRaw(keyBuf.data(), keyBuf.size());
-		}); //2. Send data.
+		return EncFunc::FileOpRet::k_nonExist;
 	}
+
+	gs_state.GetDhtStore().SetValue(key, meta, std::vector<uint8_t>(dataSrcIt, dataEnd));
+
+	return EncFunc::FileOpRet::k_success;
 }
 
-void Dht::Init(uint64_t selfAddr, int isFirstNode, uint64_t exAddr, size_t totalNode, size_t idx)
+uint8_t Dht::UpdateData(const uint8_t(&keyId)[DhtStates::sk_keySizeByte],
+	const AccessCtrl::AbAttributeList & attList, AccessCtrl::AbAttributeList & neededAttList,
+	std::vector<uint8_t>::const_iterator dataSrcIt, std::vector<uint8_t>::const_iterator dataEnd)
 {
-	std::shared_ptr<DhtStates::DhtLocalNodeType::Pow2iArrayType> pow2iArray = std::make_shared<DhtStates::DhtLocalNodeType::Pow2iArrayType>();
-	for (size_t i = 0; i < pow2iArray->size(); ++i)
+	ConstBigNumber key(keyId);
+
+	std::vector<uint8_t> meta;
+	try
 	{
-		(*pow2iArray)[i].SetBit(i, true);
+		std::vector<uint8_t> data = gs_state.GetDhtStore().GetValue(key, meta);
+
+		auto it = meta.cbegin();
+		FullPolicy fullPolicy(it, meta.cend());
+
+		if (!fullPolicy.GetClientPolicy().ExamineWrite(attList))
+		{
+			fullPolicy.GetClientPolicy().GetWriteRelatedAttributes(neededAttList);
+			neededAttList -= attList;
+
+			return EncFunc::FileOpRet::k_denied;
+		}
+	}
+	catch (const DataNotExist&)
+	{
+		return EncFunc::FileOpRet::k_nonExist;
 	}
 
-	std::array<uint8_t, DhtStates::sk_keySizeByte> filledArray;
-	memset(filledArray.data(), 0xFF, filledArray.size());
-	MbedTlsObj::ConstBigNumber largest(filledArray);
+	gs_state.GetDhtStore().SetValue(key, meta, std::vector<uint8_t>(dataSrcIt, dataEnd));
 
-	BigNumber step = largest / totalNode;
-
-	BigNumber selfId = step * idx;
-
-	PRINT_I("Self Node ID: %s.", selfId.ToBigEndianHexStr().c_str());
-	DhtStates::DhtLocalNodePtrType dhtNode = std::make_shared<DhtStates::DhtLocalNodeType>(selfId, selfAddr, 0, largest, pow2iArray);
-
-	gs_state.GetDhtNode() = dhtNode;
-
-	if (!isFirstNode)
-	{
-		NodeConnector nodeCnt(exAddr);
-		dhtNode->Join(nodeCnt);
-
-		uint64_t succAddr = dhtNode->GetImmediateSuccessor()->GetAddress();
-		const BigNumber& predId = dhtNode->GetImmediatePredecessor()->GetNodeId();
-		MigrateDataFromPeer(gs_state.GetDhtStore(), succAddr, selfId, predId);
-	}
+	return EncFunc::FileOpRet::k_success;
 }
 
-void Dht::DeInit()
+uint8_t Dht::ReadData(const uint8_t(&keyId)[DhtStates::sk_keySizeByte],
+	const AccessCtrl::EntityItem & entity, std::vector<uint8_t>& outData)
 {
-	DhtStates::DhtLocalNodePtrType dhtNode = gs_state.GetDhtNode();
-	uint64_t succAddr = dhtNode->GetImmediateSuccessor()->GetAddress();
-	dhtNode->Leave();
-	if (dhtNode->GetAddress() != succAddr)
+	ConstBigNumber key(keyId);
+
+	std::vector<uint8_t> meta;
+	try
 	{
-		MigrateAllDataToPeer(gs_state.GetDhtStore(), succAddr);
+		std::vector<uint8_t> data = gs_state.GetDhtStore().GetValue(key, meta);
+
+		auto it = meta.cbegin();
+		FullPolicy fullPolicy(it, meta.cend());
+
+		if (!fullPolicy.GetEnclavePolicy().ExamineRead(entity))
+		{
+			return EncFunc::FileOpRet::k_denied;
+		}
+		else
+		{
+			outData.swap(data);
+			return EncFunc::FileOpRet::k_success;
+		}
+	}
+	catch (const DataNotExist&)
+	{
+		return EncFunc::FileOpRet::k_nonExist;
 	}
 }
 
-bool Dht::ProcessAppRequest(Decent::Net::TlsCommLayer & tls, Net::EnclaveCntTranslator& cnt)
+uint8_t Dht::ReadData(const uint8_t(&keyId)[DhtStates::sk_keySizeByte],
+	const AccessCtrl::AbAttributeList & attList, AccessCtrl::AbAttributeList & neededAttList,
+	std::vector<uint8_t>& outData)
+{
+	ConstBigNumber key(keyId);
+
+	std::vector<uint8_t> meta;
+	try
+	{
+		std::vector<uint8_t> data = gs_state.GetDhtStore().GetValue(key, meta);
+
+		auto it = meta.cbegin();
+		FullPolicy fullPolicy(it, meta.cend());
+
+		if (!fullPolicy.GetClientPolicy().ExamineRead(attList))
+		{
+			fullPolicy.GetClientPolicy().GetReadRelatedAttributes(neededAttList);
+			neededAttList -= attList;
+
+			return EncFunc::FileOpRet::k_denied;
+		}
+		else
+		{
+			outData.swap(data);
+			return EncFunc::FileOpRet::k_success;
+		}
+	}
+	catch (const DataNotExist&)
+	{
+		return EncFunc::FileOpRet::k_nonExist;
+	}
+}
+
+uint8_t Dht::DelData(const uint8_t(&keyId)[DhtStates::sk_keySizeByte],
+	const AccessCtrl::EntityItem & entity)
+{
+	ConstBigNumber key(keyId);
+
+	std::vector<uint8_t> meta;
+	try
+	{
+		std::vector<uint8_t> data = gs_state.GetDhtStore().GetValue(key, meta);
+
+		auto it = meta.cbegin();
+		FullPolicy fullPolicy(it, meta.cend());
+
+		if (!fullPolicy.GetEnclavePolicy().ExamineWrite(entity))
+		{
+			return EncFunc::FileOpRet::k_denied;
+		}
+		else
+		{
+			gs_state.GetDhtStore().DelValue(key);
+			return EncFunc::FileOpRet::k_success;
+		}
+	}
+	catch (const DataNotExist&)
+	{
+		return EncFunc::FileOpRet::k_nonExist;
+	}
+}
+
+uint8_t Dht::DelData(const uint8_t(&keyId)[DhtStates::sk_keySizeByte],
+	const AccessCtrl::AbAttributeList & attList, AccessCtrl::AbAttributeList & neededAttList)
+{
+	ConstBigNumber key(keyId);
+
+	std::vector<uint8_t> meta;
+	try
+	{
+		std::vector<uint8_t> data = gs_state.GetDhtStore().GetValue(key, meta);
+
+		auto it = meta.cbegin();
+		FullPolicy fullPolicy(it, meta.cend());
+
+		if (!fullPolicy.GetClientPolicy().ExamineWrite(attList))
+		{
+			fullPolicy.GetClientPolicy().GetWriteRelatedAttributes(neededAttList);
+			neededAttList -= attList;
+
+			return EncFunc::FileOpRet::k_denied;
+		}
+		else
+		{
+			gs_state.GetDhtStore().DelValue(key);
+			return EncFunc::FileOpRet::k_success;
+		}
+	}
+	catch (const DataNotExist&)
+	{
+		return EncFunc::FileOpRet::k_nonExist;
+	}
+}
+
+bool Dht::ProcessAppRequest(Decent::Net::TlsCommLayer & tls, Net::EnclaveCntTranslator& cnt, const std::vector<uint8_t>& encHash)
 {
 	using namespace EncFunc::App;
 
 	RpcParser rpc(tls.ReceiveBinary());
 
-	const auto& funcNum = rpc.GetPrimitiveArg<NumType>();
+	const auto& funcNum = rpc.GetPrimitiveArg<NumType>(); //Arg 1.
 
 	switch (funcNum)
 	{
 	case k_findSuccessor:
 		if (rpc.GetArgCount() == 2)
 		{
-			const auto& keyId = rpc.GetPrimitiveArg<uint8_t[DhtStates::sk_keySizeByte]>();
+			const auto& keyId = rpc.GetPrimitiveArg<uint8_t[DhtStates::sk_keySizeByte]>(); //Arg 2.
 
 			uint8_t appKeyId[DhtStates::sk_keySizeByte] = { 0 };
 			Hasher::ArrayBatchedCalc<HashType::SHA256>(appKeyId, gsk_appKeyIdPrefix, keyId);
@@ -828,25 +994,152 @@ bool Dht::ProcessAppRequest(Decent::Net::TlsCommLayer & tls, Net::EnclaveCntTran
 			throw RuntimeException("Number of arguments for function k_findSuccessor doesn't match.");
 		}
 
-	case k_getData:
-		//GetData(tls);
-		return false;
+	case k_readData:
+		if (rpc.GetArgCount() == 2)
+		{
+			const auto& keyId = rpc.GetPrimitiveArg<uint8_t[DhtStates::sk_keySizeByte]>(); //Arg 2.
 
-	case k_setData:
-		//SetData(tls);
-		return false;
+			uint8_t appKeyId[DhtStates::sk_keySizeByte] = { 0 };
+			Hasher::ArrayBatchedCalc<HashType::SHA256>(appKeyId, gsk_appKeyIdPrefix, keyId);
+
+			if (encHash.size() != sizeof(general_256bit_hash))
+			{
+				throw RuntimeException("Feature not implemented yet. (Enclave hash is not 256 bit)");
+			}
+
+			general_256bit_hash tmpEncHash;
+			std::copy(encHash.begin(), encHash.end(), std::begin(tmpEncHash));
+
+			AccessCtrl::EntityItem entity(tmpEncHash);
+
+			std::vector<uint8_t> data;
+			uint8_t retVal = ReadData(keyId, entity, data);
+
+			if (retVal == EncFunc::FileOpRet::k_success)
+			{
+				RpcWriter rpcReturned(RpcWriter::CalcSizePrim<decltype(retVal)>() +
+					RpcWriter::CalcSizeBin(data.size()), 2);
+				auto rpcRetVal = rpcReturned.AddPrimitiveArg<decltype(retVal)>();
+				auto rpcData = rpcReturned.AddBinaryArg(data.size());
+
+				rpcRetVal = retVal;
+				std::copy(data.begin(), data.end(), rpcData.begin());
+
+				tls.SendRpc(rpcReturned);
+			}
+			else
+			{
+				RpcWriter rpcReturned(RpcWriter::CalcSizePrim<decltype(retVal)>() +
+					RpcWriter::CalcSizeBin(0), 2);
+				auto rpcRetVal = rpcReturned.AddPrimitiveArg<decltype(retVal)>();
+				auto rpcData = rpcReturned.AddBinaryArg(0);
+
+				rpcRetVal = retVal;
+
+				tls.SendRpc(rpcReturned);
+			}
+
+			return false;
+		}
+		else
+		{
+			throw RuntimeException("Number of arguments for function k_findSuccessor doesn't match.");
+		}
+
+	case k_insertData:
+		if (rpc.GetArgCount() == 4)
+		{
+			const auto& keyId = rpc.GetPrimitiveArg<uint8_t[DhtStates::sk_keySizeByte]>(); //Arg 2.
+			const auto meta = rpc.GetBinaryArg(); //Arg 3.
+			const auto data = rpc.GetBinaryArg(); //Arg 4.
+
+			uint8_t appKeyId[DhtStates::sk_keySizeByte] = { 0 };
+			Hasher::ArrayBatchedCalc<HashType::SHA256>(appKeyId, gsk_appKeyIdPrefix, keyId);
+
+			uint8_t retVal = InsertData(keyId, meta.first, meta.second, data.first, data.second);
+
+			RpcWriter rpcReturned(RpcWriter::CalcSizePrim<decltype(retVal)>(), 1);
+			auto rpcRetVal = rpcReturned.AddPrimitiveArg<decltype(retVal)>();
+
+			rpcRetVal = retVal;
+
+			tls.SendRpc(rpcReturned);
+
+			return false;
+		}
+		else
+		{
+			throw RuntimeException("Number of arguments for function k_findSuccessor doesn't match.");
+		}
+
+	case k_updateData:
+		if (rpc.GetArgCount() == 3)
+		{
+			const auto& keyId = rpc.GetPrimitiveArg<uint8_t[DhtStates::sk_keySizeByte]>(); //Arg 2.
+			const auto data = rpc.GetBinaryArg(); //Arg 3.
+
+			uint8_t appKeyId[DhtStates::sk_keySizeByte] = { 0 };
+			Hasher::ArrayBatchedCalc<HashType::SHA256>(appKeyId, gsk_appKeyIdPrefix, keyId);
+
+			if (encHash.size() != sizeof(general_256bit_hash))
+			{
+				throw RuntimeException("Feature not implemented yet. (Enclave hash is not 256 bit)");
+			}
+
+			general_256bit_hash tmpEncHash;
+			std::copy(encHash.begin(), encHash.end(), std::begin(tmpEncHash));
+
+			AccessCtrl::EntityItem entity(tmpEncHash);
+
+			uint8_t retVal = UpdateData(keyId, entity, data.first, data.second);
+
+			RpcWriter rpcReturned(RpcWriter::CalcSizePrim<decltype(retVal)>(), 1);
+			auto rpcRetVal = rpcReturned.AddPrimitiveArg<decltype(retVal)>();
+
+			rpcRetVal = retVal;
+
+			tls.SendRpc(rpcReturned);
+
+			return false;
+		}
+		else
+		{
+			throw RuntimeException("Number of arguments for function k_findSuccessor doesn't match.");
+		}
 
 	case k_delData:
-		//DelData(tls);
-		return false;
+		if (rpc.GetArgCount() == 2)
+		{
+			const auto& keyId = rpc.GetPrimitiveArg<uint8_t[DhtStates::sk_keySizeByte]>(); //Arg 2.
 
-	case k_findAtListSuc:
+			uint8_t appKeyId[DhtStates::sk_keySizeByte] = { 0 };
+			Hasher::ArrayBatchedCalc<HashType::SHA256>(appKeyId, gsk_appKeyIdPrefix, keyId);
 
-		return false;
+			if (encHash.size() != sizeof(general_256bit_hash))
+			{
+				throw RuntimeException("Feature not implemented yet. (Enclave hash is not 256 bit)");
+			}
 
-	case k_insertAttList:
+			general_256bit_hash tmpEncHash;
+			std::copy(encHash.begin(), encHash.end(), std::begin(tmpEncHash));
 
-		return false;
+			AccessCtrl::EntityItem entity(tmpEncHash);
+
+			uint8_t retVal = DelData(keyId, entity);
+
+			RpcWriter rpcReturned(RpcWriter::CalcSizePrim<decltype(retVal)>(), 1);
+			auto rpcRetVal = rpcReturned.AddPrimitiveArg<decltype(retVal)>();
+
+			rpcRetVal = retVal;
+
+			tls.SendRpc(rpcReturned);
+
+			return false;
+		}
+		else
+		{
+			throw RuntimeException("Number of arguments for function k_findSuccessor doesn't match.");
+		}
 
 	default: return false;
 	}

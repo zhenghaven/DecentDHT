@@ -12,6 +12,22 @@ namespace Decent
 {
 	namespace Dht
 	{
+		class DataAlreadyExist : public RuntimeException
+		{
+		public:
+			DataAlreadyExist() :
+				RuntimeException("Data is already existing in DHT store, and override is not allowed.")
+			{}
+		};
+
+		class DataNotExist : public RuntimeException
+		{
+		public:
+			DataNotExist() :
+				RuntimeException("Data is not existing in DHT store.")
+			{}
+		};
+
 		template<typename IdType, typename AddrType>
 		class StoreBase
 		{
@@ -173,7 +189,7 @@ namespace Decent
 					std::unique_lock<std::mutex> indexingLock(m_indexingMutex);
 					if (m_indexing.find(key) != m_indexing.end())
 					{
-						throw Decent::RuntimeException("Data is already exist in DHT store, and override is not allowed.");
+						throw DataAlreadyExist();
 					}
 				}
 
@@ -213,7 +229,7 @@ namespace Decent
 					auto it = m_indexing.find(key);
 					if (it == m_indexing.end())
 					{
-						throw Decent::RuntimeException("Queried key-value pair is not found.");
+						throw DataNotExist();
 					}
 					tag = it->second;
 				}

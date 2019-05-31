@@ -152,7 +152,9 @@ extern "C" int ecall_decent_dht_proc_msg_from_app(void* connection)
 		std::shared_ptr<Ra::TlsConfigAnyWhiteListed> tlsCfg = std::make_shared<Ra::TlsConfigAnyWhiteListed>(gs_state, Ra::TlsConfig::Mode::ServerNoVerifyPeer, GetAppSessionTicketMgr());
 		Decent::Net::TlsCommLayer tls(cnt, tlsCfg, false, nullptr);
 
-		return ProcessAppRequest(tls, cnt);
+		std::vector<uint8_t> appHash(sizeof(general_256bit_hash), 0);
+
+		return ProcessAppRequest(tls, cnt, appHash);
 	}
 	catch (const std::exception& e)
 	{

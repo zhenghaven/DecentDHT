@@ -2,8 +2,11 @@
 
 #include "../DhtServer.h"
 
+#include <cppcodec/base64_default_rfc4648.hpp>
+
 #include <DecentApi/Common/Common.h>
 #include <DecentApi/Common/Net/TlsCommLayer.h>
+#include <DecentApi/Common/Ra/Crypto.h>
 #include <DecentApi/Common/Ra/TlsConfigAnyWhiteListed.h>
 #include <DecentApi/Common/MbedTls/SessionTicketMgr.h>
 
@@ -138,7 +141,11 @@ extern "C" int ecall_decent_dht_proc_msg_from_app(void* connection)
 		std::shared_ptr<Ra::TlsConfigAnyWhiteListed> tlsCfg = std::make_shared<Ra::TlsConfigAnyWhiteListed>(gs_state, Ra::TlsConfig::Mode::ServerVerifyPeer, GetAppSessionTicketMgr());
 		Decent::Net::TlsCommLayer tls(cnt, tlsCfg, true, nullptr);
 
-		return ProcessAppRequest(tls, cnt);
+		Ra::AppX509 appCert(tls.GetPeerCertPem());
+		std::string appHashStr = Ra::GetHashFromAppId(appCert.GetPlatformType(), appCert.GetAppId());
+		std::vector<uint8_t> appHash = cppcodec::base64_rfc4648::decode(appHashStr);
+
+		return ProcessAppRequest(tls, cnt, appHash);
 	}
 	catch (const std::exception& e)
 	{

@@ -2,6 +2,8 @@
 
 #include <cstdint>
 
+#include <vector>
+
 #include <DecentApi/Common/general_key_types.h>
 
 #include "DhtStates.h"
@@ -16,6 +18,11 @@ namespace Decent
 
     namespace Dht
     {
+		namespace AccessCtrl
+		{
+			class EntityItem;
+			class AbAttributeList;
+		}
 
 		struct AddrForwardQueueItem
 		{
@@ -37,6 +44,12 @@ namespace Decent
 			uint64_t m_reqId;
 			uint64_t m_resAddr;
 		};
+
+		//(De-)Initialization functions:
+		
+		void Init(uint64_t selfAddr, int isFirstNode, uint64_t exAddr, size_t totalNode, size_t idx);
+
+		void DeInit();
 
 		//DHT node functions:
 		
@@ -78,21 +91,32 @@ namespace Decent
 
 		void SetMigrateData(Decent::Net::TlsCommLayer & tls);
 
-		void SetData(Decent::Net::TlsCommLayer & tls);
+		uint8_t InsertData(const uint8_t(&keyId)[DhtStates::sk_keySizeByte], 
+			std::vector<uint8_t>::const_iterator metaSrcIt, std::vector<uint8_t>::const_iterator metaEnd, 
+			std::vector<uint8_t>::const_iterator dataSrcIt, std::vector<uint8_t>::const_iterator dataEnd);
 
-		void GetData(Decent::Net::TlsCommLayer & tls);
+		uint8_t UpdateData(const uint8_t(&keyId)[DhtStates::sk_keySizeByte], const AccessCtrl::EntityItem& entity,
+			std::vector<uint8_t>::const_iterator dataSrcIt, std::vector<uint8_t>::const_iterator dataEnd);
 
-		void DelData(Decent::Net::TlsCommLayer & tls);
+		uint8_t UpdateData(const uint8_t(&keyId)[DhtStates::sk_keySizeByte], const AccessCtrl::AbAttributeList& attList,
+			AccessCtrl::AbAttributeList& neededAttList,
+			std::vector<uint8_t>::const_iterator dataSrcIt, std::vector<uint8_t>::const_iterator dataEnd);
 
-		//(De-)Initialization functions:
-		
-		void Init(uint64_t selfAddr, int isFirstNode, uint64_t exAddr, size_t totalNode, size_t idx);
+		uint8_t ReadData(const uint8_t(&keyId)[DhtStates::sk_keySizeByte], const AccessCtrl::EntityItem& entity,
+			std::vector<uint8_t>& outData);
 
-		void DeInit();
+		uint8_t ReadData(const uint8_t(&keyId)[DhtStates::sk_keySizeByte], const AccessCtrl::AbAttributeList& attList,
+			AccessCtrl::AbAttributeList& neededAttList,
+			std::vector<uint8_t>& outData);
+
+		uint8_t DelData(const uint8_t(&keyId)[DhtStates::sk_keySizeByte], const AccessCtrl::EntityItem& entity);
+
+		uint8_t DelData(const uint8_t(&keyId)[DhtStates::sk_keySizeByte], const AccessCtrl::AbAttributeList& attList,
+			AccessCtrl::AbAttributeList& neededAttList);
 
 		//Requests from Apps:
 		
-		bool ProcessAppRequest(Decent::Net::TlsCommLayer & tls, Net::EnclaveCntTranslator& cnt);
+		bool ProcessAppRequest(Decent::Net::TlsCommLayer & tls, Net::EnclaveCntTranslator& cnt, const std::vector<uint8_t>& encHash);
 
 		bool AppFindSuccessor(Decent::Net::TlsCommLayer &tls, Net::EnclaveCntTranslator& cnt, const uint8_t(&keyId)[DhtStates::sk_keySizeByte]);
     }
