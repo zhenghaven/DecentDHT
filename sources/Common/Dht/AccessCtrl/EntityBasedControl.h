@@ -21,14 +21,14 @@ namespace Decent
 				 *
 				 * \return	An EntityBasedControl.
 				 */
-				EntityBasedControl AllowAll();
+				static EntityBasedControl AllowAll();
 
 				/**
 				 * \brief	Construct an entity based control that denies all accesses
 				 *
 				 * \return	An EntityBasedControl.
 				 */
-				EntityBasedControl DenyAll();
+				static EntityBasedControl DenyAll();
 
 			public:
 				EntityBasedControl() = delete;

@@ -21,14 +21,14 @@ namespace Decent
 				 *
 				 * \return	An AttributeBasedControl.
 				 */
-				AttributeBasedControl AllowAll();
+				static AttributeBasedControl AllowAll();
 
 				/**
 				 * \brief	Construct an entity based control that denies all accesses
 				 *
 				 * \return	An AttributeBasedControl.
 				 */
-				AttributeBasedControl DenyAll();
+				static AttributeBasedControl DenyAll();
 
 			public:
 				AttributeBasedControl() = delete;
