@@ -15,6 +15,7 @@
 #include <DecentApi/Common/Net/RpcParser.h>
 #include <DecentApi/Common/Net/RpcWriter.h>
 #include <DecentApi/Common/Ra/Crypto.h>
+#include <DecentApi/Common/Ra/KeyContainer.h>
 
 #include <DecentApi/CommonEnclave/Net/EnclaveCntTranslator.h>
 #include <DecentApi/CommonEnclave/Ra/TlsConfigSameEnclave.h>
@@ -104,10 +105,23 @@ namespace
 	static uint64_t CheckUserIdInAttrList(const BigNumber& queriedId, const general_256bit_hash& userId)
 	{
 		auto& dhtStore = gs_state.GetDhtStore();
-		/*TODO*/
-		//dhtStore
-		
-		return 0; //false
+
+		try
+		{
+			std::vector<uint8_t> meta;
+			std::vector<uint8_t> data = gs_state.GetDhtStore().GetValue(queriedId, meta);
+
+			auto it = data.cbegin();
+			AccessCtrl::EntityList attrListObj(it, data.cend());
+
+			AccessCtrl::EntityItem testEntity(userId);
+
+			return attrListObj.Search(testEntity) ? 1 : 0;
+		}
+		catch (const std::exception&)
+		{
+			return 0; //false;
+		}
 	}
 }
 
@@ -1245,13 +1259,24 @@ namespace
 
 static bool VerifyAtListCacheSignature(const general_256bit_hash& hash, const general_secp256r1_signature_t& sign, const std::string& certPem)
 {
-	/*TODO*/
-	return false;
+	Ra::AppX509 cert(certPem);
+
+	auto selfCert = gs_state.GetAppCertContainer().GetAppCert();
+	Ra::TlsConfigSameEnclave tlsCfg(gs_state, Ra::TlsConfig::Mode::ServerVerifyPeer, nullptr);
+
+	bool vrfyRes = cert.Verify(*selfCert, nullptr, nullptr, Ra::TlsConfigSameEnclave::CertVerifyCallBack, &tlsCfg);
+
+	return vrfyRes && cert.GetEcPublicKey().VerifySign(sign, hash, sizeof(hash));
 }
 
 static void SignAtListCache(const general_256bit_hash& hash, general_secp256r1_signature_t& sign)
 {
-	/*TODO*/
+	auto signKey = gs_state.GetKeyContainer().GetSignKeyPair();
+
+	if (!signKey->EcdsaSign(sign, hash, sizeof(hash), &GetMdInfo(HashType::SHA256)))
+	{
+		throw Decent::RuntimeException("ECDSA sign failed.");
+	}
 }
 
 static std::unique_ptr<AccessCtrl::AbAttributeList> ParseCachedAttList(uint8_t hasCache, std::pair<std::vector<uint8_t>::const_iterator, std::vector<uint8_t>::const_iterator> cacheBin,
@@ -1475,11 +1500,11 @@ bool Dht::ProcessUserRequest(Decent::Net::TlsCommLayer & tls, Net::EnclaveCntTra
 			std::unique_ptr<AccessCtrl::AbAttributeList> exListCachePtr = ParseCachedAttList(validCache, cacheBin, cacheSign, cacheCertPem);
 			std::unique_ptr<AccessCtrl::AbAttributeList> neededAttrListPtr = Tools::make_unique<AccessCtrl::AbAttributeList>();
 
-			uint8_t appKeyId[DhtStates::sk_keySizeByte] = { 0 };
-			Hasher::ArrayBatchedCalc<HashType::SHA256>(appKeyId, gsk_appKeyIdPrefix, keyId);
+			uint8_t dataKeyId[DhtStates::sk_keySizeByte] = { 0 };
+			Hasher::ArrayBatchedCalc<HashType::SHA256>(dataKeyId, gsk_appKeyIdPrefix, keyId);
 
 			std::vector<uint8_t> data;
-			uint8_t retVal = ReadData(appKeyId, *exListCachePtr, *neededAttrListPtr, data);
+			uint8_t retVal = ReadData(dataKeyId, *exListCachePtr, *neededAttrListPtr, data);
 
 			if (retVal != EncFunc::FileOpRet::k_denied || neededAttrListPtr->GetSize() == 0)
 			{ //Can return immediately
@@ -1503,7 +1528,7 @@ bool Dht::ProcessUserRequest(Decent::Net::TlsCommLayer & tls, Net::EnclaveCntTra
 				}
 				else
 				{//Has new attribute, retry
-					UserReadReturnWithCache(tls, appKeyId, (*exListCachePtr) + (*approvedList));
+					UserReadReturnWithCache(tls, dataKeyId, (*exListCachePtr) + (*approvedList));
 				}
 
 				return false;
@@ -1519,7 +1544,7 @@ bool Dht::ProcessUserRequest(Decent::Net::TlsCommLayer & tls, Net::EnclaveCntTra
 
 			(*pendingTlsPtr)->SetConnectionPtr(*(*pendingCntPtr));
 
-			auto callBackAfterCollect = [pendingCntPtr, pendingTlsPtr, appKeyId](const AccessCtrl::AbAttributeList& mergedAttrList) -> void*
+			auto callBackAfterCollect = [pendingCntPtr, pendingTlsPtr, dataKeyId](const AccessCtrl::AbAttributeList& mergedAttrList) -> void*
 			{
 				void* res = nullptr;
 
@@ -1532,7 +1557,7 @@ bool Dht::ProcessUserRequest(Decent::Net::TlsCommLayer & tls, Net::EnclaveCntTra
 					}
 					else
 					{//Has new attribute, retry
-						UserReadReturnWithCache(*(*pendingTlsPtr), appKeyId, mergedAttrList);
+						UserReadReturnWithCache(*(*pendingTlsPtr), dataKeyId, mergedAttrList);
 					}
 
 					res = (*pendingCntPtr)->GetPointer();
@@ -1549,10 +1574,38 @@ bool Dht::ProcessUserRequest(Decent::Net::TlsCommLayer & tls, Net::EnclaveCntTra
 		}
 		else
 		{
-			throw RuntimeException("Number of arguments for function k_findSuccessor doesn't match.");
+			throw RuntimeException("Number of arguments for function k_readData doesn't match.");
 		}
 
 	case k_insertData:
+		if (rpc.GetArgCount() == 6)
+		{
+			const auto& keyId = rpc.GetPrimitiveArg<uint8_t[DhtStates::sk_keySizeByte]>(); //Arg 2
+			auto policyBin = rpc.GetBinaryArg();
+			auto dataBin = rpc.GetBinaryArg();
+
+			FullPolicy verifiedPolicy(policyBin.first, policyBin.second);
+			std::vector<uint8_t> verifiedPolicyBin(verifiedPolicy.GetSerializedSize());
+			verifiedPolicy.Serialize(verifiedPolicyBin.begin(), verifiedPolicyBin.end());
+
+			uint8_t dataKeyId[DhtStates::sk_keySizeByte] = { 0 };
+			Hasher::ArrayBatchedCalc<HashType::SHA256>(dataKeyId, gsk_appKeyIdPrefix, keyId);
+
+			uint8_t retVal = InsertData(dataKeyId, verifiedPolicyBin.begin(), verifiedPolicyBin.end(), dataBin.first, dataBin.second);
+
+			RpcWriter rpcReturned(RpcWriter::CalcSizePrim<decltype(retVal)>(), 1);
+			auto rpcRetVal = rpcReturned.AddPrimitiveArg<decltype(retVal)>();
+
+			rpcRetVal = retVal;
+
+			tls.SendRpc(rpcReturned);
+
+			return false;
+		}
+		else
+		{
+			throw RuntimeException("Number of arguments for function k_insertData doesn't match.");
+		}
 
 	case k_updateData:
 
@@ -1593,7 +1646,7 @@ bool Dht::ProcessUserRequest(Decent::Net::TlsCommLayer & tls, Net::EnclaveCntTra
 			Hasher::ArrayBatchedCalc<HashType::SHA256>(attrListId, gsk_atListKeyIdPrefix, userId, listName);
 
 			//Validate the given attribute list:
-			AccessCtrl::AbAttributeList attrListObj(listBin.first, listBin.second);
+			AccessCtrl::EntityList attrListObj(listBin.first, listBin.second);
 
 			std::vector<uint8_t> verifiedList(attrListObj.GetSerializedSize());
 			attrListObj.Serialize(verifiedList.begin());
