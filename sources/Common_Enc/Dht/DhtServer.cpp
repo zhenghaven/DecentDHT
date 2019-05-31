@@ -1013,7 +1013,7 @@ bool Dht::ProcessAppRequest(Decent::Net::TlsCommLayer & tls, Net::EnclaveCntTran
 			AccessCtrl::EntityItem entity(tmpEncHash);
 
 			std::vector<uint8_t> data;
-			uint8_t retVal = ReadData(keyId, entity, data);
+			uint8_t retVal = ReadData(appKeyId, entity, data);
 
 			if (retVal == EncFunc::FileOpRet::k_success)
 			{
@@ -1056,7 +1056,7 @@ bool Dht::ProcessAppRequest(Decent::Net::TlsCommLayer & tls, Net::EnclaveCntTran
 			uint8_t appKeyId[DhtStates::sk_keySizeByte] = { 0 };
 			Hasher::ArrayBatchedCalc<HashType::SHA256>(appKeyId, gsk_appKeyIdPrefix, keyId);
 
-			uint8_t retVal = InsertData(keyId, meta.first, meta.second, data.first, data.second);
+			uint8_t retVal = InsertData(appKeyId, meta.first, meta.second, data.first, data.second);
 
 			RpcWriter rpcReturned(RpcWriter::CalcSizePrim<decltype(retVal)>(), 1);
 			auto rpcRetVal = rpcReturned.AddPrimitiveArg<decltype(retVal)>();
@@ -1091,7 +1091,7 @@ bool Dht::ProcessAppRequest(Decent::Net::TlsCommLayer & tls, Net::EnclaveCntTran
 
 			AccessCtrl::EntityItem entity(tmpEncHash);
 
-			uint8_t retVal = UpdateData(keyId, entity, data.first, data.second);
+			uint8_t retVal = UpdateData(appKeyId, entity, data.first, data.second);
 
 			RpcWriter rpcReturned(RpcWriter::CalcSizePrim<decltype(retVal)>(), 1);
 			auto rpcRetVal = rpcReturned.AddPrimitiveArg<decltype(retVal)>();
@@ -1125,7 +1125,7 @@ bool Dht::ProcessAppRequest(Decent::Net::TlsCommLayer & tls, Net::EnclaveCntTran
 
 			AccessCtrl::EntityItem entity(tmpEncHash);
 
-			uint8_t retVal = DelData(keyId, entity);
+			uint8_t retVal = DelData(appKeyId, entity);
 
 			RpcWriter rpcReturned(RpcWriter::CalcSizePrim<decltype(retVal)>(), 1);
 			auto rpcRetVal = rpcReturned.AddPrimitiveArg<decltype(retVal)>();
