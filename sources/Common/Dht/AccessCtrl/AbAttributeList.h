@@ -23,9 +23,11 @@ namespace Decent
 				 * \param	it 	The iterator.
 				 * \param	end	The end.
 				 */
-				AbAttributeList(std::vector<uint8_t>::const_iterator& it, const std::vector<uint8_t>::const_iterator& end);
+				AbAttributeList(std::vector<uint8_t>::const_iterator& it, std::vector<uint8_t>::const_iterator end);
 
 				AbAttributeList(AbAttributeList&& rhs);
+
+				AbAttributeList(std::set<AbAttributeItem> list);
 
 				virtual ~AbAttributeList();
 
@@ -52,6 +54,13 @@ namespace Decent
 				bool Search(const AbAttributeItem& item) const;
 
 				size_t GetSerializedSize() const;
+
+				size_t GetSize() const;
+
+				const std::set<AbAttributeItem>& GetList() const
+				{
+					return m_list;
+				}
 
 				template<typename DestIt>
 				DestIt Serialize(DestIt it) const

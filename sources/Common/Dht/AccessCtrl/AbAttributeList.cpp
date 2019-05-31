@@ -11,7 +11,7 @@ AbAttributeList::AbAttributeList()
 {
 }
 
-AbAttributeList::AbAttributeList(std::vector<uint8_t>::const_iterator& it, const std::vector<uint8_t>::const_iterator& end)
+AbAttributeList::AbAttributeList(std::vector<uint8_t>::const_iterator& it, std::vector<uint8_t>::const_iterator end)
 {
 	auto leftDist = std::distance(it, end);
 	if (leftDist < 0 || (leftDist % AbAttributeItem::Size() != 0))
@@ -27,6 +27,11 @@ AbAttributeList::AbAttributeList(std::vector<uint8_t>::const_iterator& it, const
 
 AbAttributeList::AbAttributeList(AbAttributeList && rhs) :
 	m_list(std::forward<std::set<AbAttributeItem> >(rhs.m_list))
+{
+}
+
+AbAttributeList::AbAttributeList(std::set<AbAttributeItem> list) :
+	m_list(std::move(list))
 {
 }
 
@@ -112,4 +117,9 @@ bool AbAttributeList::Search(const AbAttributeItem & item) const
 size_t AbAttributeList::GetSerializedSize() const
 {
 	return m_list.size() * AbAttributeItem::Size();
+}
+
+size_t AbAttributeList::GetSize() const
+{
+	return m_list.size();
 }
