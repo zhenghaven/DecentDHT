@@ -23,6 +23,7 @@
 #include "../../Common/Dht/NodeBase.h"
 
 #include "../../Common/Dht/AccessCtrl/FullPolicy.h"
+#include "../../Common/Dht/AccessCtrl/EntityList.h"
 #include "../../Common/Dht/AccessCtrl/AbAttributeList.h"
 
 #include "EnclaveStore.h"
@@ -1043,7 +1044,7 @@ bool Dht::ProcessAppRequest(Decent::Net::TlsCommLayer & tls, Net::EnclaveCntTran
 		}
 		else
 		{
-			throw RuntimeException("Number of arguments for function k_findSuccessor doesn't match.");
+			throw RuntimeException("Number of arguments for function k_readData doesn't match.");
 		}
 
 	case k_insertData:
@@ -1069,7 +1070,7 @@ bool Dht::ProcessAppRequest(Decent::Net::TlsCommLayer & tls, Net::EnclaveCntTran
 		}
 		else
 		{
-			throw RuntimeException("Number of arguments for function k_findSuccessor doesn't match.");
+			throw RuntimeException("Number of arguments for function k_insertData doesn't match.");
 		}
 
 	case k_updateData:
@@ -1104,7 +1105,7 @@ bool Dht::ProcessAppRequest(Decent::Net::TlsCommLayer & tls, Net::EnclaveCntTran
 		}
 		else
 		{
-			throw RuntimeException("Number of arguments for function k_findSuccessor doesn't match.");
+			throw RuntimeException("Number of arguments for function k_updateData doesn't match.");
 		}
 
 	case k_delData:
@@ -1138,7 +1139,7 @@ bool Dht::ProcessAppRequest(Decent::Net::TlsCommLayer & tls, Net::EnclaveCntTran
 		}
 		else
 		{
-			throw RuntimeException("Number of arguments for function k_findSuccessor doesn't match.");
+			throw RuntimeException("Number of arguments for function k_delData doesn't match.");
 		}
 
 	default: return false;
@@ -1218,5 +1219,136 @@ bool Dht::AppFindSuccessor(Decent::Net::TlsCommLayer & tls, Net::EnclaveCntTrans
 		}
 
 		return true;
+	}
+}
+
+namespace
+{
+	struct HashArrayWarp
+	{
+		general_256bit_hash m_h;
+	};
+
+	static HashArrayWarp ConstructSelfHashStruct(const std::vector<uint8_t>& selfHash)
+	{
+		if (selfHash.size() != sizeof(general_256bit_hash))
+		{
+			throw Decent::RuntimeException("Feature not implemented yet. (Enclave hash is not 256 bit)");
+		}
+
+		HashArrayWarp res;
+
+		std::copy(selfHash.begin(), selfHash.end(), std::begin(res.m_h));
+
+		return res;
+	}
+}
+
+bool Dht::ProcessUserRequest(Decent::Net::TlsCommLayer & tls, Net::EnclaveCntTranslator & cnt, const std::vector<uint8_t>& selfHash)
+{
+	static const HashArrayWarp selfHashArray = ConstructSelfHashStruct(selfHash);
+
+	using namespace EncFunc::User;
+
+	RpcParser rpc(tls.ReceiveBinary());
+
+	const auto& funcNum = rpc.GetPrimitiveArg<NumType>(); //Arg 1.
+
+	switch (funcNum)
+	{
+	case k_findSuccessor:
+		if (rpc.GetArgCount() == 2)
+		{
+			const auto& keyId = rpc.GetPrimitiveArg<uint8_t[DhtStates::sk_keySizeByte]>(); //Arg 2.
+
+			uint8_t appKeyId[DhtStates::sk_keySizeByte] = { 0 };
+			Hasher::ArrayBatchedCalc<HashType::SHA256>(appKeyId, gsk_appKeyIdPrefix, keyId);
+
+			return AppFindSuccessor(tls, cnt, appKeyId);
+		}
+		else
+		{
+			throw RuntimeException("Number of arguments for function k_findSuccessor doesn't match.");
+		}
+
+	case k_readData:
+
+	case k_insertData:
+
+	case k_updateData:
+
+	case k_delData:
+
+	case k_findAtListSuc:
+		if (rpc.GetArgCount() == 2)
+		{
+			std::string listName = rpc.GetStringArg(); //Arg 2.
+
+			std::string userKeyPem = tls.GetPublicKeyPem();
+			general_256bit_hash userId = { 0 };
+			Hasher::Calc<HashType::SHA256>(userKeyPem, userId);
+
+			uint8_t attrListId[DhtStates::sk_keySizeByte] = { 0 };
+			Hasher::ArrayBatchedCalc<HashType::SHA256>(attrListId, gsk_atListKeyIdPrefix, userId, listName);
+
+			return AppFindSuccessor(tls, cnt, attrListId);
+		}
+		else
+		{
+			throw RuntimeException("Number of arguments for function k_findAtListSuc doesn't match.");
+		}
+
+	case k_insertAttList:
+		if (rpc.GetArgCount() == 3)
+		{
+			std::string listName = rpc.GetStringArg(); //Arg 2.
+			auto listBin = rpc.GetBinaryArg(); //Arg 3.
+
+			//Calc User ID:
+			std::string userKeyPem = tls.GetPublicKeyPem();
+			general_256bit_hash userId = { 0 };
+			Hasher::Calc<HashType::SHA256>(userKeyPem, userId);
+
+			//Calc Attribute list ID:
+			uint8_t attrListId[DhtStates::sk_keySizeByte] = { 0 };
+			Hasher::ArrayBatchedCalc<HashType::SHA256>(attrListId, gsk_atListKeyIdPrefix, userId, listName);
+
+			//Validate the given attribute list:
+			AccessCtrl::AbAttributeList attrListObj(listBin.first, listBin.second);
+
+			std::vector<uint8_t> verifiedList(attrListObj.GetSerializedSize());
+			attrListObj.Serialize(verifiedList.begin());
+
+			//Construct access policy for attribute list:
+			EntityItem owner(selfHashArray.m_h);
+			std::unique_ptr<EntityList> entityList = Tools::make_unique<EntityList>();
+			entityList->Insert(owner);
+
+			EntityBasedControl entityCtrl(std::move(entityList), Tools::make_unique<EntityList>(), Tools::make_unique<EntityList>());
+			FullPolicy listPolicy(owner, std::move(entityCtrl), AttributeBasedControl::DenyAll());
+
+			std::vector<uint8_t> listPolicyBin(listPolicy.GetSerializedSize());
+			listPolicy.Serialize(listPolicyBin.begin(), listPolicyBin.end());
+
+			//Write attribute list:
+			uint8_t retVal = InsertData(attrListId, listPolicyBin.begin(), listPolicyBin.end(), verifiedList.begin(), verifiedList.end());
+
+			//Return result via RPC:
+			RpcWriter rpcReturned(RpcWriter::CalcSizePrim<decltype(retVal)>(), 1);
+			auto rpcRetVal = rpcReturned.AddPrimitiveArg<decltype(retVal)>();
+
+			rpcRetVal = retVal;
+
+			tls.SendRpc(rpcReturned);
+
+			return false;
+		}
+		else
+		{
+			throw RuntimeException("Number of arguments for function k_findAtListSuc doesn't match.");
+		}
+
+	default:
+		return false;
 	}
 }
