@@ -14,6 +14,7 @@
 #include <DecentApi/Common/Net/ConnectionBase.h>
 #include <DecentApi/Common/Net/RpcParser.h>
 #include <DecentApi/Common/Net/RpcWriter.h>
+#include <DecentApi/Common/Ra/Crypto.h>
 
 #include <DecentApi/CommonEnclave/Net/EnclaveCntTranslator.h>
 #include <DecentApi/CommonEnclave/Ra/TlsConfigSameEnclave.h>
@@ -103,7 +104,7 @@ namespace
 	static uint64_t CheckUserIdInAttrList(const BigNumber& queriedId, const general_256bit_hash& userId)
 	{
 		auto& dhtStore = gs_state.GetDhtStore();
-
+		/*TODO*/
 		//dhtStore
 		
 		return 0; //false
@@ -1176,21 +1177,19 @@ bool Dht::AppFindSuccessor(Decent::Net::TlsCommLayer & tls, Net::EnclaveCntTrans
 
 		std::function<void*(const ReplyQueueItem&)> callBackFunc = [pendingCntPtr, pendingTlsPtr](const ReplyQueueItem& item) -> void*
 		{
-			std::unique_ptr<EnclaveCntTranslator>& pendingCnt = *pendingCntPtr;
-			std::unique_ptr<TlsCommLayer>& pendingTls = *pendingTlsPtr;
+			void* res = nullptr;
 
-			if (pendingCnt && pendingTls)
+			if (pendingCntPtr && pendingTlsPtr && *pendingCntPtr && *pendingTlsPtr)
 			{
-				pendingTls->SendStruct(item.m_resAddr);
-				void* res = pendingCnt->GetPointer();
-				pendingCnt.reset();
-				pendingTls.reset();
-				return res;
+				(*pendingTlsPtr)->SendStruct(item.m_resAddr);
+
+				res = (*pendingCntPtr)->GetPointer();
+
+				(*pendingTlsPtr).reset();
+				(*pendingCntPtr).reset();
 			}
-			else
-			{
-				return nullptr;
-			}
+
+			return res;
 		};
 
 		std::unique_ptr<AddrForwardQueueItem> queueItem = Tools::make_unique<AddrForwardQueueItem>();
@@ -1244,6 +1243,194 @@ namespace
 	}
 }
 
+static bool VerifyAtListCacheSignature(const general_256bit_hash& hash, const general_secp256r1_signature_t& sign, const std::string& certPem)
+{
+	/*TODO*/
+	return false;
+}
+
+static void SignAtListCache(const general_256bit_hash& hash, general_secp256r1_signature_t& sign)
+{
+	/*TODO*/
+}
+
+static std::unique_ptr<AccessCtrl::AbAttributeList> ParseCachedAttList(uint8_t hasCache, std::pair<std::vector<uint8_t>::const_iterator, std::vector<uint8_t>::const_iterator> cacheBin,
+	const general_secp256r1_signature_t& sign, const char* cacheCertPem)
+{
+	if (hasCache)
+	{
+		general_256bit_hash cacheHash;
+		Hasher::Calc<HashType::SHA256>(&(*cacheBin.first), static_cast<size_t>(std::distance(cacheBin.first, cacheBin.second)), cacheHash);
+		if (VerifyAtListCacheSignature(cacheHash, sign, cacheCertPem))
+		{
+			return Tools::make_unique<AccessCtrl::AbAttributeList>(cacheBin.first, cacheBin.second);
+		}
+	}
+	
+	return Tools::make_unique<AccessCtrl::AbAttributeList>();
+}
+
+static void LocalAttrListCollecter(const general_256bit_hash& reqUserId, const std::set<AccessCtrl::AbAttributeItem>& neededList,
+	std::shared_ptr<std::set<AccessCtrl::AbAttributeItem> > approvedList,
+	std::map<AccessCtrl::AbAttributeItem, std::pair<uint64_t, std::array<uint8_t, DhtStates::sk_keySizeByte> > >& remoteItems)
+{
+	DhtStates::DhtLocalNodePtrType localNode = gs_state.GetDhtNode();
+
+	for (const auto& neededItem : neededList)
+	{
+		std::array<uint8_t, DhtStates::sk_keySizeByte> attrListId;
+		Hasher::ArrayBatchedCalc<HashType::SHA256>(attrListId, gsk_atListKeyIdPrefix, neededItem.GetUserHash(), neededItem.GetAttrHash());
+		ConstBigNumber attrListIdNum(attrListId);
+
+		auto nextHop = GetAttrListQueryNextHop(*localNode, attrListIdNum);
+
+		if (!nextHop)
+		{
+			//Local query
+			
+			if (CheckUserIdInAttrList(attrListIdNum, reqUserId))
+			{
+				approvedList->insert(neededItem);
+			}
+		}
+		else
+		{
+			//Remote query
+			
+			remoteItems.insert(std::make_pair(neededItem, std::make_pair(nextHop->GetAddress(), attrListId)));
+		}
+	}
+}
+
+static void RemoteAttrListCollecter(const general_256bit_hash& reqUserId,
+	const std::map<AccessCtrl::AbAttributeItem, std::pair<uint64_t, std::array<uint8_t, DhtStates::sk_keySizeByte> > >& remoteItems,
+	std::shared_ptr<std::set<AccessCtrl::AbAttributeItem> > existList, std::shared_ptr<std::set<AccessCtrl::AbAttributeItem> > approvedList,
+	std::function<void*(const AccessCtrl::AbAttributeList&)> callBackAfterCollect)
+{
+	DhtStates::DhtLocalNodePtrType localNode = gs_state.GetDhtNode();
+
+	std::shared_ptr<std::mutex> apprListMutex = std::make_shared<std::mutex>();
+	std::shared_ptr<size_t> pendingCount = std::make_shared<size_t>(remoteItems.size());
+
+	for (const auto& item : remoteItems)
+	{
+		std::shared_ptr<AccessCtrl::AbAttributeItem> attrListItem = std::make_shared<AccessCtrl::AbAttributeItem>(item.first);
+
+		//Construct forward queue item
+		std::unique_ptr<AttrListForwardQueueItem> forwardQueueItem = Tools::make_unique<AttrListForwardQueueItem>();
+
+		forwardQueueItem->m_reqId = reinterpret_cast<uint64_t>(attrListItem.get());
+		forwardQueueItem->m_reAddr = localNode->GetAddress();
+		std::copy(item.second.second.begin(), item.second.second.end(), std::begin(forwardQueueItem->m_keyId));
+		std::copy(std::begin(reqUserId), std::end(reqUserId), std::begin(forwardQueueItem->m_userId));
+
+		//Reply queue callback
+		auto replyQueueCallBack = [apprListMutex, pendingCount, attrListItem, existList, approvedList, callBackAfterCollect](const ReplyQueueItem& rpQueueItem) -> void*
+		{
+			std::unique_lock<std::mutex> apprListLock(*apprListMutex);
+
+			if (*pendingCount == 0) //Just to be safe.
+			{
+				return nullptr;
+			}
+
+			if (rpQueueItem.m_resAddr)
+			{
+				approvedList->insert(*attrListItem);
+			}
+
+			(*pendingCount)--;
+
+			if (*pendingCount == 0)
+			{
+				return callBackAfterCollect(AccessCtrl::AbAttributeList(std::move(*existList)) +
+					AccessCtrl::AbAttributeList(std::move(*approvedList)));
+			}
+			else
+			{
+				return nullptr;
+			}
+		};
+
+		//Insert to pending queue first
+		{
+			std::unique_lock<std::mutex> clientPendingQueriesLock(gs_clientPendingQueriesMutex);
+			gs_clientPendingQueries.insert(std::make_pair(forwardQueueItem->m_reqId, replyQueueCallBack));
+		}
+
+		//Insert to forwardqueue
+		{
+			std::unique_lock<std::mutex> forwardQueueLock(gs_forwardQueueMutex);
+			gs_attrListForwardQueue.push(std::make_pair(item.second.first, std::move(forwardQueueItem)));
+			forwardQueueLock.unlock();
+			gs_forwardQueueSignal.notify_one();
+		}
+	}
+}
+
+static void UserReadReturnWithCache(Decent::Net::TlsCommLayer & tls, const uint8_t (&dataId)[DhtStates::sk_keySizeByte], const AccessCtrl::AbAttributeList& listForCache)
+{
+	std::string certPem = gs_state.GetCertContainer().GetCert()->ToPemString();
+	size_t listForCacheSize = listForCache.GetSerializedSize();
+
+	AccessCtrl::AbAttributeList tmpList;
+	std::vector<uint8_t> data;
+	uint8_t retVal = ReadData(dataId, listForCache, tmpList, data);
+
+	RpcWriter rpcReturned(RpcWriter::CalcSizePrim<decltype(retVal)>() +
+		RpcWriter::CalcSizeBin(data.size()) +
+		RpcWriter::CalcSizePrim<uint8_t>() +
+		RpcWriter::CalcSizeBin(listForCacheSize) +
+		RpcWriter::CalcSizePrim<general_secp256r1_signature_t>() +
+		RpcWriter::CalcSizeStr(certPem.size()), 6);
+
+	auto rpcRetVal = rpcReturned.AddPrimitiveArg<decltype(retVal)>();
+	auto rpcRetData = rpcReturned.AddBinaryArg(data.size());
+	auto rpcRetHasCache = rpcReturned.AddPrimitiveArg<uint8_t>();
+	auto rpcRetListBin = rpcReturned.AddBinaryArg(listForCacheSize);
+	auto rpcRetListSign = rpcReturned.AddPrimitiveArg<general_secp256r1_signature_t>();
+	auto rpcRetCertPem = rpcReturned.AddStringArg(certPem.size());
+
+	rpcRetVal = retVal;
+
+	if (rpcRetVal == EncFunc::FileOpRet::k_success)
+	{
+		std::copy(data.begin(), data.end(), rpcRetData.begin());
+	}
+	rpcRetHasCache = 1;
+	listForCache.Serialize(rpcRetListBin.begin());
+
+	general_256bit_hash cacheListHash;
+	Hasher::Calc<HashType::SHA256>(&(*rpcRetListBin.begin()), static_cast<size_t>(std::distance(rpcRetListBin.begin(), rpcRetListBin.end())), cacheListHash);
+
+	SignAtListCache(cacheListHash, rpcRetListSign);
+
+	rpcRetCertPem.Fill(certPem);
+
+	tls.SendRpc(rpcReturned);
+}
+
+static void UserReadReturnWithoutCache(Decent::Net::TlsCommLayer & tls, uint8_t retVal, const std::vector<uint8_t>& data)
+{
+	RpcWriter rpcReturned(RpcWriter::CalcSizePrim<decltype(retVal)>() +
+		RpcWriter::CalcSizeBin(data.size()) +
+		RpcWriter::CalcSizePrim<uint8_t>(), 3);
+
+	auto rpcRetVal = rpcReturned.AddPrimitiveArg<decltype(retVal)>();
+	auto rpcRetData = rpcReturned.AddBinaryArg(data.size());
+	auto rpcRetHasCache = rpcReturned.AddPrimitiveArg<uint8_t>();
+
+	rpcRetVal = retVal;
+
+	if (rpcRetVal == EncFunc::FileOpRet::k_success)
+	{
+		std::copy(data.begin(), data.end(), rpcRetData.begin());
+	}
+	rpcRetHasCache = 0;
+
+	tls.SendRpc(rpcReturned);
+}
+
 bool Dht::ProcessUserRequest(Decent::Net::TlsCommLayer & tls, Net::EnclaveCntTranslator & cnt, const std::vector<uint8_t>& selfHash)
 {
 	static const HashArrayWarp selfHashArray = ConstructSelfHashStruct(selfHash);
@@ -1259,7 +1446,7 @@ bool Dht::ProcessUserRequest(Decent::Net::TlsCommLayer & tls, Net::EnclaveCntTra
 	case k_findSuccessor:
 		if (rpc.GetArgCount() == 2)
 		{
-			const auto& keyId = rpc.GetPrimitiveArg<uint8_t[DhtStates::sk_keySizeByte]>(); //Arg 2.
+			const auto& keyId = rpc.GetPrimitiveArg<uint8_t[DhtStates::sk_keySizeByte]>(); //Arg 2
 
 			uint8_t appKeyId[DhtStates::sk_keySizeByte] = { 0 };
 			Hasher::ArrayBatchedCalc<HashType::SHA256>(appKeyId, gsk_appKeyIdPrefix, keyId);
@@ -1272,6 +1459,98 @@ bool Dht::ProcessUserRequest(Decent::Net::TlsCommLayer & tls, Net::EnclaveCntTra
 		}
 
 	case k_readData:
+		if (rpc.GetArgCount() == 6)
+		{
+			const auto& keyId = rpc.GetPrimitiveArg<uint8_t[DhtStates::sk_keySizeByte]>(); //Arg 2
+			const auto& validCache = rpc.GetPrimitiveArg<uint8_t>(); //Arg 3
+			auto cacheBin = rpc.GetBinaryArg(); //Arg 4
+			const auto& cacheSign = rpc.GetPrimitiveArg<general_secp256r1_signature_t>(); //Arg 5
+			const char* cacheCertPem = rpc.GetCStringArg(); //Arg 6
+
+			//User ID:
+			std::string userKeyPem = tls.GetPublicKeyPem();
+			general_256bit_hash userId = { 0 };
+			Hasher::Calc<HashType::SHA256>(userKeyPem, userId);
+
+			std::unique_ptr<AccessCtrl::AbAttributeList> exListCachePtr = ParseCachedAttList(validCache, cacheBin, cacheSign, cacheCertPem);
+			std::unique_ptr<AccessCtrl::AbAttributeList> neededAttrListPtr = Tools::make_unique<AccessCtrl::AbAttributeList>();
+
+			uint8_t appKeyId[DhtStates::sk_keySizeByte] = { 0 };
+			Hasher::ArrayBatchedCalc<HashType::SHA256>(appKeyId, gsk_appKeyIdPrefix, keyId);
+
+			std::vector<uint8_t> data;
+			uint8_t retVal = ReadData(appKeyId, *exListCachePtr, *neededAttrListPtr, data);
+
+			if (retVal != EncFunc::FileOpRet::k_denied || neededAttrListPtr->GetSize() == 0)
+			{ //Can return immediately
+				UserReadReturnWithoutCache(tls, retVal, data);
+
+				return false;
+			}
+
+			//Start from here, retVal == denied && neededAttrList.size() > 0
+			
+			//Local Attr list collector
+			std::shared_ptr<std::set<AccessCtrl::AbAttributeItem> > approvedList = std::make_shared<std::set<AccessCtrl::AbAttributeItem> >();
+			std::map<AccessCtrl::AbAttributeItem, std::pair<uint64_t, std::array<uint8_t, DhtStates::sk_keySizeByte> > > remoteItems;
+			LocalAttrListCollecter(userId, neededAttrListPtr->GetList(), approvedList, remoteItems);
+
+			if (remoteItems.size() == 0)
+			{ //Can be answered now
+				if (approvedList->size() == 0)
+				{// Nothing new, directly return
+					UserReadReturnWithoutCache(tls, retVal, data);
+				}
+				else
+				{//Has new attribute, retry
+					UserReadReturnWithCache(tls, appKeyId, (*exListCachePtr) + (*approvedList));
+				}
+
+				return false;
+			}
+
+			//Remote Attr list collector
+			std::shared_ptr<std::set<AccessCtrl::AbAttributeItem> > exList = std::make_shared<std::set<AccessCtrl::AbAttributeItem> >(exListCachePtr->GetList());
+			
+			std::shared_ptr<std::unique_ptr<EnclaveCntTranslator> > pendingCntPtr =
+				std::make_shared<std::unique_ptr<EnclaveCntTranslator> >(Tools::make_unique<EnclaveCntTranslator>(std::move(cnt)));
+			std::shared_ptr<std::unique_ptr<TlsCommLayer> > pendingTlsPtr =
+				std::make_shared<std::unique_ptr<TlsCommLayer> >(Tools::make_unique<TlsCommLayer>(std::move(tls)));
+
+			(*pendingTlsPtr)->SetConnectionPtr(*(*pendingCntPtr));
+
+			auto callBackAfterCollect = [pendingCntPtr, pendingTlsPtr, appKeyId](const AccessCtrl::AbAttributeList& mergedAttrList) -> void*
+			{
+				void* res = nullptr;
+
+				if (pendingCntPtr && pendingTlsPtr && *pendingCntPtr && *pendingTlsPtr)
+				{
+					if (mergedAttrList.GetSize() == 0)
+					{// Nothing new, directly return
+						std::vector<uint8_t> data;
+						UserReadReturnWithoutCache(*(*pendingTlsPtr), EncFunc::FileOpRet::k_denied, data);
+					}
+					else
+					{//Has new attribute, retry
+						UserReadReturnWithCache(*(*pendingTlsPtr), appKeyId, mergedAttrList);
+					}
+
+					res = (*pendingCntPtr)->GetPointer();
+					(*pendingTlsPtr).reset();
+					(*pendingCntPtr).reset();
+				}
+
+				return res;
+			};
+
+			RemoteAttrListCollecter(userId, remoteItems, exList, approvedList, callBackAfterCollect);
+
+			return true;
+		}
+		else
+		{
+			throw RuntimeException("Number of arguments for function k_findSuccessor doesn't match.");
+		}
 
 	case k_insertData:
 
