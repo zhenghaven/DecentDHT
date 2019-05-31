@@ -105,6 +105,27 @@ namespace Decent
 				 */
 				bool ExamineExecute(const AbAttributeList& attrList) const;
 
+				/**
+				 * \brief	Gets read related attribute list
+				 *
+				 * \param [in,out]	attrList	List of attributes.
+				 */
+				void GetReadRelatedAttributes(AbAttributeList& attrList) const;
+
+				/**
+				 * \brief	Gets write related attribute list
+				 *
+				 * \param [in,out]	attrList	List of attributes.
+				 */
+				void GetWriteRelatedAttributes(AbAttributeList& attrList) const;
+
+				/**
+				 * \brief	Gets execute related attribute list
+				 *
+				 * \param [in,out]	attrList	List of attributes.
+				 */
+				void GetExecuteRelatedAttributes(AbAttributeList& attrList) const;
+
 			private:
 				/** \brief	The read policy */
 				std::unique_ptr<AbPolicyBase> m_rPolicy;

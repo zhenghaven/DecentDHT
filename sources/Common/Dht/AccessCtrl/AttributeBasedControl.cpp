@@ -74,3 +74,18 @@ bool AttributeBasedControl::ExamineExecute(const AbAttributeList & attrList) con
 {
 	return m_xPolicy->Examine(attrList);
 }
+
+void AttributeBasedControl::GetReadRelatedAttributes(AbAttributeList & attrList) const
+{
+	m_rPolicy->GetRelatedAttributes(attrList);
+}
+
+void AttributeBasedControl::GetWriteRelatedAttributes(AbAttributeList & attrList) const
+{
+	m_wPolicy->GetRelatedAttributes(attrList);
+}
+
+void AttributeBasedControl::GetExecuteRelatedAttributes(AbAttributeList & attrList) const
+{
+	m_xPolicy->GetRelatedAttributes(attrList);
+}
