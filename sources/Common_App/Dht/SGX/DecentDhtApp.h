@@ -24,6 +24,8 @@ namespace Decent
 
 			virtual bool ProcessMsgFromApp(Decent::Net::ConnectionBase& connection);
 
+			virtual bool ProcessMsgFromUser(Decent::Net::ConnectionBase& connection);
+
 			virtual void QueryForwardWorker();
 
 			virtual void QueryReplyWorker();

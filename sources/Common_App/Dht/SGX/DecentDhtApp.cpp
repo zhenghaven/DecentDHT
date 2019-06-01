@@ -15,6 +15,7 @@ extern "C" sgx_status_t ecall_decent_dht_deinit(sgx_enclave_id_t eid);
 extern "C" sgx_status_t ecall_decent_dht_proc_msg_from_dht(sgx_enclave_id_t eid, int* retval, void* connection, void** prev_held_cnt);
 extern "C" sgx_status_t ecall_decent_dht_proc_msg_from_store(sgx_enclave_id_t eid, int* retval, void* connection);
 extern "C" sgx_status_t ecall_decent_dht_proc_msg_from_app(sgx_enclave_id_t eid, int* retval, void* connection);
+extern "C" sgx_status_t ecall_decent_dht_proc_msg_from_user(sgx_enclave_id_t eid, int* retval, void* connection);
 
 extern "C" sgx_status_t ecall_decent_dht_forward_queue_worker(sgx_enclave_id_t eid, int* retval);
 extern "C" sgx_status_t ecall_decent_dht_reply_queue_worker(sgx_enclave_id_t eid, int* retval);
@@ -61,6 +62,16 @@ bool DecentDhtApp::ProcessMsgFromApp(ConnectionBase & connection)
 	return retValue;
 }
 
+bool DecentDhtApp::ProcessMsgFromUser(ConnectionBase & connection)
+{
+	int retValue = false;
+
+	sgx_status_t enclaveRet = ecall_decent_dht_proc_msg_from_user(GetEnclaveId(), &retValue, &connection);
+	DECENT_CHECK_SGX_STATUS_ERROR(enclaveRet, ecall_decent_dht_proc_msg_from_user);
+
+	return retValue;
+}
+
 void DecentDhtApp::QueryForwardWorker()
 {
 	int retVal = false;
@@ -103,6 +114,10 @@ bool DecentDhtApp::ProcessSmartMessage(const std::string & category, ConnectionB
 	else if (category == RequestCategory::sk_fromApp)
 	{
 		return ProcessMsgFromApp(connection);
+	}
+	else if (category == RequestCategory::sk_fromUser)
+	{
+		return ProcessMsgFromUser(connection);
 	}
 	else
 	{

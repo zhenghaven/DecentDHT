@@ -12,8 +12,10 @@
 
 #include <DecentApi/CommonEnclave/Net/EnclaveCntTranslator.h>
 #include <DecentApi/CommonEnclave/Ra/TlsConfigSameEnclave.h>
+#include <DecentApi/CommonEnclave/Tools/Crypto.h>
 
 #include "../../../Common/Dht/FuncNums.h"
+#include "../../../Common/Dht/TlsConfigAnyUser.h"
 
 #include "../DhtStatesSingleton.h"
 
@@ -146,6 +148,34 @@ extern "C" int ecall_decent_dht_proc_msg_from_app(void* connection)
 		std::vector<uint8_t> appHash = cppcodec::base64_rfc4648::decode(appHashStr);
 
 		return ProcessAppRequest(tls, cnt, appHash);
+	}
+	catch (const std::exception& e)
+	{
+		PRINT_W("Failed to process message from App. Error msg: %s", e.what());
+		return false;
+	}
+}
+
+extern "C" int ecall_decent_dht_proc_msg_from_user(void* connection)
+{
+	if (!gs_state.GetDhtNode())
+	{
+		LOGW("Local DHT Node had not been initialized yet!");
+		return false;
+	}
+
+	EnclaveCntTranslator cnt(connection);
+
+	using namespace EncFunc::App;
+
+	LOGI("Processing message from App...");
+
+	try
+	{
+		std::shared_ptr<Dht::TlsConfigAnyUser> tlsCfg = std::make_shared<Dht::TlsConfigAnyUser>(gs_state, Ra::TlsConfig::Mode::ServerVerifyPeer, GetAppSessionTicketMgr());
+		Decent::Net::TlsCommLayer tls(cnt, tlsCfg, true, nullptr);
+
+		return ProcessUserRequest(tls, cnt, Tools::GetSelfHash());
 	}
 	catch (const std::exception& e)
 	{

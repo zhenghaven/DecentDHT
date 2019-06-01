@@ -17,6 +17,7 @@ enclave
 		public int  ecall_decent_dht_proc_msg_from_dht([user_check] void* connection, [out] void** prev_held_cnt);
 		public int  ecall_decent_dht_proc_msg_from_store([user_check] void* connection);
 		public int  ecall_decent_dht_proc_msg_from_app([user_check] void* connection);
+		public int  ecall_decent_dht_proc_msg_from_user([user_check] void* connection);
 
 		public int  ecall_decent_dht_forward_queue_worker();
 		public int  ecall_decent_dht_reply_queue_worker();
