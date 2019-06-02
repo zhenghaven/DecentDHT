@@ -563,6 +563,7 @@ void Dht::ListQueryNonBlock(const AttrListForwardQueueItem & item)
 	}
 	else
 	{
+		LOGI("Forwarding list attribute query...");
 		std::unique_lock<std::mutex> forwardQueueLock(gs_forwardQueueMutex);
 		gs_attrListForwardQueue.push(std::make_pair(nextHop->GetAddress(), std::move(forwardItem)));
 		forwardQueueLock.unlock();
@@ -1066,13 +1067,17 @@ bool Dht::ProcessAppRequest(Decent::Net::TlsCommLayer & tls, Net::EnclaveCntTran
 		if (rpc.GetArgCount() == 4)
 		{
 			const auto& keyId = rpc.GetPrimitiveArg<uint8_t[DhtStates::sk_keySizeByte]>(); //Arg 2.
-			const auto meta = rpc.GetBinaryArg(); //Arg 3.
-			const auto data = rpc.GetBinaryArg(); //Arg 4.
+			auto meta = rpc.GetBinaryArg(); //Arg 3.
+			auto data = rpc.GetBinaryArg(); //Arg 4.
+
+			FullPolicy verifiedPolicy(meta.first, meta.second);
+			std::vector<uint8_t> verifiedPolicyBin(verifiedPolicy.GetSerializedSize());
+			verifiedPolicy.Serialize(verifiedPolicyBin.begin(), verifiedPolicyBin.end());
 
 			uint8_t appKeyId[DhtStates::sk_keySizeByte] = { 0 };
 			Hasher::ArrayBatchedCalc<HashType::SHA256>(appKeyId, gsk_appKeyIdPrefix, keyId);
 
-			uint8_t retVal = InsertData(appKeyId, meta.first, meta.second, data.first, data.second);
+			uint8_t retVal = InsertData(appKeyId, verifiedPolicyBin.begin(), verifiedPolicyBin.end(), data.first, data.second);
 
 			RpcWriter rpcReturned(RpcWriter::CalcSizePrim<decltype(retVal)>(), 1);
 			auto rpcRetVal = rpcReturned.AddPrimitiveArg<decltype(retVal)>();
@@ -1385,6 +1390,7 @@ static void RemoteAttrListCollecter(const general_256bit_hash& reqUserId,
 
 		//Insert to forwardqueue
 		{
+			LOGI("Forwarding list attribute query...");
 			std::unique_lock<std::mutex> forwardQueueLock(gs_forwardQueueMutex);
 			gs_attrListForwardQueue.push(std::make_pair(item.second.first, std::move(forwardQueueItem)));
 			forwardQueueLock.unlock();
@@ -1578,11 +1584,11 @@ bool Dht::ProcessUserRequest(Decent::Net::TlsCommLayer & tls, Net::EnclaveCntTra
 		}
 
 	case k_insertData:
-		if (rpc.GetArgCount() == 6)
+		if (rpc.GetArgCount() == 4)
 		{
 			const auto& keyId = rpc.GetPrimitiveArg<uint8_t[DhtStates::sk_keySizeByte]>(); //Arg 2
-			auto policyBin = rpc.GetBinaryArg();
-			auto dataBin = rpc.GetBinaryArg();
+			auto policyBin = rpc.GetBinaryArg(); //Arg 3
+			auto dataBin = rpc.GetBinaryArg(); //Arg 4
 
 			FullPolicy verifiedPolicy(policyBin.first, policyBin.second);
 			std::vector<uint8_t> verifiedPolicyBin(verifiedPolicy.GetSerializedSize());
