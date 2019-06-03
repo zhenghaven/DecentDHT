@@ -1622,12 +1622,17 @@ bool Dht::ProcessUserRequest(Decent::Net::TlsCommLayer & tls, Net::EnclaveCntTra
 		{
 			std::string listName = rpc.GetStringArg(); //Arg 2.
 
+			//Calc User ID:
 			std::string userKeyPem = tls.GetPublicKeyPem();
 			general_256bit_hash userId = { 0 };
 			Hasher::Calc<HashType::SHA256>(userKeyPem, userId);
 
+			//Calc ListName ID:
+			general_256bit_hash listId = { 0 };
+			Hasher::Calc<HashType::SHA256>(listName, listId);
+
 			uint8_t attrListId[DhtStates::sk_keySizeByte] = { 0 };
-			Hasher::ArrayBatchedCalc<HashType::SHA256>(attrListId, gsk_atListKeyIdPrefix, userId, listName);
+			Hasher::ArrayBatchedCalc<HashType::SHA256>(attrListId, gsk_atListKeyIdPrefix, userId, listId);
 
 			return AppFindSuccessor(tls, cnt, attrListId);
 		}
