@@ -1335,7 +1335,7 @@ static void LocalAttrListCollecter(const general_256bit_hash& reqUserId, const s
 static void RemoteAttrListCollecter(const general_256bit_hash& reqUserId,
 	const std::map<AccessCtrl::AbAttributeItem, std::pair<uint64_t, std::array<uint8_t, DhtStates::sk_keySizeByte> > >& remoteItems,
 	std::shared_ptr<std::set<AccessCtrl::AbAttributeItem> > existList, std::shared_ptr<std::set<AccessCtrl::AbAttributeItem> > approvedList,
-	std::function<void*(const AccessCtrl::AbAttributeList&)> callBackAfterCollect)
+	std::function<void*(const AccessCtrl::AbAttributeList&, const AccessCtrl::AbAttributeList&)> callBackAfterCollect)
 {
 	DhtStates::DhtLocalNodePtrType localNode = gs_state.GetDhtNode();
 
@@ -1373,7 +1373,7 @@ static void RemoteAttrListCollecter(const general_256bit_hash& reqUserId,
 
 			if (*pendingCount == 0)
 			{
-				return callBackAfterCollect(AccessCtrl::AbAttributeList(std::move(*existList)) +
+				return callBackAfterCollect(AccessCtrl::AbAttributeList(std::move(*existList)),
 					AccessCtrl::AbAttributeList(std::move(*approvedList)));
 			}
 			else
@@ -1457,6 +1457,54 @@ static void UserReadReturnWithoutCache(Decent::Net::TlsCommLayer & tls, uint8_t 
 	{
 		std::copy(data.begin(), data.end(), rpcRetData.begin());
 	}
+	rpcRetHasCache = 0;
+
+	tls.SendRpc(rpcReturned);
+}
+
+static void UserUpdateReturnWithCache(Decent::Net::TlsCommLayer & tls, const uint8_t(&dataId)[DhtStates::sk_keySizeByte], const AccessCtrl::AbAttributeList& listForCache, const std::vector<uint8_t>& data)
+{
+	std::string certPem = gs_state.GetCertContainer().GetCert()->ToPemString();
+	size_t listForCacheSize = listForCache.GetSerializedSize();
+
+	AccessCtrl::AbAttributeList tmpList;
+	uint8_t retVal = UpdateData(dataId, listForCache, tmpList, data.begin(), data.end());
+
+	RpcWriter rpcReturned(RpcWriter::CalcSizePrim<decltype(retVal)>() +
+		RpcWriter::CalcSizePrim<uint8_t>() +
+		RpcWriter::CalcSizeBin(listForCacheSize) +
+		RpcWriter::CalcSizePrim<general_secp256r1_signature_t>() +
+		RpcWriter::CalcSizeStr(certPem.size()), 5);
+
+	auto rpcRetVal = rpcReturned.AddPrimitiveArg<decltype(retVal)>();
+	auto rpcRetHasCache = rpcReturned.AddPrimitiveArg<uint8_t>();
+	auto rpcRetListBin = rpcReturned.AddBinaryArg(listForCacheSize);
+	auto rpcRetListSign = rpcReturned.AddPrimitiveArg<general_secp256r1_signature_t>();
+	auto rpcRetCertPem = rpcReturned.AddStringArg(certPem.size());
+
+	rpcRetVal = retVal;
+	rpcRetHasCache = 1;
+	listForCache.Serialize(rpcRetListBin.begin());
+
+	general_256bit_hash cacheListHash;
+	Hasher::Calc<HashType::SHA256>(&(*rpcRetListBin.begin()), static_cast<size_t>(std::distance(rpcRetListBin.begin(), rpcRetListBin.end())), cacheListHash);
+
+	SignAtListCache(cacheListHash, rpcRetListSign);
+
+	rpcRetCertPem.Fill(certPem);
+
+	tls.SendRpc(rpcReturned);
+}
+
+static void UserUpdateReturnWithoutCache(Decent::Net::TlsCommLayer & tls, uint8_t retVal)
+{
+	RpcWriter rpcReturned(RpcWriter::CalcSizePrim<decltype(retVal)>() +
+		RpcWriter::CalcSizePrim<uint8_t>(), 2);
+
+	auto rpcRetVal = rpcReturned.AddPrimitiveArg<decltype(retVal)>();
+	auto rpcRetHasCache = rpcReturned.AddPrimitiveArg<uint8_t>();
+
+	rpcRetVal = retVal;
 	rpcRetHasCache = 0;
 
 	tls.SendRpc(rpcReturned);
@@ -1550,20 +1598,20 @@ bool Dht::ProcessUserRequest(Decent::Net::TlsCommLayer & tls, Net::EnclaveCntTra
 
 			(*pendingTlsPtr)->SetConnectionPtr(*(*pendingCntPtr));
 
-			auto callBackAfterCollect = [pendingCntPtr, pendingTlsPtr, dataKeyId](const AccessCtrl::AbAttributeList& mergedAttrList) -> void*
+			auto callBackAfterCollect = [pendingCntPtr, pendingTlsPtr, dataKeyId](const AccessCtrl::AbAttributeList& exList, const AccessCtrl::AbAttributeList& approvedList) -> void*
 			{
 				void* res = nullptr;
 
 				if (pendingCntPtr && pendingTlsPtr && *pendingCntPtr && *pendingTlsPtr)
 				{
-					if (mergedAttrList.GetSize() == 0)
+					if (approvedList.GetSize() == 0)
 					{// Nothing new, directly return
 						std::vector<uint8_t> data;
 						UserReadReturnWithoutCache(*(*pendingTlsPtr), EncFunc::FileOpRet::k_denied, data);
 					}
 					else
 					{//Has new attribute, retry
-						UserReadReturnWithCache(*(*pendingTlsPtr), dataKeyId, mergedAttrList);
+						UserReadReturnWithCache(*(*pendingTlsPtr), dataKeyId, exList + approvedList);
 					}
 
 					res = (*pendingCntPtr)->GetPointer();
@@ -1614,6 +1662,99 @@ bool Dht::ProcessUserRequest(Decent::Net::TlsCommLayer & tls, Net::EnclaveCntTra
 		}
 
 	case k_updateData:
+		if (rpc.GetArgCount() == 7)
+		{
+			const auto& keyId = rpc.GetPrimitiveArg<uint8_t[DhtStates::sk_keySizeByte]>(); //Arg 2
+			auto dataIn = rpc.GetBinaryArg(); //Arg 3
+			const auto& validCache = rpc.GetPrimitiveArg<uint8_t>(); //Arg 4
+			auto cacheBin = rpc.GetBinaryArg(); //Arg 5
+			const auto& cacheSign = rpc.GetPrimitiveArg<general_secp256r1_signature_t>(); //Arg 6
+			const char* cacheCertPem = rpc.GetCStringArg(); //Arg 7
+
+			//User ID:
+			std::string userKeyPem = tls.GetPublicKeyPem();
+			general_256bit_hash userId = { 0 };
+			Hasher::Calc<HashType::SHA256>(userKeyPem, userId);
+
+			std::unique_ptr<AccessCtrl::AbAttributeList> exListCachePtr = ParseCachedAttList(validCache, cacheBin, cacheSign, cacheCertPem);
+			std::unique_ptr<AccessCtrl::AbAttributeList> neededAttrListPtr = Tools::make_unique<AccessCtrl::AbAttributeList>();
+
+			uint8_t dataKeyId[DhtStates::sk_keySizeByte] = { 0 };
+			Hasher::ArrayBatchedCalc<HashType::SHA256>(dataKeyId, gsk_appKeyIdPrefix, keyId);
+
+			uint8_t retVal = UpdateData(dataKeyId, *exListCachePtr, *neededAttrListPtr, dataIn.first, dataIn.second);
+
+			if (retVal != EncFunc::FileOpRet::k_denied || neededAttrListPtr->GetSize() == 0)
+			{ //Can return immediately
+				UserUpdateReturnWithoutCache(tls, retVal);
+
+				return false;
+			}
+
+			//Start from here, retVal == denied && neededAttrList.size() > 0
+
+			//Local Attr list collector
+			std::shared_ptr<std::set<AccessCtrl::AbAttributeItem> > approvedList = std::make_shared<std::set<AccessCtrl::AbAttributeItem> >();
+			std::map<AccessCtrl::AbAttributeItem, std::pair<uint64_t, std::array<uint8_t, DhtStates::sk_keySizeByte> > > remoteItems;
+			LocalAttrListCollecter(userId, neededAttrListPtr->GetList(), approvedList, remoteItems);
+
+			if (remoteItems.size() == 0)
+			{ //Can be answered now
+				if (approvedList->size() == 0)
+				{// Nothing new, directly return
+					UserUpdateReturnWithoutCache(tls, retVal);
+				}
+				else
+				{//Has new attribute, retry
+					UserUpdateReturnWithCache(tls, dataKeyId, (*exListCachePtr) + (*approvedList), std::vector<uint8_t>(dataIn.first, dataIn.second));
+				}
+
+				return false;
+			}
+
+			//Remote Attr list collector
+			std::shared_ptr<std::set<AccessCtrl::AbAttributeItem> > exList = std::make_shared<std::set<AccessCtrl::AbAttributeItem> >(exListCachePtr->GetList());
+
+			std::shared_ptr<std::unique_ptr<EnclaveCntTranslator> > pendingCntPtr =
+				std::make_shared<std::unique_ptr<EnclaveCntTranslator> >(Tools::make_unique<EnclaveCntTranslator>(std::move(cnt)));
+			std::shared_ptr<std::unique_ptr<TlsCommLayer> > pendingTlsPtr =
+				std::make_shared<std::unique_ptr<TlsCommLayer> >(Tools::make_unique<TlsCommLayer>(std::move(tls)));
+
+			(*pendingTlsPtr)->SetConnectionPtr(*(*pendingCntPtr));
+
+			std::vector<uint8_t> data2UpdateLater(dataIn.first, dataIn.second);
+
+			auto callBackAfterCollect = [pendingCntPtr, pendingTlsPtr, dataKeyId, data2UpdateLater](const AccessCtrl::AbAttributeList& exList, const AccessCtrl::AbAttributeList& approvedList) -> void*
+			{
+				void* res = nullptr;
+
+				if (pendingCntPtr && pendingTlsPtr && *pendingCntPtr && *pendingTlsPtr)
+				{
+					if (approvedList.GetSize() == 0)
+					{// Nothing new, directly return
+						UserUpdateReturnWithoutCache(*(*pendingTlsPtr), EncFunc::FileOpRet::k_denied);
+					}
+					else
+					{//Has new attribute, retry
+						UserUpdateReturnWithCache(*(*pendingTlsPtr), dataKeyId, exList + approvedList, data2UpdateLater);
+					}
+
+					res = (*pendingCntPtr)->GetPointer();
+					(*pendingTlsPtr).reset();
+					(*pendingCntPtr).reset();
+				}
+
+				return res;
+			};
+
+			RemoteAttrListCollecter(userId, remoteItems, exList, approvedList, callBackAfterCollect);
+
+			return true;
+		}
+		else
+		{
+			throw RuntimeException("Number of arguments for function k_readData doesn't match.");
+		}
 
 	case k_delData:
 
