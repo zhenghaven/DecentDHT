@@ -1647,9 +1647,13 @@ bool Dht::ProcessUserRequest(Decent::Net::TlsCommLayer & tls, Net::EnclaveCntTra
 			general_256bit_hash userId = { 0 };
 			Hasher::Calc<HashType::SHA256>(userKeyPem, userId);
 
+			//Calc ListName ID:
+			general_256bit_hash listId = { 0 };
+			Hasher::Calc<HashType::SHA256>(listName, listId);
+
 			//Calc Attribute list ID:
 			uint8_t attrListId[DhtStates::sk_keySizeByte] = { 0 };
-			Hasher::ArrayBatchedCalc<HashType::SHA256>(attrListId, gsk_atListKeyIdPrefix, userId, listName);
+			Hasher::ArrayBatchedCalc<HashType::SHA256>(attrListId, gsk_atListKeyIdPrefix, userId, listId);
 
 			//Validate the given attribute list:
 			AccessCtrl::EntityList attrListObj(listBin.first, listBin.second);
