@@ -20,6 +20,10 @@
 #include <DecentApi/CommonEnclave/Net/EnclaveCntTranslator.h>
 #include <DecentApi/CommonEnclave/Ra/TlsConfigSameEnclave.h>
 
+#if !defined(ACCESS_CONTROL_NO_CACHE) && !defined(ENCLAVE_PLATFORM_NON_ENCLAVE)
+#include <DecentApi/CommonEnclave/Tools/DataSealer.h>
+#endif
+
 #include "../../Common/Dht/LocalNode.h"
 #include "../../Common/Dht/FuncNums.h"
 #include "../../Common/Dht/NodeBase.h"
@@ -1260,40 +1264,39 @@ namespace
 
 		return res;
 	}
+
+	constexpr const char gsk_attrListSealKeyLabel[] = "AttrListSealKey";
 }
 
-static bool VerifyAtListCacheSignature(const general_256bit_hash& hash, const general_secp256r1_signature_t& sign, const std::string& certPem)
+static bool VerifyAtListCacheSignature(const std::vector<uint8_t>& sealedList, std::vector<uint8_t>& unsealedList)
 {
-	Ra::AppX509 cert(certPem);
-
-	auto selfCert = gs_state.GetAppCertContainer().GetAppCert();
-	Ra::TlsConfigSameEnclave tlsCfg(gs_state, Ra::TlsConfig::Mode::ServerVerifyPeer, nullptr);
-
-	bool vrfyRes = cert.Verify(*selfCert, nullptr, nullptr, Ra::TlsConfigSameEnclave::CertVerifyCallBack, &tlsCfg);
-
-	return vrfyRes && cert.GetEcPublicKey().VerifySign(sign, hash, sizeof(hash));
-}
-
-static void SignAtListCache(const general_256bit_hash& hash, general_secp256r1_signature_t& sign)
-{
-	auto signKey = gs_state.GetKeyContainer().GetSignKeyPair();
-
-	if (!signKey->EcdsaSign(sign, hash, sizeof(hash), &GetMdInfo(HashType::SHA256)))
+#if !defined(ACCESS_CONTROL_NO_CACHE) && !defined(ENCLAVE_PLATFORM_NON_ENCLAVE)
+	try
 	{
-		throw Decent::RuntimeException("ECDSA sign failed.");
+		std::vector<uint8_t> mac;
+		std::vector<uint8_t> meta;
+		Tools::DataSealer::UnsealData(Tools::DataSealer::KeyPolicy::ByMrEnclave, gs_state, gsk_attrListSealKeyLabel, sealedList, mac, meta, unsealedList);
+
+		return true;
 	}
+	catch (const std::exception&)
+	{
+		return false;
+	}
+#else
+	return false;
+#endif
 }
 
-static std::unique_ptr<AccessCtrl::AbAttributeList> ParseCachedAttList(uint8_t hasCache, std::pair<std::vector<uint8_t>::const_iterator, std::vector<uint8_t>::const_iterator> cacheBin,
-	const general_secp256r1_signature_t& sign, const char* cacheCertPem)
+static std::unique_ptr<AccessCtrl::AbAttributeList> ParseCachedAttList(uint8_t hasCache, std::pair<std::vector<uint8_t>::const_iterator, std::vector<uint8_t>::const_iterator> cacheBin)
 {
 	if (hasCache)
 	{
-		general_256bit_hash cacheHash;
-		Hasher::Calc<HashType::SHA256>(&(*cacheBin.first), static_cast<size_t>(std::distance(cacheBin.first, cacheBin.second)), cacheHash);
-		if (VerifyAtListCacheSignature(cacheHash, sign, cacheCertPem))
+		std::vector<uint8_t> unsealedList;
+		if (VerifyAtListCacheSignature(std::vector<uint8_t>(cacheBin.first, cacheBin.second), unsealedList))
 		{
-			return Tools::make_unique<AccessCtrl::AbAttributeList>(cacheBin.first, cacheBin.second);
+			auto it = unsealedList.cbegin();
+			return Tools::make_unique<AccessCtrl::AbAttributeList>(it, unsealedList.cend());
 		}
 	}
 	
@@ -1399,28 +1402,37 @@ static void RemoteAttrListCollecter(const general_256bit_hash& reqUserId,
 	}
 }
 
+//#define ACCESS_CONTROL_NO_CACHE
+
 static void UserReadReturnWithCache(Decent::Net::TlsCommLayer & tls, const uint8_t (&dataId)[DhtStates::sk_keySizeByte], const AccessCtrl::AbAttributeList& listForCache)
 {
 	std::string certPem = gs_state.GetCertContainer().GetCert()->ToPemString();
-	size_t listForCacheSize = listForCache.GetSerializedSize();
 
 	AccessCtrl::AbAttributeList tmpList;
 	std::vector<uint8_t> data;
 	uint8_t retVal = ReadData(dataId, listForCache, tmpList, data);
 
+	std::vector<uint8_t> sealedList;
+
+#if !defined(ACCESS_CONTROL_NO_CACHE) && !defined(ENCLAVE_PLATFORM_NON_ENCLAVE)
+	std::vector<uint8_t> unsealedList;
+	unsealedList.resize(listForCache.GetSerializedSize());
+	listForCache.Serialize(unsealedList.begin());
+
+	std::vector<uint8_t> mac;
+	std::vector<uint8_t> meta;
+	sealedList = Tools::DataSealer::SealData(Tools::DataSealer::KeyPolicy::ByMrEnclave, gs_state, gsk_attrListSealKeyLabel, mac, meta, unsealedList);
+#endif
+
 	RpcWriter rpcReturned(RpcWriter::CalcSizePrim<decltype(retVal)>() +
 		RpcWriter::CalcSizeBin(data.size()) +
 		RpcWriter::CalcSizePrim<uint8_t>() +
-		RpcWriter::CalcSizeBin(listForCacheSize) +
-		RpcWriter::CalcSizePrim<general_secp256r1_signature_t>() +
-		RpcWriter::CalcSizeStr(certPem.size()), 6);
+		RpcWriter::CalcSizeBin(sealedList.size()), 4);
 
 	auto rpcRetVal = rpcReturned.AddPrimitiveArg<decltype(retVal)>();
 	auto rpcRetData = rpcReturned.AddBinaryArg(data.size());
 	auto rpcRetHasCache = rpcReturned.AddPrimitiveArg<uint8_t>();
-	auto rpcRetListBin = rpcReturned.AddBinaryArg(listForCacheSize);
-	auto rpcRetListSign = rpcReturned.AddPrimitiveArg<general_secp256r1_signature_t>();
-	auto rpcRetCertPem = rpcReturned.AddStringArg(certPem.size());
+	auto rpcRetListBin = rpcReturned.AddBinaryArg(sealedList.size());
 
 	rpcRetVal = retVal;
 
@@ -1428,15 +1440,14 @@ static void UserReadReturnWithCache(Decent::Net::TlsCommLayer & tls, const uint8
 	{
 		std::copy(data.begin(), data.end(), rpcRetData.begin());
 	}
+
+#if !defined(ACCESS_CONTROL_NO_CACHE) && !defined(ENCLAVE_PLATFORM_NON_ENCLAVE)
 	rpcRetHasCache = 1;
-	listForCache.Serialize(rpcRetListBin.begin());
 
-	general_256bit_hash cacheListHash;
-	Hasher::Calc<HashType::SHA256>(&(*rpcRetListBin.begin()), static_cast<size_t>(std::distance(rpcRetListBin.begin(), rpcRetListBin.end())), cacheListHash);
-
-	SignAtListCache(cacheListHash, rpcRetListSign);
-
-	rpcRetCertPem.Fill(certPem);
+	std::copy(sealedList.begin(), sealedList.end(), rpcRetListBin.begin());
+#else
+	rpcRetHasCache = 0;
+#endif
 
 	tls.SendRpc(rpcReturned);
 }
@@ -1465,33 +1476,39 @@ static void UserReadReturnWithoutCache(Decent::Net::TlsCommLayer & tls, uint8_t 
 static void UserUpdateReturnWithCache(Decent::Net::TlsCommLayer & tls, const uint8_t(&dataId)[DhtStates::sk_keySizeByte], const AccessCtrl::AbAttributeList& listForCache, const std::vector<uint8_t>& data)
 {
 	std::string certPem = gs_state.GetCertContainer().GetCert()->ToPemString();
-	size_t listForCacheSize = listForCache.GetSerializedSize();
 
 	AccessCtrl::AbAttributeList tmpList;
 	uint8_t retVal = UpdateData(dataId, listForCache, tmpList, data.begin(), data.end());
 
+	std::vector<uint8_t> sealedList;
+
+#if !defined(ACCESS_CONTROL_NO_CACHE) && !defined(ENCLAVE_PLATFORM_NON_ENCLAVE)
+	std::vector<uint8_t> unsealedList;
+	unsealedList.resize(listForCache.GetSerializedSize());
+	listForCache.Serialize(unsealedList.begin());
+
+	std::vector<uint8_t> mac;
+	std::vector<uint8_t> meta;
+	sealedList = Tools::DataSealer::SealData(Tools::DataSealer::KeyPolicy::ByMrEnclave, gs_state, gsk_attrListSealKeyLabel, mac, meta, unsealedList);
+#endif
+
 	RpcWriter rpcReturned(RpcWriter::CalcSizePrim<decltype(retVal)>() +
 		RpcWriter::CalcSizePrim<uint8_t>() +
-		RpcWriter::CalcSizeBin(listForCacheSize) +
-		RpcWriter::CalcSizePrim<general_secp256r1_signature_t>() +
-		RpcWriter::CalcSizeStr(certPem.size()), 5);
+		RpcWriter::CalcSizeBin(sealedList.size()), 3);
 
 	auto rpcRetVal = rpcReturned.AddPrimitiveArg<decltype(retVal)>();
 	auto rpcRetHasCache = rpcReturned.AddPrimitiveArg<uint8_t>();
-	auto rpcRetListBin = rpcReturned.AddBinaryArg(listForCacheSize);
-	auto rpcRetListSign = rpcReturned.AddPrimitiveArg<general_secp256r1_signature_t>();
-	auto rpcRetCertPem = rpcReturned.AddStringArg(certPem.size());
+	auto rpcRetListBin = rpcReturned.AddBinaryArg(sealedList.size());
 
 	rpcRetVal = retVal;
+
+#if !defined(ACCESS_CONTROL_NO_CACHE) && !defined(ENCLAVE_PLATFORM_NON_ENCLAVE)
 	rpcRetHasCache = 1;
-	listForCache.Serialize(rpcRetListBin.begin());
 
-	general_256bit_hash cacheListHash;
-	Hasher::Calc<HashType::SHA256>(&(*rpcRetListBin.begin()), static_cast<size_t>(std::distance(rpcRetListBin.begin(), rpcRetListBin.end())), cacheListHash);
-
-	SignAtListCache(cacheListHash, rpcRetListSign);
-
-	rpcRetCertPem.Fill(certPem);
+	std::copy(sealedList.begin(), sealedList.end(), rpcRetListBin.begin());
+#else
+	rpcRetHasCache = 0;
+#endif
 
 	tls.SendRpc(rpcReturned);
 }
@@ -1513,33 +1530,39 @@ static void UserUpdateReturnWithoutCache(Decent::Net::TlsCommLayer & tls, uint8_
 static void UserDeleteReturnWithCache(Decent::Net::TlsCommLayer & tls, const uint8_t(&dataId)[DhtStates::sk_keySizeByte], const AccessCtrl::AbAttributeList& listForCache)
 {
 	std::string certPem = gs_state.GetCertContainer().GetCert()->ToPemString();
-	size_t listForCacheSize = listForCache.GetSerializedSize();
 
 	AccessCtrl::AbAttributeList tmpList;
 	uint8_t retVal = DelData(dataId, listForCache, tmpList);
 
+	std::vector<uint8_t> sealedList;
+
+#if !defined(ACCESS_CONTROL_NO_CACHE) && !defined(ENCLAVE_PLATFORM_NON_ENCLAVE)
+	std::vector<uint8_t> unsealedList;
+	unsealedList.resize(listForCache.GetSerializedSize());
+	listForCache.Serialize(unsealedList.begin());
+
+	std::vector<uint8_t> mac;
+	std::vector<uint8_t> meta;
+	sealedList = Tools::DataSealer::SealData(Tools::DataSealer::KeyPolicy::ByMrEnclave, gs_state, gsk_attrListSealKeyLabel, mac, meta, unsealedList);
+#endif
+
 	RpcWriter rpcReturned(RpcWriter::CalcSizePrim<decltype(retVal)>() +
 		RpcWriter::CalcSizePrim<uint8_t>() +
-		RpcWriter::CalcSizeBin(listForCacheSize) +
-		RpcWriter::CalcSizePrim<general_secp256r1_signature_t>() +
-		RpcWriter::CalcSizeStr(certPem.size()), 5);
+		RpcWriter::CalcSizeBin(sealedList.size()), 5);
 
 	auto rpcRetVal = rpcReturned.AddPrimitiveArg<decltype(retVal)>();
 	auto rpcRetHasCache = rpcReturned.AddPrimitiveArg<uint8_t>();
-	auto rpcRetListBin = rpcReturned.AddBinaryArg(listForCacheSize);
-	auto rpcRetListSign = rpcReturned.AddPrimitiveArg<general_secp256r1_signature_t>();
-	auto rpcRetCertPem = rpcReturned.AddStringArg(certPem.size());
+	auto rpcRetListBin = rpcReturned.AddBinaryArg(sealedList.size());
 
 	rpcRetVal = retVal;
+
+#if !defined(ACCESS_CONTROL_NO_CACHE) && !defined(ENCLAVE_PLATFORM_NON_ENCLAVE)
 	rpcRetHasCache = 1;
-	listForCache.Serialize(rpcRetListBin.begin());
 
-	general_256bit_hash cacheListHash;
-	Hasher::Calc<HashType::SHA256>(&(*rpcRetListBin.begin()), static_cast<size_t>(std::distance(rpcRetListBin.begin(), rpcRetListBin.end())), cacheListHash);
-
-	SignAtListCache(cacheListHash, rpcRetListSign);
-
-	rpcRetCertPem.Fill(certPem);
+	std::copy(sealedList.begin(), sealedList.end(), rpcRetListBin.begin());
+#else
+	rpcRetHasCache = 0;
+#endif
 
 	tls.SendRpc(rpcReturned);
 }
@@ -1586,20 +1609,18 @@ bool Dht::ProcessUserRequest(Decent::Net::TlsCommLayer & tls, Net::EnclaveCntTra
 		}
 
 	case k_readData:
-		if (rpc.GetArgCount() == 6)
+		if (rpc.GetArgCount() == 4)
 		{
 			const auto& keyId = rpc.GetPrimitiveArg<uint8_t[DhtStates::sk_keySizeByte]>(); //Arg 2
 			const auto& validCache = rpc.GetPrimitiveArg<uint8_t>(); //Arg 3
 			auto cacheBin = rpc.GetBinaryArg(); //Arg 4
-			const auto& cacheSign = rpc.GetPrimitiveArg<general_secp256r1_signature_t>(); //Arg 5
-			const char* cacheCertPem = rpc.GetCStringArg(); //Arg 6
 
 			//User ID:
 			std::string userKeyPem = tls.GetPublicKeyPem();
 			general_256bit_hash userId = { 0 };
 			Hasher::Calc<HashType::SHA256>(userKeyPem, userId);
 
-			std::unique_ptr<AccessCtrl::AbAttributeList> exListCachePtr = ParseCachedAttList(validCache, cacheBin, cacheSign, cacheCertPem);
+			std::unique_ptr<AccessCtrl::AbAttributeList> exListCachePtr = ParseCachedAttList(validCache, cacheBin);
 			std::unique_ptr<AccessCtrl::AbAttributeList> neededAttrListPtr = Tools::make_unique<AccessCtrl::AbAttributeList>();
 
 			uint8_t dataKeyId[DhtStates::sk_keySizeByte] = { 0 };
@@ -1710,21 +1731,19 @@ bool Dht::ProcessUserRequest(Decent::Net::TlsCommLayer & tls, Net::EnclaveCntTra
 		}
 
 	case k_updateData:
-		if (rpc.GetArgCount() == 7)
+		if (rpc.GetArgCount() == 5)
 		{
 			const auto& keyId = rpc.GetPrimitiveArg<uint8_t[DhtStates::sk_keySizeByte]>(); //Arg 2
 			auto dataIn = rpc.GetBinaryArg(); //Arg 3
 			const auto& validCache = rpc.GetPrimitiveArg<uint8_t>(); //Arg 4
 			auto cacheBin = rpc.GetBinaryArg(); //Arg 5
-			const auto& cacheSign = rpc.GetPrimitiveArg<general_secp256r1_signature_t>(); //Arg 6
-			const char* cacheCertPem = rpc.GetCStringArg(); //Arg 7
 
 			//User ID:
 			std::string userKeyPem = tls.GetPublicKeyPem();
 			general_256bit_hash userId = { 0 };
 			Hasher::Calc<HashType::SHA256>(userKeyPem, userId);
 
-			std::unique_ptr<AccessCtrl::AbAttributeList> exListCachePtr = ParseCachedAttList(validCache, cacheBin, cacheSign, cacheCertPem);
+			std::unique_ptr<AccessCtrl::AbAttributeList> exListCachePtr = ParseCachedAttList(validCache, cacheBin);
 			std::unique_ptr<AccessCtrl::AbAttributeList> neededAttrListPtr = Tools::make_unique<AccessCtrl::AbAttributeList>();
 
 			uint8_t dataKeyId[DhtStates::sk_keySizeByte] = { 0 };
@@ -1805,20 +1824,18 @@ bool Dht::ProcessUserRequest(Decent::Net::TlsCommLayer & tls, Net::EnclaveCntTra
 		}
 
 	case k_delData:
-		if (rpc.GetArgCount() == 6)
+		if (rpc.GetArgCount() == 4)
 		{
 			const auto& keyId = rpc.GetPrimitiveArg<uint8_t[DhtStates::sk_keySizeByte]>(); //Arg 2
 			const auto& validCache = rpc.GetPrimitiveArg<uint8_t>(); //Arg 3
 			auto cacheBin = rpc.GetBinaryArg(); //Arg 4
-			const auto& cacheSign = rpc.GetPrimitiveArg<general_secp256r1_signature_t>(); //Arg 5
-			const char* cacheCertPem = rpc.GetCStringArg(); //Arg 6
 
 			//User ID:
 			std::string userKeyPem = tls.GetPublicKeyPem();
 			general_256bit_hash userId = { 0 };
 			Hasher::Calc<HashType::SHA256>(userKeyPem, userId);
 
-			std::unique_ptr<AccessCtrl::AbAttributeList> exListCachePtr = ParseCachedAttList(validCache, cacheBin, cacheSign, cacheCertPem);
+			std::unique_ptr<AccessCtrl::AbAttributeList> exListCachePtr = ParseCachedAttList(validCache, cacheBin);
 			std::unique_ptr<AccessCtrl::AbAttributeList> neededAttrListPtr = Tools::make_unique<AccessCtrl::AbAttributeList>();
 
 			uint8_t dataKeyId[DhtStates::sk_keySizeByte] = { 0 };
@@ -1930,6 +1947,8 @@ bool Dht::ProcessUserRequest(Decent::Net::TlsCommLayer & tls, Net::EnclaveCntTra
 			std::string userKeyPem = tls.GetPublicKeyPem();
 			general_256bit_hash userId = { 0 };
 			Hasher::Calc<HashType::SHA256>(userKeyPem, userId);
+			//std::string userIdStr = cppcodec::base64_rfc4648::encode(userId);
+			//PRINT_I("User, %s, is adding new attribute list.", userIdStr.c_str());
 
 			//Calc ListName ID:
 			general_256bit_hash listId = { 0 };
