@@ -11,7 +11,6 @@
 #include <DecentApi/CommonApp/Net/TCPServer.h>
 #include <DecentApi/CommonApp/Net/TCPConnection.h>
 #include <DecentApi/CommonApp/Tools/DiskFile.h>
-#include <DecentApi/CommonApp/Tools/ConfigManager.h>
 #include <DecentApi/CommonApp/Tools/FileSystemUtil.h>
 #include <DecentApi/CommonApp/Threading/MainThreadAsynWorker.h>
 
@@ -20,6 +19,8 @@
 #include <DecentApi/Common/Ra/WhiteList/WhiteList.h>
 #include <DecentApi/Common/Net/CntPoolConnection.h>
 #include <DecentApi/Common/MbedTls/BigNumber.h>
+
+#include <DecentApi/DecentAppApp/DecentAppConfig.h>
 
 #include "../Common/Dht/AppName.h"
 #include "../Common/Dht/RequestCategory.h"
@@ -32,6 +33,7 @@ using namespace Decent::Tools;
 using namespace Decent::Dht;
 using namespace Decent::Net;
 using namespace Decent::Threading;
+using namespace Decent::AppConfig;
 
 static std::shared_ptr<DhtConnectionPool> GetTcpConnectionPool()
 {
@@ -108,7 +110,7 @@ int main(int argc, char ** argv)
 	cmd.parse(argc, argv);
 
 	//------- Read configuration file:
-	std::unique_ptr<ConfigManager> configMgr;
+	std::unique_ptr<DecentAppConfig> configMgr;
 	try
 	{
 		std::string configJsonStr;
@@ -116,7 +118,7 @@ int main(int argc, char ** argv)
 		configJsonStr.resize(file.GetFileSize());
 		file.ReadBlockExactSize(configJsonStr);
 
-		configMgr = std::make_unique<ConfigManager>(configJsonStr);
+		configMgr = std::make_unique<DecentAppConfig>(configJsonStr);
 	}
 	catch (const std::exception& e)
 	{
@@ -131,7 +133,7 @@ int main(int argc, char ** argv)
 	uint64_t exNodeFullAddr = 0;
 	try
 	{
-		const ConfigItem& selfItem = configMgr->GetItem(AppName::sk_decentDht);
+		const auto& selfItem = configMgr->GetEnclaveList().GetItem(AppName::sk_decentDht);
 
 		selfIp = TCPConnection::GetIpAddressFromStr(selfItem.GetAddr());
 		selfPort = selfNodePortNum.getValue() ? selfNodePortNum.getValue() : selfItem.GetPort();
