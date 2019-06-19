@@ -392,7 +392,7 @@ void Dht::TerminateWorkers()
 	gs_replyQueueSignal.notify_all();
 }
 
-void Dht::GetNodeId(Decent::Net::TlsCommLayer &tls)
+void Dht::GetNodeId(Decent::Net::SecureCommLayer & secComm)
 {
     //LOGI("DHT Server: Getting the NodeId...");
 	DhtStates::DhtLocalNodePtrType localNode = gs_state.GetDhtNode();
@@ -404,48 +404,48 @@ void Dht::GetNodeId(Decent::Net::TlsCommLayer &tls)
 	auto keyBin = rpc.AddPrimitiveArg<uint8_t[DhtStates::sk_keySizeByte]>();
 	localNode->GetNodeId().ToBinary(keyBin.Get(), sk_struct);
 
-	tls.SendRpc(rpc);
+	secComm.SendRpc(rpc);
 }
 
-void Dht::FindSuccessor(Decent::Net::TlsCommLayer &tls, const uint8_t(&keyId)[DhtStates::sk_keySizeByte])
+void Dht::FindSuccessor(Decent::Net::SecureCommLayer & secComm, const uint8_t(&keyId)[DhtStates::sk_keySizeByte])
 {
 	ConstBigNumber queriedId(keyId);
 	//LOGI("Recv queried ID: %s.", static_cast<const BigNumber&>(queriedId).ToBigEndianHexStr().c_str());
 
 	DhtStates::DhtLocalNodePtrType localNode = gs_state.GetDhtNode();
 
-	ReturnNode(tls, localNode->FindSuccessor(queriedId));
+	ReturnNode(secComm, localNode->FindSuccessor(queriedId));
 }
 
-void Dht::FindPredecessor(Decent::Net::TlsCommLayer &tls, const uint8_t(&keyId)[DhtStates::sk_keySizeByte])
+void Dht::FindPredecessor(Decent::Net::SecureCommLayer & secComm, const uint8_t(&keyId)[DhtStates::sk_keySizeByte])
 {
 	ConstBigNumber queriedId(keyId);
     //LOGI("Recv queried ID: %s.", static_cast<const BigNumber&>(queriedId).ToBigEndianHexStr().c_str());
 
 	DhtStates::DhtLocalNodePtrType localNode = gs_state.GetDhtNode();
 
-	ReturnNode(tls, localNode->FindPredecessor(queriedId));
+	ReturnNode(secComm, localNode->FindPredecessor(queriedId));
 }
 
-void Dht::GetImmediateSucessor(Decent::Net::TlsCommLayer &tls)
+void Dht::GetImmediateSucessor(Decent::Net::SecureCommLayer & secComm)
 {
     //LOGI("DHT Server: Finding Immediate Successor...");
 
     DhtStates::DhtLocalNodePtrType localNode = gs_state.GetDhtNode();
 
-	ReturnNode(tls, localNode->GetImmediateSuccessor());
+	ReturnNode(secComm, localNode->GetImmediateSuccessor());
 }
 
-void Dht::GetImmediatePredecessor(Decent::Net::TlsCommLayer &tls)
+void Dht::GetImmediatePredecessor(Decent::Net::SecureCommLayer & secComm)
 {
 	//LOGI("DHT Server: Getting Immediate Predecessor...");
 
 	DhtStates::DhtLocalNodePtrType localNode = gs_state.GetDhtNode();
 
-	ReturnNode(tls, localNode->GetImmediatePredecessor());
+	ReturnNode(secComm, localNode->GetImmediatePredecessor());
 }
 
-void Dht::SetImmediatePredecessor(Decent::Net::TlsCommLayer &tls, const uint8_t(&keyId)[DhtStates::sk_keySizeByte], uint64_t addr)
+void Dht::SetImmediatePredecessor(Decent::Net::SecureCommLayer & secComm, const uint8_t(&keyId)[DhtStates::sk_keySizeByte], uint64_t addr)
 {
 	//LOGI("DHT Server: Setting Immediate Predecessor...");
 
@@ -453,10 +453,10 @@ void Dht::SetImmediatePredecessor(Decent::Net::TlsCommLayer &tls, const uint8_t(
 
 	localNode->SetImmediatePredecessor(std::make_shared<NodeConnector>(addr, BigNumber(keyId, true))); //2. Receive Node. - Done!
 
-	tls.SendRpc(RpcWriter(0, 0));
+	secComm.SendRpc(RpcWriter(0, 0));
 }
 
-void Dht::UpdateFingerTable(Decent::Net::TlsCommLayer &tls, const uint8_t(&keyId)[DhtStates::sk_keySizeByte], uint64_t addr, uint64_t i)
+void Dht::UpdateFingerTable(Decent::Net::SecureCommLayer & secComm, const uint8_t(&keyId)[DhtStates::sk_keySizeByte], uint64_t addr, uint64_t i)
 {
 	PRINT_I("Updating finger table; i = %llu.", i);
 
@@ -466,10 +466,10 @@ void Dht::UpdateFingerTable(Decent::Net::TlsCommLayer &tls, const uint8_t(&keyId
 
 	localNode->UpdateFingerTable(s, i);
 
-	tls.SendRpc(RpcWriter(0, 0));
+	secComm.SendRpc(RpcWriter(0, 0));
 }
 
-void Dht::DeUpdateFingerTable(Decent::Net::TlsCommLayer &tls, const uint8_t(&oldId)[DhtStates::sk_keySizeByte], const uint8_t(&keyId)[DhtStates::sk_keySizeByte], uint64_t addr, uint64_t i)
+void Dht::DeUpdateFingerTable(Decent::Net::SecureCommLayer & secComm, const uint8_t(&oldId)[DhtStates::sk_keySizeByte], const uint8_t(&keyId)[DhtStates::sk_keySizeByte], uint64_t addr, uint64_t i)
 {
 	PRINT_I("De-updating finger table; i = %llu.", i);
 
@@ -479,7 +479,7 @@ void Dht::DeUpdateFingerTable(Decent::Net::TlsCommLayer &tls, const uint8_t(&old
 
 	localNode->DeUpdateFingerTable(ConstBigNumber(oldId), s, i);
 
-	tls.SendRpc(RpcWriter(0, 0));
+	secComm.SendRpc(RpcWriter(0, 0));
 }
 
 void Dht::QueryNonBlock(const AddrForwardQueueItem& item)
@@ -575,13 +575,13 @@ void Dht::ListQueryNonBlock(const AttrListForwardQueueItem & item)
 	}
 }
 
-void Dht::ProcessDhtQuery(Decent::Net::TlsCommLayer & tls, void*& heldCntPtr)
+void Dht::ProcessDhtQuery(Decent::Net::SecureCommLayer & secComm, void*& heldCntPtr)
 {
 	using namespace EncFunc::Dht;
 
 	//LOGI("DHT Server: Processing DHT queries...");
 
-	RpcParser rpc(tls.ReceiveBinary());
+	RpcParser rpc(secComm.ReceiveBinary());
 	const NumType& funcNum = rpc.GetPrimitiveArg<NumType>();
 
 	switch (funcNum)
@@ -590,7 +590,7 @@ void Dht::ProcessDhtQuery(Decent::Net::TlsCommLayer & tls, void*& heldCntPtr)
 	case k_getNodeId:
 		if (rpc.GetArgCount() == 1)
 		{
-			GetNodeId(tls);
+			GetNodeId(secComm);
 		}
 		else
 		{
@@ -602,7 +602,7 @@ void Dht::ProcessDhtQuery(Decent::Net::TlsCommLayer & tls, void*& heldCntPtr)
 		if (rpc.GetArgCount() == 2)
 		{
 			const auto& keyId = rpc.GetPrimitiveArg<uint8_t[DhtStates::sk_keySizeByte]>();
-			FindSuccessor(tls, keyId);
+			FindSuccessor(secComm, keyId);
 		}
 		else
 		{
@@ -614,7 +614,7 @@ void Dht::ProcessDhtQuery(Decent::Net::TlsCommLayer & tls, void*& heldCntPtr)
 		if (rpc.GetArgCount() == 2)
 		{
 			const auto& keyId = rpc.GetPrimitiveArg<uint8_t[DhtStates::sk_keySizeByte]>();
-			FindPredecessor(tls, keyId);
+			FindPredecessor(secComm, keyId);
 		}
 		else
 		{
@@ -625,7 +625,7 @@ void Dht::ProcessDhtQuery(Decent::Net::TlsCommLayer & tls, void*& heldCntPtr)
 	case k_getImmediateSuc:
 		if (rpc.GetArgCount() == 1)
 		{
-			GetImmediateSucessor(tls);
+			GetImmediateSucessor(secComm);
 		}
 		else
 		{
@@ -636,7 +636,7 @@ void Dht::ProcessDhtQuery(Decent::Net::TlsCommLayer & tls, void*& heldCntPtr)
 	case k_getImmediatePre:
 		if (rpc.GetArgCount() == 1)
 		{
-			GetImmediatePredecessor(tls);
+			GetImmediatePredecessor(secComm);
 		}
 		else
 		{
@@ -649,7 +649,7 @@ void Dht::ProcessDhtQuery(Decent::Net::TlsCommLayer & tls, void*& heldCntPtr)
 		{
 			const auto& keyId = rpc.GetPrimitiveArg<uint8_t[DhtStates::sk_keySizeByte]>();
 			const auto& addr = rpc.GetPrimitiveArg<uint64_t>();
-			SetImmediatePredecessor(tls, keyId, addr);
+			SetImmediatePredecessor(secComm, keyId, addr);
 		}
 		else
 		{
@@ -663,7 +663,7 @@ void Dht::ProcessDhtQuery(Decent::Net::TlsCommLayer & tls, void*& heldCntPtr)
 			const auto& keyId = rpc.GetPrimitiveArg<uint8_t[DhtStates::sk_keySizeByte]>();
 			const auto& addr = rpc.GetPrimitiveArg<uint64_t>();
 			const auto& i = rpc.GetPrimitiveArg<uint64_t>();
-			UpdateFingerTable(tls, keyId, addr, i);
+			UpdateFingerTable(secComm, keyId, addr, i);
 		}
 		else
 		{
@@ -678,7 +678,7 @@ void Dht::ProcessDhtQuery(Decent::Net::TlsCommLayer & tls, void*& heldCntPtr)
 			const auto& keyId = rpc.GetPrimitiveArg<uint8_t[DhtStates::sk_keySizeByte]>();
 			const auto& addr = rpc.GetPrimitiveArg<uint64_t>();
 			const auto& i = rpc.GetPrimitiveArg<uint64_t>();
-			DeUpdateFingerTable(tls, oldId, keyId, addr, i);
+			DeUpdateFingerTable(secComm, oldId, keyId, addr, i);
 		}
 		else
 		{
@@ -727,21 +727,21 @@ void Dht::ProcessDhtQuery(Decent::Net::TlsCommLayer & tls, void*& heldCntPtr)
 	}
 }
 
-void Dht::ProcessStoreRequest(Decent::Net::TlsCommLayer & tls)
+void Dht::ProcessStoreRequest(Decent::Net::SecureCommLayer & secComm)
 {
 	using namespace EncFunc::Store;
 
 	NumType funcNum;
-	tls.ReceiveStruct(funcNum); //1. Received function type.
+	secComm.ReceiveStruct(funcNum); //1. Received function type.
 
 	switch (funcNum)
 	{
 	case k_getMigrateData:
-		GetMigrateData(tls);
+		GetMigrateData(secComm);
 		break;
 
 	case k_setMigrateData:
-		SetMigrateData(tls);
+		SetMigrateData(secComm);
 		break;
 
 	default:
@@ -749,41 +749,41 @@ void Dht::ProcessStoreRequest(Decent::Net::TlsCommLayer & tls)
 	}
 }
 
-void Dht::GetMigrateData(Decent::Net::TlsCommLayer & tls)
+void Dht::GetMigrateData(Decent::Net::SecureCommLayer & secComm)
 {
 	std::array<uint8_t, DhtStates::sk_keySizeByte> startKeyBin{};
-	tls.ReceiveRaw(startKeyBin.data(), startKeyBin.size());
+	secComm.ReceiveRaw(startKeyBin.data(), startKeyBin.size());
 	ConstBigNumber start(startKeyBin);
 
 	std::array<uint8_t, DhtStates::sk_keySizeByte> endKeyBin{};
-	tls.ReceiveRaw(endKeyBin.data(), endKeyBin.size());
+	secComm.ReceiveRaw(endKeyBin.data(), endKeyBin.size());
 	ConstBigNumber end(endKeyBin);
 
 	gs_state.GetDhtStore().SendMigratingData(
-		[&tls](const void* buffer, const size_t size) -> void
+		[&secComm](const void* buffer, const size_t size) -> void
 	{
-		tls.SendRaw(buffer, size);
+		secComm.SendRaw(buffer, size);
 	},
-		[&tls](const BigNumber& key) -> void
+		[&secComm](const BigNumber& key) -> void
 	{
 		std::array<uint8_t, DhtStates::sk_keySizeByte> keyBuf{};
 		key.ToBinary(keyBuf);
-		tls.SendRaw(keyBuf.data(), keyBuf.size());
+		secComm.SendRaw(keyBuf.data(), keyBuf.size());
 	},
 		start, end);
 }
 
-void Dht::SetMigrateData(Decent::Net::TlsCommLayer & tls)
+void Dht::SetMigrateData(Decent::Net::SecureCommLayer & secComm)
 {
 	gs_state.GetDhtStore().RecvMigratingData(
-		[&tls](void* buffer, const size_t size) -> void
+		[&secComm](void* buffer, const size_t size) -> void
 	{
-		tls.ReceiveRaw(buffer, size);
+		secComm.ReceiveRaw(buffer, size);
 	},
-		[&tls]() -> BigNumber
+		[&secComm]() -> BigNumber
 	{
 		std::array<uint8_t, DhtStates::sk_keySizeByte> keyBuf{};
-		tls.ReceiveRaw(keyBuf.data(), keyBuf.size());
+		secComm.ReceiveRaw(keyBuf.data(), keyBuf.size());
 		return BigNumber(keyBuf);
 	});
 }
@@ -990,11 +990,16 @@ uint8_t Dht::DelData(const uint8_t(&keyId)[DhtStates::sk_keySizeByte],
 	}
 }
 
-bool Dht::ProcessAppRequest(Decent::Net::TlsCommLayer & tls, Net::EnclaveCntTranslator& cnt, const std::vector<uint8_t>& encHash)
+bool Dht::ProcessAppRequest(std::unique_ptr<SecureCommLayer> & secCnt, Net::EnclaveCntTranslator& cnt, const std::vector<uint8_t>& encHash)
 {
+	if (!secCnt)
+	{
+		throw RuntimeException("Pointer to secure comm layer is null.");
+	}
+
 	using namespace EncFunc::App;
 
-	RpcParser rpc(tls.ReceiveBinary());
+	RpcParser rpc(secCnt->ReceiveBinary());
 
 	const auto& funcNum = rpc.GetPrimitiveArg<NumType>(); //Arg 1.
 
@@ -1008,7 +1013,7 @@ bool Dht::ProcessAppRequest(Decent::Net::TlsCommLayer & tls, Net::EnclaveCntTran
 			uint8_t appKeyId[DhtStates::sk_keySizeByte] = { 0 };
 			Hasher::ArrayBatchedCalc<HashType::SHA256>(appKeyId, gsk_appKeyIdPrefix, keyId);
 
-			return AppFindSuccessor(tls, cnt, appKeyId);
+			return AppFindSuccessor(secCnt, cnt, appKeyId);
 		}
 		else
 		{
@@ -1046,7 +1051,7 @@ bool Dht::ProcessAppRequest(Decent::Net::TlsCommLayer & tls, Net::EnclaveCntTran
 				rpcRetVal = retVal;
 				std::copy(data.begin(), data.end(), rpcData.begin());
 
-				tls.SendRpc(rpcReturned);
+				secCnt->SendRpc(rpcReturned);
 			}
 			else
 			{
@@ -1057,7 +1062,7 @@ bool Dht::ProcessAppRequest(Decent::Net::TlsCommLayer & tls, Net::EnclaveCntTran
 
 				rpcRetVal = retVal;
 
-				tls.SendRpc(rpcReturned);
+				secCnt->SendRpc(rpcReturned);
 			}
 
 			return false;
@@ -1088,7 +1093,7 @@ bool Dht::ProcessAppRequest(Decent::Net::TlsCommLayer & tls, Net::EnclaveCntTran
 
 			rpcRetVal = retVal;
 
-			tls.SendRpc(rpcReturned);
+			secCnt->SendRpc(rpcReturned);
 
 			return false;
 		}
@@ -1123,7 +1128,7 @@ bool Dht::ProcessAppRequest(Decent::Net::TlsCommLayer & tls, Net::EnclaveCntTran
 
 			rpcRetVal = retVal;
 
-			tls.SendRpc(rpcReturned);
+			secCnt->SendRpc(rpcReturned);
 
 			return false;
 		}
@@ -1157,7 +1162,7 @@ bool Dht::ProcessAppRequest(Decent::Net::TlsCommLayer & tls, Net::EnclaveCntTran
 
 			rpcRetVal = retVal;
 
-			tls.SendRpc(rpcReturned);
+			secCnt->SendRpc(rpcReturned);
 
 			return false;
 		}
@@ -1166,35 +1171,20 @@ bool Dht::ProcessAppRequest(Decent::Net::TlsCommLayer & tls, Net::EnclaveCntTran
 			throw RuntimeException("Number of arguments for function k_delData doesn't match.");
 		}
 
-	default: return false;
+	default: throw RuntimeException("Unknown function is called by the client application.");
 	}
 }
 
-bool Dht::AppFindSuccessor(Decent::Net::TlsCommLayer & tls, Net::EnclaveCntTranslator& cnt, const uint8_t(&keyId)[DhtStates::sk_keySizeByte])
+namespace
 {
-	ConstBigNumber queriedId(keyId);
-
-	//LOGI("Recv app queried ID: %s.", static_cast<const BigNumber&>(queriedId).ToBigEndianHexStr().c_str());
-
-	DhtStates::DhtLocalNodePtrType localNode = gs_state.GetDhtNode();
-	
-	uint64_t resAddr = 0;
-	if (TryGetQueriedAddrLocally(*localNode, queriedId, resAddr))
+	static bool AppFindSuccessorForwardProc(std::unique_ptr<SecureCommLayer> secCnt, Net::EnclaveCntTranslator& cnt,
+		const uint8_t(&keyId)[DhtStates::sk_keySizeByte], const MbedTlsObj::BigNumber& queriedId,
+		DhtStates::DhtLocalNodePtrType localNode)
 	{
-		//Query can be answered immediately.
-
-		tls.SendStruct(resAddr);
-
-		return false;
-	}
-	else
-	{
-		//Query should be forwarded to peer(s) and reply later.
-
-		std::shared_ptr<std::unique_ptr<EnclaveCntTranslator> > pendingCntPtr = 
+		std::shared_ptr<std::unique_ptr<EnclaveCntTranslator> > pendingCntPtr =
 			std::make_shared<std::unique_ptr<EnclaveCntTranslator> >(Tools::make_unique<EnclaveCntTranslator>(std::move(cnt)));
-		std::shared_ptr<std::unique_ptr<TlsCommLayer> > pendingTlsPtr = 
-			std::make_shared<std::unique_ptr<TlsCommLayer> >(Tools::make_unique<TlsCommLayer>(std::move(tls)));
+		std::shared_ptr<std::unique_ptr<SecureCommLayer> > pendingTlsPtr =
+			std::make_shared<std::unique_ptr<SecureCommLayer> >(std::move(secCnt));
 
 		(*pendingTlsPtr)->SetConnectionPtr(*(*pendingCntPtr));
 
@@ -1222,7 +1212,7 @@ bool Dht::AppFindSuccessor(Decent::Net::TlsCommLayer & tls, Net::EnclaveCntTrans
 		queueItem->m_reqId = reinterpret_cast<uint64_t>((*pendingTlsPtr).get());
 
 		//PRINT_I("Forward query with ID %s to peer.", requestId.c_str());
-		
+
 		{
 			std::unique_lock<std::mutex> clientPendingQueriesLock(gs_clientPendingQueriesMutex);
 			gs_clientPendingQueries.insert(
@@ -1241,6 +1231,31 @@ bool Dht::AppFindSuccessor(Decent::Net::TlsCommLayer & tls, Net::EnclaveCntTrans
 		}
 
 		return true;
+	}
+}
+
+bool Dht::AppFindSuccessor(std::unique_ptr<SecureCommLayer> & secCnt, Net::EnclaveCntTranslator& cnt, const uint8_t(&keyId)[DhtStates::sk_keySizeByte])
+{
+	ConstBigNumber queriedId(keyId);
+
+	//LOGI("Recv app queried ID: %s.", static_cast<const BigNumber&>(queriedId).ToBigEndianHexStr().c_str());
+
+	DhtStates::DhtLocalNodePtrType localNode = gs_state.GetDhtNode();
+	
+	uint64_t resAddr = 0;
+	if (TryGetQueriedAddrLocally(*localNode, queriedId, resAddr))
+	{
+		//Query can be answered immediately.
+
+		secCnt->SendStruct(resAddr);
+
+		return false;
+	}
+	else
+	{
+		//Query should be forwarded to peer(s) and reply later.
+
+		return AppFindSuccessorForwardProc(std::move(secCnt), cnt, keyId, queriedId, localNode);
 	}
 }
 
@@ -1581,13 +1596,18 @@ static void UserDeleteReturnWithoutCache(Decent::Net::TlsCommLayer & tls, uint8_
 	tls.SendRpc(rpcReturned);
 }
 
-bool Dht::ProcessUserRequest(Decent::Net::TlsCommLayer & tls, Net::EnclaveCntTranslator & cnt, const std::vector<uint8_t>& selfHash)
+bool Dht::ProcessUserRequest(std::unique_ptr<TlsCommLayer> & tls, Net::EnclaveCntTranslator & cnt, const std::vector<uint8_t>& selfHash)
 {
 	static const HashArrayWarp selfHashArray = ConstructSelfHashStruct(selfHash);
 
+	if (!tls)
+	{
+		throw RuntimeException("Pointer to secure comm layer is null.");
+	}
+
 	using namespace EncFunc::User;
 
-	RpcParser rpc(tls.ReceiveBinary());
+	RpcParser rpc(tls->ReceiveBinary());
 
 	const auto& funcNum = rpc.GetPrimitiveArg<NumType>(); //Arg 1.
 
@@ -1616,7 +1636,7 @@ bool Dht::ProcessUserRequest(Decent::Net::TlsCommLayer & tls, Net::EnclaveCntTra
 			auto cacheBin = rpc.GetBinaryArg(); //Arg 4
 
 			//User ID:
-			std::string userKeyPem = tls.GetPublicKeyPem();
+			std::string userKeyPem = tls->GetPublicKeyPem();
 			general_256bit_hash userId = { 0 };
 			Hasher::Calc<HashType::SHA256>(userKeyPem, userId);
 
@@ -1631,7 +1651,7 @@ bool Dht::ProcessUserRequest(Decent::Net::TlsCommLayer & tls, Net::EnclaveCntTra
 
 			if (retVal != EncFunc::FileOpRet::k_denied || neededAttrListPtr->GetSize() == 0)
 			{ //Can return immediately
-				UserReadReturnWithoutCache(tls, retVal, data);
+				UserReadReturnWithoutCache(*tls, retVal, data);
 
 				return false;
 			}
@@ -1647,11 +1667,11 @@ bool Dht::ProcessUserRequest(Decent::Net::TlsCommLayer & tls, Net::EnclaveCntTra
 			{ //Can be answered now
 				if (approvedList->size() == 0)
 				{// Nothing new, directly return
-					UserReadReturnWithoutCache(tls, retVal, data);
+					UserReadReturnWithoutCache(*tls, retVal, data);
 				}
 				else
 				{//Has new attribute, retry
-					UserReadReturnWithCache(tls, dataKeyId, (*exListCachePtr) + (*approvedList));
+					UserReadReturnWithCache(*tls, dataKeyId, (*exListCachePtr) + (*approvedList));
 				}
 
 				return false;
@@ -1663,7 +1683,7 @@ bool Dht::ProcessUserRequest(Decent::Net::TlsCommLayer & tls, Net::EnclaveCntTra
 			std::shared_ptr<std::unique_ptr<EnclaveCntTranslator> > pendingCntPtr =
 				std::make_shared<std::unique_ptr<EnclaveCntTranslator> >(Tools::make_unique<EnclaveCntTranslator>(std::move(cnt)));
 			std::shared_ptr<std::unique_ptr<TlsCommLayer> > pendingTlsPtr =
-				std::make_shared<std::unique_ptr<TlsCommLayer> >(Tools::make_unique<TlsCommLayer>(std::move(tls)));
+				std::make_shared<std::unique_ptr<TlsCommLayer> >(std::move(tls));
 
 			(*pendingTlsPtr)->SetConnectionPtr(*(*pendingCntPtr));
 
@@ -1721,7 +1741,7 @@ bool Dht::ProcessUserRequest(Decent::Net::TlsCommLayer & tls, Net::EnclaveCntTra
 
 			rpcRetVal = retVal;
 
-			tls.SendRpc(rpcReturned);
+			tls->SendRpc(rpcReturned);
 
 			return false;
 		}
@@ -1739,7 +1759,7 @@ bool Dht::ProcessUserRequest(Decent::Net::TlsCommLayer & tls, Net::EnclaveCntTra
 			auto cacheBin = rpc.GetBinaryArg(); //Arg 5
 
 			//User ID:
-			std::string userKeyPem = tls.GetPublicKeyPem();
+			std::string userKeyPem = tls->GetPublicKeyPem();
 			general_256bit_hash userId = { 0 };
 			Hasher::Calc<HashType::SHA256>(userKeyPem, userId);
 
@@ -1753,7 +1773,7 @@ bool Dht::ProcessUserRequest(Decent::Net::TlsCommLayer & tls, Net::EnclaveCntTra
 
 			if (retVal != EncFunc::FileOpRet::k_denied || neededAttrListPtr->GetSize() == 0)
 			{ //Can return immediately
-				UserUpdateReturnWithoutCache(tls, retVal);
+				UserUpdateReturnWithoutCache(*tls, retVal);
 
 				return false;
 			}
@@ -1769,11 +1789,11 @@ bool Dht::ProcessUserRequest(Decent::Net::TlsCommLayer & tls, Net::EnclaveCntTra
 			{ //Can be answered now
 				if (approvedList->size() == 0)
 				{// Nothing new, directly return
-					UserUpdateReturnWithoutCache(tls, retVal);
+					UserUpdateReturnWithoutCache(*tls, retVal);
 				}
 				else
 				{//Has new attribute, retry
-					UserUpdateReturnWithCache(tls, dataKeyId, (*exListCachePtr) + (*approvedList), std::vector<uint8_t>(dataIn.first, dataIn.second));
+					UserUpdateReturnWithCache(*tls, dataKeyId, (*exListCachePtr) + (*approvedList), std::vector<uint8_t>(dataIn.first, dataIn.second));
 				}
 
 				return false;
@@ -1785,7 +1805,7 @@ bool Dht::ProcessUserRequest(Decent::Net::TlsCommLayer & tls, Net::EnclaveCntTra
 			std::shared_ptr<std::unique_ptr<EnclaveCntTranslator> > pendingCntPtr =
 				std::make_shared<std::unique_ptr<EnclaveCntTranslator> >(Tools::make_unique<EnclaveCntTranslator>(std::move(cnt)));
 			std::shared_ptr<std::unique_ptr<TlsCommLayer> > pendingTlsPtr =
-				std::make_shared<std::unique_ptr<TlsCommLayer> >(Tools::make_unique<TlsCommLayer>(std::move(tls)));
+				std::make_shared<std::unique_ptr<TlsCommLayer> >(std::move(tls));
 
 			(*pendingTlsPtr)->SetConnectionPtr(*(*pendingCntPtr));
 
@@ -1831,7 +1851,7 @@ bool Dht::ProcessUserRequest(Decent::Net::TlsCommLayer & tls, Net::EnclaveCntTra
 			auto cacheBin = rpc.GetBinaryArg(); //Arg 4
 
 			//User ID:
-			std::string userKeyPem = tls.GetPublicKeyPem();
+			std::string userKeyPem = tls->GetPublicKeyPem();
 			general_256bit_hash userId = { 0 };
 			Hasher::Calc<HashType::SHA256>(userKeyPem, userId);
 
@@ -1845,7 +1865,7 @@ bool Dht::ProcessUserRequest(Decent::Net::TlsCommLayer & tls, Net::EnclaveCntTra
 
 			if (retVal != EncFunc::FileOpRet::k_denied || neededAttrListPtr->GetSize() == 0)
 			{ //Can return immediately
-				UserDeleteReturnWithoutCache(tls, retVal);
+				UserDeleteReturnWithoutCache(*tls, retVal);
 
 				return false;
 			}
@@ -1861,11 +1881,11 @@ bool Dht::ProcessUserRequest(Decent::Net::TlsCommLayer & tls, Net::EnclaveCntTra
 			{ //Can be answered now
 				if (approvedList->size() == 0)
 				{// Nothing new, directly return
-					UserDeleteReturnWithoutCache(tls, retVal);
+					UserDeleteReturnWithoutCache(*tls, retVal);
 				}
 				else
 				{//Has new attribute, retry
-					UserDeleteReturnWithCache(tls, dataKeyId, (*exListCachePtr) + (*approvedList));
+					UserDeleteReturnWithCache(*tls, dataKeyId, (*exListCachePtr) + (*approvedList));
 				}
 
 				return false;
@@ -1877,7 +1897,7 @@ bool Dht::ProcessUserRequest(Decent::Net::TlsCommLayer & tls, Net::EnclaveCntTra
 			std::shared_ptr<std::unique_ptr<EnclaveCntTranslator> > pendingCntPtr =
 				std::make_shared<std::unique_ptr<EnclaveCntTranslator> >(Tools::make_unique<EnclaveCntTranslator>(std::move(cnt)));
 			std::shared_ptr<std::unique_ptr<TlsCommLayer> > pendingTlsPtr =
-				std::make_shared<std::unique_ptr<TlsCommLayer> >(Tools::make_unique<TlsCommLayer>(std::move(tls)));
+				std::make_shared<std::unique_ptr<TlsCommLayer> >(std::move(tls));
 
 			(*pendingTlsPtr)->SetConnectionPtr(*(*pendingCntPtr));
 
@@ -1919,7 +1939,7 @@ bool Dht::ProcessUserRequest(Decent::Net::TlsCommLayer & tls, Net::EnclaveCntTra
 			std::string listName = rpc.GetStringArg(); //Arg 2.
 
 			//Calc User ID:
-			std::string userKeyPem = tls.GetPublicKeyPem();
+			std::string userKeyPem = tls->GetPublicKeyPem();
 			general_256bit_hash userId = { 0 };
 			Hasher::Calc<HashType::SHA256>(userKeyPem, userId);
 
@@ -1944,7 +1964,7 @@ bool Dht::ProcessUserRequest(Decent::Net::TlsCommLayer & tls, Net::EnclaveCntTra
 			auto listBin = rpc.GetBinaryArg(); //Arg 3.
 
 			//Calc User ID:
-			std::string userKeyPem = tls.GetPublicKeyPem();
+			std::string userKeyPem = tls->GetPublicKeyPem();
 			general_256bit_hash userId = { 0 };
 			Hasher::Calc<HashType::SHA256>(userKeyPem, userId);
 			//std::string userIdStr = cppcodec::base64_rfc4648::encode(userId);
@@ -1984,7 +2004,7 @@ bool Dht::ProcessUserRequest(Decent::Net::TlsCommLayer & tls, Net::EnclaveCntTra
 
 			rpcRetVal = retVal;
 
-			tls.SendRpc(rpcReturned);
+			tls->SendRpc(rpcReturned);
 
 			return false;
 		}
@@ -1995,5 +2015,30 @@ bool Dht::ProcessUserRequest(Decent::Net::TlsCommLayer & tls, Net::EnclaveCntTra
 
 	default:
 		return false;
+	}
+}
+
+bool Dht::AppFindSuccessor(std::unique_ptr<TlsCommLayer> & tls, Net::EnclaveCntTranslator& cnt, const uint8_t(&keyId)[DhtStates::sk_keySizeByte])
+{
+	ConstBigNumber queriedId(keyId);
+
+	//LOGI("Recv app queried ID: %s.", static_cast<const BigNumber&>(queriedId).ToBigEndianHexStr().c_str());
+
+	DhtStates::DhtLocalNodePtrType localNode = gs_state.GetDhtNode();
+
+	uint64_t resAddr = 0;
+	if (TryGetQueriedAddrLocally(*localNode, queriedId, resAddr))
+	{
+		//Query can be answered immediately.
+
+		tls->SendStruct(resAddr);
+
+		return false;
+	}
+	else
+	{
+		//Query should be forwarded to peer(s) and reply later.
+
+		return AppFindSuccessorForwardProc(std::move(tls), cnt, keyId, queriedId, localNode);
 	}
 }

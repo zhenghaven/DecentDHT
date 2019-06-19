@@ -3,6 +3,7 @@
 #include "../DhtServer.h"
 
 #include <DecentApi/Common/Common.h>
+#include <DecentApi/Common/make_unique.h>
 #include <DecentApi/Common/Net/TlsCommLayer.h>
 #include <DecentApi/Common/MbedTls/SessionTicketMgr.h>
 
@@ -150,7 +151,7 @@ extern "C" int ecall_decent_dht_proc_msg_from_app(void* connection)
 	try
 	{
 		std::shared_ptr<Ra::TlsConfigAnyWhiteListed> tlsCfg = std::make_shared<Ra::TlsConfigAnyWhiteListed>(gs_state, Ra::TlsConfig::Mode::ServerNoVerifyPeer, GetAppSessionTicketMgr());
-		Decent::Net::TlsCommLayer tls(cnt, tlsCfg, false, nullptr);
+		std::unique_ptr<SecureCommLayer> tls = Tools::make_unique<TlsCommLayer>(cnt, tlsCfg, false, nullptr);
 
 		std::vector<uint8_t> appHash(sizeof(general_256bit_hash), 0);
 

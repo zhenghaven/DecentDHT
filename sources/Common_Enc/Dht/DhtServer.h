@@ -13,6 +13,7 @@ namespace Decent
 	namespace Net
 	{
 		class TlsCommLayer;
+		class SecureCommLayer;
 		class EnclaveCntTranslator;
 	}
 
@@ -53,23 +54,23 @@ namespace Decent
 
 		//DHT node functions:
 		
-		void ProcessDhtQuery(Decent::Net::TlsCommLayer& tls, void*& heldCntPtr);
+		void ProcessDhtQuery(Decent::Net::SecureCommLayer & secComm, void*& heldCntPtr);
 
-		void GetNodeId(Decent::Net::TlsCommLayer &tls);
+		void GetNodeId(Decent::Net::SecureCommLayer &secComm);
 
-		void FindSuccessor(Decent::Net::TlsCommLayer &tls, const uint8_t(&keyId)[DhtStates::sk_keySizeByte]);
+		void FindSuccessor(Decent::Net::SecureCommLayer &secComm, const uint8_t(&keyId)[DhtStates::sk_keySizeByte]);
 
-		void FindPredecessor(Decent::Net::TlsCommLayer &tls, const uint8_t(&keyId)[DhtStates::sk_keySizeByte]);
+		void FindPredecessor(Decent::Net::SecureCommLayer &secComm, const uint8_t(&keyId)[DhtStates::sk_keySizeByte]);
 
-		void GetImmediateSucessor(Decent::Net::TlsCommLayer &tls);
+		void GetImmediateSucessor(Decent::Net::SecureCommLayer &secComm);
 
-		void GetImmediatePredecessor(Decent::Net::TlsCommLayer &tls);
+		void GetImmediatePredecessor(Decent::Net::SecureCommLayer &secComm);
 
-		void SetImmediatePredecessor(Decent::Net::TlsCommLayer &tls, const uint8_t(&keyId)[DhtStates::sk_keySizeByte], uint64_t addr);
+		void SetImmediatePredecessor(Decent::Net::SecureCommLayer &secComm, const uint8_t(&keyId)[DhtStates::sk_keySizeByte], uint64_t addr);
 
-		void UpdateFingerTable(Decent::Net::TlsCommLayer &tls, const uint8_t(&keyId)[DhtStates::sk_keySizeByte], uint64_t addr, uint64_t i);
+		void UpdateFingerTable(Decent::Net::SecureCommLayer &secComm, const uint8_t(&keyId)[DhtStates::sk_keySizeByte], uint64_t addr, uint64_t i);
 
-		void DeUpdateFingerTable(Decent::Net::TlsCommLayer &tls, const uint8_t(&oldIdBin)[DhtStates::sk_keySizeByte], const uint8_t(&keyId)[DhtStates::sk_keySizeByte], uint64_t addr, uint64_t i);
+		void DeUpdateFingerTable(Decent::Net::SecureCommLayer &secComm, const uint8_t(&oldIdBin)[DhtStates::sk_keySizeByte], const uint8_t(&keyId)[DhtStates::sk_keySizeByte], uint64_t addr, uint64_t i);
 
 		void QueryNonBlock(const AddrForwardQueueItem& item);
 
@@ -85,11 +86,11 @@ namespace Decent
 
 		//DHT Store functions:
 		
-		void ProcessStoreRequest(Decent::Net::TlsCommLayer & tls);
+		void ProcessStoreRequest(Decent::Net::SecureCommLayer & secComm);
 		
-		void GetMigrateData(Decent::Net::TlsCommLayer & tls);
+		void GetMigrateData(Decent::Net::SecureCommLayer & secComm);
 
-		void SetMigrateData(Decent::Net::TlsCommLayer & tls);
+		void SetMigrateData(Decent::Net::SecureCommLayer & secComm);
 
 		uint8_t InsertData(const uint8_t(&keyId)[DhtStates::sk_keySizeByte], 
 			std::vector<uint8_t>::const_iterator metaSrcIt, std::vector<uint8_t>::const_iterator metaEnd, 
@@ -116,13 +117,15 @@ namespace Decent
 
 		//Requests from Apps:
 		
-		bool ProcessAppRequest(Decent::Net::TlsCommLayer & tls, Net::EnclaveCntTranslator& cnt, const std::vector<uint8_t>& encHash);
+		bool ProcessAppRequest(std::unique_ptr<Decent::Net::SecureCommLayer> & secCnt, Net::EnclaveCntTranslator& cnt, const std::vector<uint8_t>& encHash);
 
-		bool AppFindSuccessor(Decent::Net::TlsCommLayer &tls, Net::EnclaveCntTranslator& cnt, const uint8_t(&keyId)[DhtStates::sk_keySizeByte]);
+		bool AppFindSuccessor(std::unique_ptr<Decent::Net::SecureCommLayer> & secCnt, Net::EnclaveCntTranslator& cnt, const uint8_t(&keyId)[DhtStates::sk_keySizeByte]);
 
 		//Request from Users (non-enclaves):
 		
-		bool ProcessUserRequest(Decent::Net::TlsCommLayer & tls, Net::EnclaveCntTranslator& cnt, const std::vector<uint8_t>& selfHash);
+		bool ProcessUserRequest(std::unique_ptr<Decent::Net::TlsCommLayer> & tls, Net::EnclaveCntTranslator& cnt, const std::vector<uint8_t>& selfHash);
+
+		bool AppFindSuccessor(std::unique_ptr<Decent::Net::TlsCommLayer> & tls, Net::EnclaveCntTranslator& cnt, const uint8_t(&keyId)[DhtStates::sk_keySizeByte]);
 
     }
 }

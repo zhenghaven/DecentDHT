@@ -5,6 +5,7 @@
 #include <cppcodec/base64_default_rfc4648.hpp>
 
 #include <DecentApi/Common/Common.h>
+#include <DecentApi/Common/make_unique.h>
 #include <DecentApi/Common/Net/TlsCommLayer.h>
 #include <DecentApi/Common/Ra/Crypto.h>
 #include <DecentApi/Common/Ra/TlsConfigAnyWhiteListed.h>
@@ -141,13 +142,15 @@ extern "C" int ecall_decent_dht_proc_msg_from_app(void* connection)
 	try
 	{
 		std::shared_ptr<Ra::TlsConfigAnyWhiteListed> tlsCfg = std::make_shared<Ra::TlsConfigAnyWhiteListed>(gs_state, Ra::TlsConfig::Mode::ServerVerifyPeer, GetAppSessionTicketMgr());
-		Decent::Net::TlsCommLayer tls(cnt, tlsCfg, true, nullptr);
+		std::unique_ptr<TlsCommLayer> tls = Tools::make_unique<TlsCommLayer>(cnt, tlsCfg, true, nullptr);
 
-		Ra::AppX509 appCert(tls.GetPeerCertPem());
+		Ra::AppX509 appCert(tls->GetPeerCertPem());
 		std::string appHashStr = Ra::GetHashFromAppId(appCert.GetPlatformType(), appCert.GetAppId());
 		std::vector<uint8_t> appHash = cppcodec::base64_rfc4648::decode(appHashStr);
 
-		return ProcessAppRequest(tls, cnt, appHash);
+		std::unique_ptr<SecureCommLayer> secCnt = std::move(tls);
+
+		return ProcessAppRequest(secCnt, cnt, appHash);
 	}
 	catch (const std::exception& e)
 	{
@@ -173,7 +176,7 @@ extern "C" int ecall_decent_dht_proc_msg_from_user(void* connection)
 	try
 	{
 		std::shared_ptr<Dht::TlsConfigAnyUser> tlsCfg = std::make_shared<Dht::TlsConfigAnyUser>(gs_state, Ra::TlsConfig::Mode::ServerVerifyPeer, GetAppSessionTicketMgr());
-		Decent::Net::TlsCommLayer tls(cnt, tlsCfg, true, nullptr);
+		std::unique_ptr<TlsCommLayer> tls = Tools::make_unique<TlsCommLayer>(cnt, tlsCfg, true, nullptr);
 
 		return ProcessUserRequest(tls, cnt, Tools::GetSelfHash());
 	}
