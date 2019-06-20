@@ -9,7 +9,7 @@
 
 #include "../../../Common/Dht/RequestCategory.h"
 
-extern "C" sgx_status_t ecall_decent_dht_init(sgx_enclave_id_t eid, int* retval, uint64_t self_addr, int is_first_node, uint64_t ex_addr, size_t totalNode, size_t idx, void* ias_cntor);
+extern "C" sgx_status_t ecall_decent_dht_init(sgx_enclave_id_t eid, int* retval, uint64_t self_addr, int is_first_node, uint64_t ex_addr, size_t totalNode, size_t idx, void* ias_cntor, const sgx_spid_t* spid, uint64_t enclave_Id);
 extern "C" sgx_status_t ecall_decent_dht_deinit(sgx_enclave_id_t eid);
 
 extern "C" sgx_status_t ecall_decent_dht_proc_msg_from_dht(sgx_enclave_id_t eid, int* retval, void* connection, void** prev_held_cnt);
@@ -125,11 +125,11 @@ bool DecentDhtApp::ProcessSmartMessage(const std::string & category, ConnectionB
 	}
 }
 
-void DecentDhtApp::InitDhtNode(uint64_t selfAddr, uint64_t exNodeAddr, size_t totalNode, size_t idx, Decent::Ias::Connector* iasCntor)
+void DecentDhtApp::InitDhtNode(uint64_t selfAddr, uint64_t exNodeAddr, size_t totalNode, size_t idx, Decent::Ias::Connector* iasCntor, const sgx_spid_t& spid)
 {
 	int retValue = false;
 
-	sgx_status_t enclaveRet = ecall_decent_dht_init(GetEnclaveId(), &retValue, selfAddr, exNodeAddr == 0, exNodeAddr, totalNode, idx, iasCntor);
+	sgx_status_t enclaveRet = ecall_decent_dht_init(GetEnclaveId(), &retValue, selfAddr, exNodeAddr == 0, exNodeAddr, totalNode, idx, iasCntor, &spid, GetEnclaveId());
 	DECENT_CHECK_SGX_STATUS_ERROR(enclaveRet, ecall_decent_dht_init);
 	DECENT_ASSERT_ENCLAVE_APP_RESULT(retValue, "Initialize DHT node.");
 }

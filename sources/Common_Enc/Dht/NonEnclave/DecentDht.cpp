@@ -20,16 +20,6 @@
 
 #include "../DhtStatesSingleton.h"
 
-#ifndef DECENT_DHT_NAIVE_RA_VER
-#	define DECENT_DHT_NAIVE_RA_VER
-#endif // !DECENT_DHT_NAIVE_RA_VER
-
-#ifdef DECENT_DHT_NAIVE_RA_VER
-#include <DecentApi/Common/SGX/RaSpCommLayer.h>
-#include <DecentApi/CommonEnclave/SGX/RaClientCommLayer.h>
-#endif // DECENT_DHT_NAIVE_RA_VER
-
-
 using namespace Decent;
 using namespace Decent::Ra;
 using namespace Decent::Dht;
@@ -53,7 +43,7 @@ namespace
 	}
 }
 
-extern "C" int ecall_decent_dht_init(uint64_t self_addr, int is_first_node, uint64_t ex_addr, size_t totalNode, size_t idx, void* ias_cntor)
+extern "C" int ecall_decent_dht_init(uint64_t self_addr, int is_first_node, uint64_t ex_addr, size_t totalNode, size_t idx)
 {
 	try
 	{
@@ -64,8 +54,6 @@ extern "C" int ecall_decent_dht_init(uint64_t self_addr, int is_first_node, uint
 			std::shared_ptr<MbedTlsObj::X509Cert> cert = std::make_shared<ServerX509>(*gs_state.GetKeyContainer().GetSignKeyPair(), "N/A", "N/A", "N/A");
 			certContainer.SetCert(cert);
 		}
-
-		gs_state.SetIasConnector(ias_cntor);
 
 		Init(self_addr, is_first_node, ex_addr, totalNode, idx);
 	}
@@ -104,11 +92,8 @@ extern "C" int ecall_decent_dht_proc_msg_from_dht(void* connection, void** prev_
 
 	try
 	{
-#ifdef DECENT_DHT_NAIVE_RA_VER
-//#else
 		std::shared_ptr<Ra::TlsConfigSameEnclave> tlsCfg = std::make_shared<Ra::TlsConfigSameEnclave>(gs_state, Ra::TlsConfig::Mode::ServerVerifyPeer, GetDhtSessionTicketMgr());
 		Decent::Net::TlsCommLayer secComm(cnt, tlsCfg, true, nullptr);
-#endif // DECENT_DHT_NAIVE_RA_VER
 
 		ProcessDhtQuery(secComm, *prev_held_cnt);
 	}

@@ -3,6 +3,15 @@
 #include <DecentApi/DecentAppEnclave/AppStates.h>
 #include <DecentApi/Common/MbedTls/BigNumber.h>
 
+#if defined(ENCLAVE_PLATFORM_SGX)
+#	include <sgx_quote.h>
+#else
+typedef struct _spid_t
+{
+	uint8_t             id[16];
+} sgx_spid_t;
+#endif
+
 namespace Decent
 {
 	namespace Dht
@@ -73,12 +82,34 @@ namespace Decent
 				return m_iasCntor;
 			}
 
+			void SetEnclaveId(uint64_t enclaveId)
+			{
+				m_enclaveId = enclaveId;
+			}
+
+			uint64_t GetEnclaveId() const
+			{
+				return m_enclaveId;
+			}
+
+			void SetSpid(std::shared_ptr<sgx_spid_t> spid)
+			{
+				m_spid = spid;
+			}
+
+			std::shared_ptr<const sgx_spid_t> GetSpid() const
+			{
+				return m_spid;
+			}
+
 		private:
 			DhtLocalNodePtrType m_dhtNode;
 			EnclaveStore& m_dhtStore;
 			DhtSecureConnectionMgr& m_cntPool;
 
 			void* m_iasCntor;
+			uint64_t m_enclaveId;
+			std::shared_ptr<sgx_spid_t> m_spid;
 		};
 	}
 }

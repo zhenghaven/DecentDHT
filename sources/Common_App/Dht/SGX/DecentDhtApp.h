@@ -2,6 +2,8 @@
 
 #include <DecentApi/DecentAppApp/DecentApp.h>
 
+typedef struct _spid_t sgx_spid_t;
+
 namespace Decent
 {
 	namespace Threading
@@ -39,7 +41,7 @@ namespace Decent
 
 			virtual bool ProcessSmartMessage(const std::string& category, Net::ConnectionBase& connection, Net::ConnectionBase*& freeHeldCnt) override;
 
-			void InitDhtNode(uint64_t selfAddr, uint64_t exNodeAddr, size_t totalNode, size_t idx, Ias::Connector* iasCntor);
+			void InitDhtNode(uint64_t selfAddr, uint64_t exNodeAddr, size_t totalNode, size_t idx, Ias::Connector* iasCntor, const sgx_spid_t& spid);
 
 			void InitQueryWorkers(const size_t forwardWorkerNum, const size_t replyWorkerNum);
 

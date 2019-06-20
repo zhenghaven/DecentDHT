@@ -5,6 +5,8 @@
 #include <tclap/CmdLine.h>
 #include <boost/filesystem.hpp>
 
+#include <sgx_quote.h>
+
 #include <DecentApi/CommonApp/Common.h>
 
 #include <DecentApi/CommonApp/Net/SmartServer.h>
@@ -33,7 +35,8 @@
 #endif // !DECENT_DHT_NAIVE_RA_VER
 
 #ifdef DECENT_DHT_NAIVE_RA_VER
-#	include <DecentApi/CommonApp/SGX/IasConnector.h>
+#	include<cppcodec/hex_upper.hpp>
+#	include<DecentApi/CommonApp/SGX/IasConnector.h>
 #endif // DECENT_DHT_NAIVE_RA_VER
 
 
@@ -204,8 +207,11 @@ int main(int argc, char ** argv)
 		return -1;
 	}
 
+	sgx_spid_t spid;
 #ifdef DECENT_DHT_NAIVE_RA_VER
-	std::unique_ptr<Ias::Connector> iasConnector = std::make_unique<Ias::Connector>("key-here");
+	std::unique_ptr<Ias::Connector> iasConnector = std::make_unique<Ias::Connector>("key");
+	std::string spidStr = "spid";
+	cppcodec::hex_upper::decode(spid.id, sizeof(spid.id), spidStr);
 #endif // DECENT_DHT_NAIVE_RA_VER
 
 	//------- Setup Enclave:
@@ -222,7 +228,7 @@ int main(int argc, char ** argv)
 		smartServer.AddServer(server, enclave, GetTcpConnectionPool(), 1, 1002);
 
 #ifdef DECENT_DHT_NAIVE_RA_VER
-		enclave->InitDhtNode(selfFullAddr, exNodeFullAddr, totalNode.getValue(), nodeIdx.getValue(), iasConnector.get());
+		enclave->InitDhtNode(selfFullAddr, exNodeFullAddr, totalNode.getValue(), nodeIdx.getValue(), iasConnector.get(), spid);
 #else
 		enclave->InitDhtNode(selfFullAddr, exNodeFullAddr, totalNode.getValue(), nodeIdx.getValue(), nullptr);
 #endif // DECENT_DHT_NAIVE_RA_VER

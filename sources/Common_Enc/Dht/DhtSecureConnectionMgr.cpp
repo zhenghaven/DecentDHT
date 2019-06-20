@@ -11,6 +11,17 @@
 #include "ConnectionManager.h"
 #include "DhtStates.h"
 
+#ifndef DECENT_DHT_NAIVE_RA_VER
+#	define DECENT_DHT_NAIVE_RA_VER
+#endif // !DECENT_DHT_NAIVE_RA_VER
+
+#if defined(DECENT_DHT_NAIVE_RA_VER) && defined(ENCLAVE_PLATFORM_SGX)
+#include <DecentApi/Common/SGX/RaProcessorSp.h>
+#include <DecentApi/Common/SGX/RaSpCommLayer.h>
+#include <DecentApi/CommonEnclave/SGX/RaProcessorClient.h>
+#include <DecentApi/CommonEnclave/SGX/RaClientCommLayer.h>
+#endif // DECENT_DHT_NAIVE_RA_VER
+
 using namespace Decent;
 using namespace Decent::Net;
 using namespace Decent::Dht;
@@ -36,15 +47,25 @@ CntPair DhtSecureConnectionMgr::GetNew(const uint64_t& addr, DhtStates& state)
 {
 	std::unique_ptr<ConnectionBase> connection = ConnectionManager::GetConnection2DecentNode(addr);
 
+#if defined(DECENT_DHT_NAIVE_RA_VER) && defined(ENCLAVE_PLATFORM_SGX)
+	std::unique_ptr<Sgx::RaProcessorClient> client =
+		Tools::make_unique<Sgx::RaProcessorClient>(state.GetEnclaveId(), Sgx::RaProcessorClient::sk_acceptAnyPubKey, Sgx::RaProcessorClient::sk_acceptAnyRaConfig);
+
+	std::unique_ptr<Sgx::RaClientCommLayer> tmpSecComm =
+		Tools::make_unique<Sgx::RaClientCommLayer>(*connection, client);
+
+
+#else
 	std::shared_ptr<MbedTlsObj::Session> session = m_sessionCache.Get(addr);
-	
-	std::unique_ptr<TlsCommLayer> tls = Tools::make_unique<TlsCommLayer>(*connection, GetClientTlsConfigDhtNode(state), true, session);
+
+	std::unique_ptr<TlsCommLayer> tmpSecComm = Tools::make_unique<TlsCommLayer>(*connection, GetClientTlsConfigDhtNode(state), true, session);
 
 	if (!session)
 	{
-		m_sessionCache.Put(addr, tls->GetSessionCopy(), false);
+		m_sessionCache.Put(addr, tmpSecComm->GetSessionCopy(), false);
 	}
+#endif //DECENT_DHT_NAIVE_RA_VER
 
-	std::unique_ptr<SecureCommLayer> comm = std::move(tls);
+	std::unique_ptr<SecureCommLayer> comm = std::move(tmpSecComm);
 	return CntPair(connection, comm);
 }
