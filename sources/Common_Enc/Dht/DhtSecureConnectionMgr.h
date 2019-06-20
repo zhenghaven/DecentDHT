@@ -9,13 +9,11 @@ namespace Decent
 	{
 		class Session;
 	}
-	namespace Ra
-	{
-		class States;
-	}
 
 	namespace Dht
 	{
+		class DhtStates;
+
 		class DhtSecureConnectionMgr
 		{
 		public:
@@ -23,7 +21,7 @@ namespace Decent
 
 			virtual ~DhtSecureConnectionMgr();
 
-			virtual Net::CntPair GetNew(const uint64_t& addr, Ra::States& state);
+			virtual Net::CntPair GetNew(const uint64_t& addr, DhtStates& state);
 
 		private:
 			Tools::SharedCachingQueue<uint64_t, MbedTlsObj::Session> m_sessionCache;

@@ -9,6 +9,11 @@ namespace Decent
 		class SingleTaskThreadPool;
 	}
 
+	namespace Ias
+	{
+		class Connector;
+	}
+
 	namespace Dht
 	{
 		class DecentDhtApp : public Decent::RaSgx::DecentApp
@@ -34,7 +39,7 @@ namespace Decent
 
 			virtual bool ProcessSmartMessage(const std::string& category, Net::ConnectionBase& connection, Net::ConnectionBase*& freeHeldCnt) override;
 
-			void InitDhtNode(uint64_t selfAddr, uint64_t exNodeAddr, size_t totalNode, size_t idx);
+			void InitDhtNode(uint64_t selfAddr, uint64_t exNodeAddr, size_t totalNode, size_t idx, Ias::Connector* iasCntor);
 
 			void InitQueryWorkers(const size_t forwardWorkerNum, const size_t replyWorkerNum);
 

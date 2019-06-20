@@ -26,7 +26,8 @@ namespace Decent
 				AppStates(certCntnr, keyCntnr, serverWl, getLoadedFunc),
 				m_dhtNode(),
 				m_dhtStore(dhtStore),
-				m_cntPool(cntPool)
+				m_cntPool(cntPool),
+				m_iasCntor(nullptr)
 			{}
 			
 			virtual ~DhtStates()
@@ -62,10 +63,22 @@ namespace Decent
 				return m_cntPool;
 			}
 
+			void SetIasConnector(void* ptr)
+			{
+				m_iasCntor = ptr;
+			}
+
+			void* GetIasConnector() const
+			{
+				return m_iasCntor;
+			}
+
 		private:
 			DhtLocalNodePtrType m_dhtNode;
 			EnclaveStore& m_dhtStore;
 			DhtSecureConnectionMgr& m_cntPool;
+
+			void* m_iasCntor;
 		};
 	}
 }

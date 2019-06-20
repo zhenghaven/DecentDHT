@@ -28,6 +28,15 @@
 #include "../Common_App/Dht/SGX/DecentDhtApp.h"
 #include "../Common_App/Dht/DhtConnectionPool.h"
 
+#ifndef DECENT_DHT_NAIVE_RA_VER
+#	define DECENT_DHT_NAIVE_RA_VER
+#endif // !DECENT_DHT_NAIVE_RA_VER
+
+#ifdef DECENT_DHT_NAIVE_RA_VER
+#	include <DecentApi/CommonApp/SGX/IasConnector.h>
+#endif // DECENT_DHT_NAIVE_RA_VER
+
+
 using namespace Decent;
 using namespace Decent::Tools;
 using namespace Decent::Dht;
@@ -195,6 +204,10 @@ int main(int argc, char ** argv)
 		return -1;
 	}
 
+#ifdef DECENT_DHT_NAIVE_RA_VER
+	std::unique_ptr<Ias::Connector> iasConnector = std::make_unique<Ias::Connector>("key-here");
+#endif // DECENT_DHT_NAIVE_RA_VER
+
 	//------- Setup Enclave:
 	std::shared_ptr<DecentDhtApp> enclave;
 	try
@@ -208,7 +221,11 @@ int main(int argc, char ** argv)
 
 		smartServer.AddServer(server, enclave, GetTcpConnectionPool(), 1, 1002);
 
-		enclave->InitDhtNode(selfFullAddr, exNodeFullAddr, totalNode.getValue(), nodeIdx.getValue());
+#ifdef DECENT_DHT_NAIVE_RA_VER
+		enclave->InitDhtNode(selfFullAddr, exNodeFullAddr, totalNode.getValue(), nodeIdx.getValue(), iasConnector.get());
+#else
+		enclave->InitDhtNode(selfFullAddr, exNodeFullAddr, totalNode.getValue(), nodeIdx.getValue(), nullptr);
+#endif // DECENT_DHT_NAIVE_RA_VER
 
 		enclave->InitQueryWorkers(1, 1);
 	}
