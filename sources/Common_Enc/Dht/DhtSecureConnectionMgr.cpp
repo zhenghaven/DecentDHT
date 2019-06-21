@@ -11,15 +11,11 @@
 #include "ConnectionManager.h"
 #include "DhtStates.h"
 
-#ifndef DECENT_DHT_NAIVE_RA_VER
-#	define DECENT_DHT_NAIVE_RA_VER
-#endif // !DECENT_DHT_NAIVE_RA_VER
-
-#if defined(DECENT_DHT_NAIVE_RA_VER) && defined(ENCLAVE_PLATFORM_SGX)
+#ifdef DECENT_DHT_NAIVE_RA_VER
+#include <DecentApi/Common/Ra/KeyContainer.h>
 #include <DecentApi/Common/SGX/RaProcessorSp.h>
-#include <DecentApi/Common/SGX/RaSpCommLayer.h>
 #include <DecentApi/CommonEnclave/SGX/RaProcessorClient.h>
-#include <DecentApi/CommonEnclave/SGX/RaClientCommLayer.h>
+#include <DecentApi/CommonEnclave/SGX/RaMutualCommLayer.h>
 #endif // DECENT_DHT_NAIVE_RA_VER
 
 using namespace Decent;
@@ -33,6 +29,13 @@ namespace
 		static std::shared_ptr<Ra::TlsConfigSameEnclave> tlsCfg = std::make_shared<Ra::TlsConfigSameEnclave>(state, Ra::TlsConfig::Mode::ClientHasCert, nullptr);
 		return tlsCfg;
 	}
+
+#ifdef DECENT_DHT_NAIVE_RA_VER
+	static Sgx::RaProcessorSp::SgxQuoteVerifier quoteVrfy = [](const sgx_quote_t&)
+	{
+		return true;
+	};
+#endif // DECENT_DHT_NAIVE_RA_VER
 }
 
 DhtSecureConnectionMgr::DhtSecureConnectionMgr(size_t maxOutCnt) :
@@ -47,16 +50,26 @@ CntPair DhtSecureConnectionMgr::GetNew(const uint64_t& addr, DhtStates& state)
 {
 	std::unique_ptr<ConnectionBase> connection = ConnectionManager::GetConnection2DecentNode(addr);
 
-#if defined(DECENT_DHT_NAIVE_RA_VER) && defined(ENCLAVE_PLATFORM_SGX)
-	std::unique_ptr<Sgx::RaProcessorClient> client =
-		Tools::make_unique<Sgx::RaProcessorClient>(state.GetEnclaveId(), Sgx::RaProcessorClient::sk_acceptAnyPubKey, Sgx::RaProcessorClient::sk_acceptAnyRaConfig);
+	auto session = m_sessionCache.Get(addr);
 
-	std::unique_ptr<Sgx::RaClientCommLayer> tmpSecComm =
-		Tools::make_unique<Sgx::RaClientCommLayer>(*connection, client);
+#ifdef DECENT_DHT_NAIVE_RA_VER
 
+	std::unique_ptr<Sgx::RaMutualCommLayer> tmpSecComm =
+		Tools::make_unique<Sgx::RaMutualCommLayer>(*connection,
+			Tools::make_unique<Sgx::RaProcessorClient>(state.GetEnclaveId(),
+				Sgx::RaProcessorClient::sk_acceptAnyPubKey, Sgx::RaProcessorClient::sk_acceptAnyRaConfig),
+			Tools::make_unique<Sgx::RaProcessorSp>(state.GetIasConnector(),
+				state.GetKeyContainer().GetSignKeyPair(), state.GetSpid(),
+				Sgx::RaProcessorSp::sk_defaultRpDataVrfy, quoteVrfy),
+			session);
+
+	std::shared_ptr<const Sgx::RaClientSession> neSession = tmpSecComm->GetClientSession();
+	if (session != neSession)
+	{
+		m_sessionCache.Put(addr, neSession, false);
+	}
 
 #else
-	std::shared_ptr<MbedTlsObj::Session> session = m_sessionCache.Get(addr);
 
 	std::unique_ptr<TlsCommLayer> tmpSecComm = Tools::make_unique<TlsCommLayer>(*connection, GetClientTlsConfigDhtNode(state), true, session);
 
@@ -64,8 +77,8 @@ CntPair DhtSecureConnectionMgr::GetNew(const uint64_t& addr, DhtStates& state)
 	{
 		m_sessionCache.Put(addr, tmpSecComm->GetSessionCopy(), false);
 	}
+
 #endif //DECENT_DHT_NAIVE_RA_VER
 
-	std::unique_ptr<SecureCommLayer> comm = std::move(tmpSecComm);
-	return CntPair(connection, comm);
+	return CntPair(std::move(connection), std::move(tmpSecComm));
 }

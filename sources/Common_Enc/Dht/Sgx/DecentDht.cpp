@@ -14,6 +14,7 @@
 #include <DecentApi/CommonEnclave/Net/EnclaveCntTranslator.h>
 #include <DecentApi/CommonEnclave/Ra/TlsConfigSameEnclave.h>
 #include <DecentApi/CommonEnclave/Tools/Crypto.h>
+#include <DecentApi/CommonEnclave/Tools/DataSealer.h>
 
 #include "../../../Common/Dht/FuncNums.h"
 #include "../../../Common/Dht/TlsConfigAnyUser.h"
@@ -27,19 +28,21 @@
 #ifdef DECENT_DHT_NAIVE_RA_VER
 #include <DecentApi/Common/Ra/KeyContainer.h>
 #include <DecentApi/Common/SGX/RaProcessorSp.h>
-#include <DecentApi/Common/SGX/RaSpCommLayer.h>
 #include <DecentApi/CommonEnclave/SGX/RaProcessorClient.h>
-#include <DecentApi/CommonEnclave/SGX/RaClientCommLayer.h>
+#include <DecentApi/CommonEnclave/SGX/RaMutualCommLayer.h>
 #endif // DECENT_DHT_NAIVE_RA_VER
 
 using namespace Decent;
 using namespace Decent::Dht;
 using namespace Decent::Net;
+using namespace Decent::Tools;
 using namespace Decent::MbedTlsObj;
 
 namespace
 {
 	DhtStates& gs_state = Dht::GetDhtStatesSingleton();
+
+	static constexpr char gsk_ticketLabel[] = "TicketLabel";
 
 	std::shared_ptr<SessionTicketMgr> GetDhtSessionTicketMgr()
 	{
@@ -52,6 +55,13 @@ namespace
 		static const std::shared_ptr<SessionTicketMgr> inst = std::make_shared<SessionTicketMgr>();
 		return inst;
 	}
+
+#ifdef DECENT_DHT_NAIVE_RA_VER
+	static Sgx::RaProcessorSp::SgxQuoteVerifier quoteVrfy = [](const sgx_quote_t&)
+	{
+		return true;
+	};
+#endif // DECENT_DHT_NAIVE_RA_VER
 }
 
 extern "C" int ecall_decent_dht_init(uint64_t self_addr, int is_first_node, uint64_t ex_addr, size_t totalNode, size_t idx, void* ias_cntor, sgx_spid_t* spid, uint64_t enclave_Id)
@@ -100,16 +110,28 @@ extern "C" int ecall_decent_dht_proc_msg_from_dht(void* connection, void** prev_
 	try
 	{
 #ifdef DECENT_DHT_NAIVE_RA_VER
-		Sgx::RaProcessorSp::SgxQuoteVerifier quoteVrfy = [](const sgx_quote_t&)
+
+		Sgx::RaMutualCommLayer secComm(cnt,
+			Tools::make_unique<Sgx::RaProcessorClient>(gs_state.GetEnclaveId(),
+				Sgx::RaProcessorClient::sk_acceptAnyPubKey, Sgx::RaProcessorClient::sk_acceptAnyRaConfig),
+			Tools::make_unique<Sgx::RaProcessorSp>(gs_state.GetIasConnector(),
+				gs_state.GetKeyContainer().GetSignKeyPair(), gs_state.GetSpid(),
+				Sgx::RaProcessorSp::sk_defaultRpDataVrfy, quoteVrfy),
+			[](const std::vector<uint8_t>& sessionBin) -> std::vector<uint8_t> //seal
 		{
-			return true;
-		};
+			std::vector<uint8_t> mac;
+			return Tools::DataSealer::SealData(DataSealer::KeyPolicy::ByMrEnclave, gs_state, gsk_ticketLabel, mac, std::vector<uint8_t>(), sessionBin, 512);
+		},
+			[](const std::vector<uint8_t>& ticket) -> std::vector<uint8_t> //unseal
+		{
+			std::vector<uint8_t> sessionBin;
+			std::vector<uint8_t> meta;
 
-		std::unique_ptr<Sgx::RaProcessorSp> raProcSp = Tools::make_unique<Sgx::RaProcessorSp>(gs_state.GetIasConnector(),
-			gs_state.GetKeyContainer().GetSignKeyPair(), gs_state.GetSpid(),
-			Sgx::RaProcessorSp::sk_defaultRpDataVrfy, quoteVrfy);
+			DataSealer::UnsealData(DataSealer::KeyPolicy::ByMrEnclave, gs_state, gsk_ticketLabel, ticket, std::vector<uint8_t>(), meta, sessionBin, 512);
 
-		Sgx::RaSpCommLayer secComm(cnt, raProcSp);
+			return sessionBin;
+		});
+
 #else
 		std::shared_ptr<Ra::TlsConfigSameEnclave> tlsCfg = std::make_shared<Ra::TlsConfigSameEnclave>(gs_state, Ra::TlsConfig::Mode::ServerVerifyPeer, GetDhtSessionTicketMgr());
 		Decent::Net::TlsCommLayer secComm(cnt, tlsCfg, true, nullptr);
