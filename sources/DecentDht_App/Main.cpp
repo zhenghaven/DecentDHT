@@ -210,7 +210,7 @@ int main(int argc, char ** argv)
 	sgx_spid_t spid;
 #ifdef DECENT_DHT_NAIVE_RA_VER
 	std::unique_ptr<Ias::Connector> iasConnector = std::make_unique<Ias::Connector>("key");
-	std::string spidStr = "spid";
+	std::string spidStr = "AA";
 	cppcodec::hex_upper::decode(spid.id, sizeof(spid.id), spidStr);
 #endif // DECENT_DHT_NAIVE_RA_VER
 
@@ -230,7 +230,7 @@ int main(int argc, char ** argv)
 #ifdef DECENT_DHT_NAIVE_RA_VER
 		enclave->InitDhtNode(selfFullAddr, exNodeFullAddr, totalNode.getValue(), nodeIdx.getValue(), iasConnector.get(), spid);
 #else
-		enclave->InitDhtNode(selfFullAddr, exNodeFullAddr, totalNode.getValue(), nodeIdx.getValue(), nullptr);
+		enclave->InitDhtNode(selfFullAddr, exNodeFullAddr, totalNode.getValue(), nodeIdx.getValue(), nullptr, spid);
 #endif // DECENT_DHT_NAIVE_RA_VER
 
 		enclave->InitQueryWorkers(1, 1);
