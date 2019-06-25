@@ -192,14 +192,46 @@ extern "C" int ecall_decent_dht_proc_msg_from_app(void* connection)
 
 	try
 	{
+		std::vector<uint8_t> appHash;
+
+#ifdef DECENT_DHT_NAIVE_RA_VER
+
+		std::unique_ptr<Sgx::RaMutualCommLayer> tmpSecComm = Tools::make_unique<Sgx::RaMutualCommLayer>(cnt,
+			Tools::make_unique<Sgx::RaProcessorClient>(gs_state.GetEnclaveId(),
+				Sgx::RaProcessorClient::sk_acceptAnyPubKey, Sgx::RaProcessorClient::sk_acceptAnyRaConfig),
+			Tools::make_unique<Sgx::RaProcessorSp>(gs_state.GetIasConnector(),
+				gs_state.GetKeyContainer().GetSignKeyPair(), gs_state.GetSpid(),
+				Sgx::RaProcessorSp::sk_defaultRpDataVrfy, quoteVrfy),
+			[](const std::vector<uint8_t>& sessionBin) -> std::vector<uint8_t> //seal
+		{
+			std::vector<uint8_t> mac;
+			return Tools::DataSealer::SealData(DataSealer::KeyPolicy::ByMrEnclave, gs_state, gsk_ticketLabel, mac, std::vector<uint8_t>(), sessionBin, 1024);
+		},
+			[](const std::vector<uint8_t>& ticket) -> std::vector<uint8_t> //unseal
+		{
+			std::vector<uint8_t> sessionBin;
+			std::vector<uint8_t> meta;
+
+			DataSealer::UnsealData(DataSealer::KeyPolicy::ByMrEnclave, gs_state, gsk_ticketLabel, ticket, std::vector<uint8_t>(), meta, sessionBin, 1024);
+
+			return sessionBin;
+		});
+
+		const auto& mrEnclave = tmpSecComm->GetPeerIasReport().m_quote.report_body.mr_enclave.m;
+		appHash = std::vector<uint8_t>(std::begin(mrEnclave), std::end(mrEnclave));
+
+#else
+
 		std::shared_ptr<Ra::TlsConfigAnyWhiteListed> tlsCfg = std::make_shared<Ra::TlsConfigAnyWhiteListed>(gs_state, Ra::TlsConfig::Mode::ServerVerifyPeer, GetAppSessionTicketMgr());
-		std::unique_ptr<TlsCommLayer> tls = Tools::make_unique<TlsCommLayer>(cnt, tlsCfg, true, nullptr);
+		std::unique_ptr<TlsCommLayer> tmpSecComm = Tools::make_unique<TlsCommLayer>(cnt, tlsCfg, true, nullptr);
 
-		Ra::AppX509 appCert(tls->GetPeerCertPem());
+		Ra::AppX509 appCert(tmpSecComm->GetPeerCertPem());
 		std::string appHashStr = Ra::GetHashFromAppId(appCert.GetPlatformType(), appCert.GetAppId());
-		std::vector<uint8_t> appHash = cppcodec::base64_rfc4648::decode(appHashStr);
+		appHash = cppcodec::base64_rfc4648::decode(appHashStr);
 
-		std::unique_ptr<SecureCommLayer> secCnt = std::move(tls);
+#endif
+
+		std::unique_ptr<SecureCommLayer> secCnt = std::move(tmpSecComm);
 
 		return ProcessAppRequest(secCnt, cnt, appHash);
 	}
