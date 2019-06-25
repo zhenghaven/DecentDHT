@@ -120,14 +120,14 @@ extern "C" int ecall_decent_dht_proc_msg_from_dht(void* connection, void** prev_
 			[](const std::vector<uint8_t>& sessionBin) -> std::vector<uint8_t> //seal
 		{
 			std::vector<uint8_t> mac;
-			return Tools::DataSealer::SealData(DataSealer::KeyPolicy::ByMrEnclave, gs_state, gsk_ticketLabel, mac, std::vector<uint8_t>(), sessionBin, 512);
+			return Tools::DataSealer::SealData(DataSealer::KeyPolicy::ByMrEnclave, gs_state, gsk_ticketLabel, mac, std::vector<uint8_t>(), sessionBin, 1024);
 		},
 			[](const std::vector<uint8_t>& ticket) -> std::vector<uint8_t> //unseal
 		{
 			std::vector<uint8_t> sessionBin;
 			std::vector<uint8_t> meta;
 
-			DataSealer::UnsealData(DataSealer::KeyPolicy::ByMrEnclave, gs_state, gsk_ticketLabel, ticket, std::vector<uint8_t>(), meta, sessionBin, 512);
+			DataSealer::UnsealData(DataSealer::KeyPolicy::ByMrEnclave, gs_state, gsk_ticketLabel, ticket, std::vector<uint8_t>(), meta, sessionBin, 1024);
 
 			return sessionBin;
 		});
