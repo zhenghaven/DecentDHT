@@ -6,6 +6,7 @@
 #include <map>
 #include <mutex>
 
+#include <DecentApi/Common/GeneralKeyTypes.h>
 #include <DecentApi/Common/RuntimeException.h>
 
 namespace Decent
@@ -32,7 +33,7 @@ namespace Decent
 		class StoreBase
 		{
 		public: //static member:
-			typedef std::map<IdType, std::vector<uint8_t> > IndexingType;
+			typedef std::map<IdType, General128Tag > IndexingType;
 
 		public:
 			StoreBase() = delete;
@@ -193,7 +194,7 @@ namespace Decent
 					}
 				}
 
-				std::vector<uint8_t> tag = SaveDataFile(key, meta, data);
+				General128Tag tag = SaveDataFile(key, meta, data);
 
 				{
 					std::unique_lock<std::mutex> indexingLock(m_indexingMutex);
@@ -223,7 +224,7 @@ namespace Decent
 					throw Decent::RuntimeException("This server is not resposible for queried key.");
 				}
 
-				std::vector<uint8_t> tag;
+				General128Tag tag;
 				{
 					std::unique_lock<std::mutex> indexingLock(m_indexingMutex);
 					auto it = m_indexing.find(key);
@@ -248,7 +249,7 @@ namespace Decent
 			 * \return	The tag for the data stored in std::vector&lt;uint8_t&gt;. The tag is generated for
 			 * 			verification later.
 			 */
-			virtual std::vector<uint8_t> SaveDataFile(const IdType& key, const std::vector<uint8_t>& meta, const std::vector<uint8_t>& data) = 0;
+			virtual General128Tag SaveDataFile(const IdType& key, const std::vector<uint8_t>& meta, const std::vector<uint8_t>& data) = 0;
 
 			/**
 			 * \brief	Delete the data file from the file system. NOTE: this function should only interact
@@ -269,7 +270,7 @@ namespace Decent
 			 *
 			 * \return	The data.
 			 */
-			virtual std::vector<uint8_t> ReadDataFile(const IdType& key, const std::vector<uint8_t>& tag, std::vector<uint8_t>& meta) = 0;
+			virtual std::vector<uint8_t> ReadDataFile(const IdType& key, const General128Tag& tag, std::vector<uint8_t>& meta) = 0;
 
 			/**
 			 * \brief	Migrate (i.e. read and delete) one key-value pair from the file system. NOTE: this
@@ -282,7 +283,7 @@ namespace Decent
 			 *
 			 * \return	The data in std::vector&lt;uint8_t&gt;
 			 */
-			virtual std::vector<uint8_t> MigrateOneDataFile(const IdType& key, const std::vector<uint8_t>& tag, std::vector<uint8_t>& meta) = 0;
+			virtual std::vector<uint8_t> MigrateOneDataFile(const IdType& key, const General128Tag& tag, std::vector<uint8_t>& meta) = 0;
 
 
 			/**

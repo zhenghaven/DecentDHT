@@ -1288,9 +1288,8 @@ static bool VerifyAtListCacheSignature(const std::vector<uint8_t>& sealedList, s
 #if !defined(ACCESS_CONTROL_NO_CACHE) && !defined(ENCLAVE_PLATFORM_NON_ENCLAVE)
 	try
 	{
-		std::vector<uint8_t> mac;
 		std::vector<uint8_t> meta;
-		Tools::DataSealer::UnsealData(Tools::DataSealer::KeyPolicy::ByMrEnclave, gs_state, gsk_attrListSealKeyLabel, sealedList, mac, meta, unsealedList);
+		Tools::DataSealer::UnsealData(Tools::DataSealer::KeyPolicy::ByMrEnclave, gs_state, gsk_attrListSealKeyLabel, sealedList, meta, unsealedList, nullptr);
 
 		return true;
 	}
@@ -1434,9 +1433,9 @@ static void UserReadReturnWithCache(Decent::Net::TlsCommLayer & tls, const uint8
 	unsealedList.resize(listForCache.GetSerializedSize());
 	listForCache.Serialize(unsealedList.begin());
 
-	std::vector<uint8_t> mac;
+	General128Tag mac;
 	std::vector<uint8_t> meta;
-	sealedList = Tools::DataSealer::SealData(Tools::DataSealer::KeyPolicy::ByMrEnclave, gs_state, gsk_attrListSealKeyLabel, mac, meta, unsealedList);
+	sealedList = Tools::DataSealer::SealData(Tools::DataSealer::KeyPolicy::ByMrEnclave, gs_state, gsk_attrListSealKeyLabel, meta, unsealedList, mac);
 #endif
 
 	RpcWriter rpcReturned(RpcWriter::CalcSizePrim<decltype(retVal)>() +
@@ -1502,9 +1501,9 @@ static void UserUpdateReturnWithCache(Decent::Net::TlsCommLayer & tls, const uin
 	unsealedList.resize(listForCache.GetSerializedSize());
 	listForCache.Serialize(unsealedList.begin());
 
-	std::vector<uint8_t> mac;
+	General128Tag mac;
 	std::vector<uint8_t> meta;
-	sealedList = Tools::DataSealer::SealData(Tools::DataSealer::KeyPolicy::ByMrEnclave, gs_state, gsk_attrListSealKeyLabel, mac, meta, unsealedList);
+	sealedList = Tools::DataSealer::SealData(Tools::DataSealer::KeyPolicy::ByMrEnclave, gs_state, gsk_attrListSealKeyLabel, meta, unsealedList, mac);
 #endif
 
 	RpcWriter rpcReturned(RpcWriter::CalcSizePrim<decltype(retVal)>() +
@@ -1556,9 +1555,9 @@ static void UserDeleteReturnWithCache(Decent::Net::TlsCommLayer & tls, const uin
 	unsealedList.resize(listForCache.GetSerializedSize());
 	listForCache.Serialize(unsealedList.begin());
 
-	std::vector<uint8_t> mac;
+	General128Tag mac;
 	std::vector<uint8_t> meta;
-	sealedList = Tools::DataSealer::SealData(Tools::DataSealer::KeyPolicy::ByMrEnclave, gs_state, gsk_attrListSealKeyLabel, mac, meta, unsealedList);
+	sealedList = Tools::DataSealer::SealData(Tools::DataSealer::KeyPolicy::ByMrEnclave, gs_state, gsk_attrListSealKeyLabel, meta, unsealedList, mac);
 #endif
 
 	RpcWriter rpcReturned(RpcWriter::CalcSizePrim<decltype(retVal)>() +

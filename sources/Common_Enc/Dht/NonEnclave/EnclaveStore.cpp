@@ -76,7 +76,7 @@ bool EnclaveStore::IsResponsibleFor(const MbedTlsObj::BigNumber & key) const
 	return localNode ? localNode->IsResponsibleFor(key) : false;
 }
 
-std::vector<uint8_t> EnclaveStore::SaveDataFile(const MbedTlsObj::BigNumber& key, const std::vector<uint8_t>& meta, const std::vector<uint8_t>& data)
+General128Tag EnclaveStore::SaveDataFile(const MbedTlsObj::BigNumber& key, const std::vector<uint8_t>& meta, const std::vector<uint8_t>& data)
 {
 	using namespace Decent::Tools;
 
@@ -84,14 +84,14 @@ std::vector<uint8_t> EnclaveStore::SaveDataFile(const MbedTlsObj::BigNumber& key
 	LOGI("DHT store: adding key to the index. %s", keyStr.c_str());
 	//LOGI("DHT store: writing value: %s", std::string(reinterpret_cast<const char*>(data.data()), data.size()).c_str());
 
-	std::vector<uint8_t> mac;
+	General128Tag tag = General128Tag();
 	{
 		MemKeyValueStore* m_memStorePtr = static_cast<MemKeyValueStore*>(m_memStore);
 
 		m_memStorePtr->Store(keyStr, CombineMetaAndData(meta, data));
 	}
 
-	return mac;
+	return tag;
 }
 
 void EnclaveStore::DeleteDataFile(const MbedTlsObj::BigNumber& key)
@@ -110,7 +110,7 @@ void EnclaveStore::DeleteDataFile(const MbedTlsObj::BigNumber& key)
 	}
 }
 
-std::vector<uint8_t> EnclaveStore::ReadDataFile(const MbedTlsObj::BigNumber& key, const std::vector<uint8_t>& tag, std::vector<uint8_t>& meta)
+std::vector<uint8_t> EnclaveStore::ReadDataFile(const MbedTlsObj::BigNumber& key, const General128Tag& tag, std::vector<uint8_t>& meta)
 {
 	using namespace Decent::Tools;
 
@@ -128,7 +128,7 @@ std::vector<uint8_t> EnclaveStore::ReadDataFile(const MbedTlsObj::BigNumber& key
 	}
 }
 
-std::vector<uint8_t> EnclaveStore::MigrateOneDataFile(const MbedTlsObj::BigNumber& key, const std::vector<uint8_t>& tag, std::vector<uint8_t>& meta)
+std::vector<uint8_t> EnclaveStore::MigrateOneDataFile(const MbedTlsObj::BigNumber& key, const General128Tag& tag, std::vector<uint8_t>& meta)
 {
 	using namespace Decent::Tools;
 

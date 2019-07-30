@@ -20,13 +20,13 @@ namespace Decent
 			virtual bool IsResponsibleFor(const MbedTlsObj::BigNumber& key) const;
 
 		protected:
-			virtual std::vector<uint8_t> SaveDataFile(const MbedTlsObj::BigNumber& key, const std::vector<uint8_t>& meta, const std::vector<uint8_t>& data) override;
+			virtual General128Tag SaveDataFile(const MbedTlsObj::BigNumber& key, const std::vector<uint8_t>& meta, const std::vector<uint8_t>& data) override;
 
 			virtual void DeleteDataFile(const MbedTlsObj::BigNumber& key) override;
 
-			virtual std::vector<uint8_t> ReadDataFile(const MbedTlsObj::BigNumber& key, const std::vector<uint8_t>& tag, std::vector<uint8_t>& meta) override;
+			virtual std::vector<uint8_t> ReadDataFile(const MbedTlsObj::BigNumber& key, const General128Tag& tag, std::vector<uint8_t>& meta) override;
 
-			virtual std::vector<uint8_t> MigrateOneDataFile(const MbedTlsObj::BigNumber& key, const std::vector<uint8_t>& tag, std::vector<uint8_t>& meta) override;
+			virtual std::vector<uint8_t> MigrateOneDataFile(const MbedTlsObj::BigNumber& key, const General128Tag& tag, std::vector<uint8_t>& meta) override;
 
 		private:
 			void* m_memStore;
