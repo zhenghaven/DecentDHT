@@ -225,7 +225,7 @@ int main(int argc, char ** argv)
 		enclave = std::make_shared<DecentDhtApp>(
 			ENCLAVE_FILENAME, tokenPath, wlKeyArg.getValue(), *serverCon);
 
-		smartServer.AddServer(server, enclave, GetTcpConnectionPool(), 1, 1002);
+		smartServer.AddServer(server, enclave, GetTcpConnectionPool(), 20, 1002);
 
 #ifdef DECENT_DHT_NAIVE_RA_VER
 		enclave->InitDhtNode(selfFullAddr, exNodeFullAddr, totalNode.getValue(), nodeIdx.getValue(), iasConnector.get(), spid);
@@ -233,7 +233,7 @@ int main(int argc, char ** argv)
 		enclave->InitDhtNode(selfFullAddr, exNodeFullAddr, totalNode.getValue(), nodeIdx.getValue(), nullptr, spid);
 #endif // DECENT_DHT_NAIVE_RA_VER
 
-		enclave->InitQueryWorkers(1, 1);
+		enclave->InitQueryWorkers(2, 2);
 	}
 	catch (const std::exception& e)
 	{

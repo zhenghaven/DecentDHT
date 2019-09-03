@@ -306,8 +306,12 @@ void Dht::DeInit()
 
 void Dht::QueryForwardWorker()
 {
-	std::queue<std::pair<uint64_t, std::unique_ptr<AddrForwardQueueItem> > > tmpAddrQueue;
-	std::queue<std::pair<uint64_t, std::unique_ptr<AttrListForwardQueueItem> > > tmpListQueue;
+	//std::queue<std::pair<uint64_t, std::unique_ptr<AddrForwardQueueItem> > > tmpAddrQueue;
+	//std::queue<std::pair<uint64_t, std::unique_ptr<AttrListForwardQueueItem> > > tmpListQueue;
+
+	uint64_t addr = 0;
+	std::unique_ptr<AddrForwardQueueItem> addrItem;
+	std::unique_ptr<AttrListForwardQueueItem> attrItem;
 
 	while (!gs_isForwardingTerminated)
 	{
@@ -322,35 +326,44 @@ void Dht::QueryForwardWorker()
 
 			if (!gs_isForwardingTerminated && gs_addrForwardQueue.size() > 0)
 			{
-				tmpAddrQueue.swap(gs_addrForwardQueue);
+				//tmpAddrQueue.swap(gs_addrForwardQueue);
+				addr = gs_addrForwardQueue.front().first;
+				addrItem = std::move(gs_addrForwardQueue.front().second);
+				gs_addrForwardQueue.pop();
 			}
-
-			if (!gs_isForwardingTerminated && gs_attrListForwardQueue.size() > 0)
+			else if (!gs_isForwardingTerminated && gs_attrListForwardQueue.size() > 0)
+			//if (!gs_isForwardingTerminated && gs_attrListForwardQueue.size() > 0)
 			{
-				tmpListQueue.swap(gs_attrListForwardQueue);
+				//tmpListQueue.swap(gs_attrListForwardQueue);
+				addr = gs_attrListForwardQueue.front().first;
+				attrItem = std::move(gs_attrListForwardQueue.front().second);
+				gs_attrListForwardQueue.pop();
 			}
 		}
 
-		while (tmpAddrQueue.size() > 0)
+		if(addrItem)
+		//while (tmpAddrQueue.size() > 0)
 		{
-			ForwardAddrQuery(tmpAddrQueue.front().first, *tmpAddrQueue.front().second);
-			tmpAddrQueue.pop();
+			//ForwardAddrQuery(tmpAddrQueue.front().first, *tmpAddrQueue.front().second);
+			//tmpAddrQueue.pop();
+			ForwardAddrQuery(addr, *addrItem);
 		}
-
-		while (tmpListQueue.size() > 0)
+		else if(attrItem)
+		//while (tmpListQueue.size() > 0)
 		{
-			ForwardListQuery(tmpListQueue.front().first, *tmpListQueue.front().second);
-			tmpListQueue.pop();
+			//ForwardListQuery(tmpListQueue.front().first, *tmpListQueue.front().second);
+			//tmpListQueue.pop();
+			ForwardListQuery(addr, *attrItem);
 		}
 	}
 }
 
 void Dht::QueryReplyWorker()
 {
-	std::queue<std::pair< uint64_t, std::unique_ptr<ReplyQueueItem> > > tmpQueue;
+	//std::queue<std::pair< uint64_t, std::unique_ptr<ReplyQueueItem> > > tmpQueue;
 	//bool hasJob = false;
-	//uint64_t addr = 0;
-	//std::unique_ptr<ReplyQueueItem> item;
+	uint64_t addr = 0;
+	std::unique_ptr<ReplyQueueItem> item;
 
 	while (!gs_isForwardingTerminated)
 	{
@@ -365,20 +378,20 @@ void Dht::QueryReplyWorker()
 
 			if (!gs_isForwardingTerminated && gs_replyQueue.size() > 0)
 			{
-				tmpQueue.swap(gs_replyQueue);
+				//tmpQueue.swap(gs_replyQueue);
 				//hasJob = true;
-				//addr = gs_replyQueue.front().first;
-				//item = std::move(gs_replyQueue.front().second);
-				//gs_replyQueue.pop();
+				addr = gs_replyQueue.front().first;
+				item = std::move(gs_replyQueue.front().second);
+				gs_replyQueue.pop();
 			}
 		}
 
-		//if (hasJob)
-		while (tmpQueue.size() > 0)
+		if (item)
+		//while (tmpQueue.size() > 0)
 		{
-			ReplyQuery(tmpQueue.front().first, *tmpQueue.front().second);
-			tmpQueue.pop();
-			//ReplyQuery(addr, *item);
+			//ReplyQuery(tmpQueue.front().first, *tmpQueue.front().second);
+			//tmpQueue.pop();
+			ReplyQuery(addr, *item);
 			//hasJob = false;
 		}
 	}
