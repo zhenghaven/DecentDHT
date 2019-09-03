@@ -96,7 +96,11 @@ int main(int argc, char ** argv)
 	//------- Construct main thread worker at very first:
 	std::shared_ptr<MainThreadAsynWorker> mainThreadWorker = std::make_shared<MainThreadAsynWorker>();
 
-	std::cout << "================ Decent DHT ================" << std::endl;
+#ifdef DECENT_DHT_NAIVE_RA_VER
+	std::cout << "================ Decent DHT (Naive RA) ================" << std::endl;
+#else
+	std::cout << "================ Decent DHT (DECENT RA) ================" << std::endl;
+#endif
 
 	//------- Setup Smart Server:
 	Net::SmartServer smartServer(mainThreadWorker);
