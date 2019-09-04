@@ -58,7 +58,7 @@ extern "C" void* ocall_decent_dht_cnt_mgr_get_dht(uint64_t address)
 	try
 	{
 		std::unique_ptr<ConnectionBase> cnt = GetTcpConnectionPool()->Get(address);
-		cnt->SendPack(RequestCategory::sk_fromDht);
+		cnt->SendContainer(RequestCategory::sk_fromDht);
 
 		return new CntPoolConnection<uint64_t>(address, std::move(cnt), GetTcpConnectionPool());
 	}
@@ -73,7 +73,7 @@ extern "C" void* ocall_decent_dht_cnt_mgr_get_store(uint64_t address)
 	try
 	{
 		std::unique_ptr<ConnectionBase> cnt = GetTcpConnectionPool()->Get(address);
-		cnt->SendPack(RequestCategory::sk_fromStore);
+		cnt->SendContainer(RequestCategory::sk_fromStore);
 
 		return new CntPoolConnection<uint64_t>(address, std::move(cnt), GetTcpConnectionPool());
 	}
@@ -186,11 +186,11 @@ int main(int argc, char ** argv)
 		if (isSendWlArg.getValue())
 		{
 			serverCon = std::make_unique<TCPConnection>(serverIp, serverPort);
-			serverCon->SendPack(Ra::RequestCategory::sk_loadWhiteList);
-			serverCon->SendPack(wlKeyArg.getValue());
-			serverCon->SendPack(configMgr->GetEnclaveList().GetLoadedWhiteListStr());
+			serverCon->SendContainer(Ra::RequestCategory::sk_loadWhiteList);
+			serverCon->SendContainer(wlKeyArg.getValue());
+			serverCon->SendContainer(configMgr->GetEnclaveList().GetLoadedWhiteListStr());
 			char ackMsg[] = "ACK";
-			serverCon->ReceiveRawGuarantee(&ackMsg, sizeof(ackMsg));
+			serverCon->RecvRawAll(&ackMsg, sizeof(ackMsg));
 		}
 	}
 	catch (const std::exception& e)

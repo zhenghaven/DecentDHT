@@ -9,29 +9,24 @@ size_t EnclaveCntTranslator::SendRaw(const void * const dataPtr, const size_t si
 	return static_cast<ConnectionBase*>(m_cntPtr)->SendRaw(dataPtr, size);
 }
 
+size_t EnclaveCntTranslator::RecvRaw(void * const bufPtr, const size_t size)
+{
+	return static_cast<ConnectionBase*>(m_cntPtr)->RecvRaw(bufPtr, size);
+}
+
 void EnclaveCntTranslator::SendPack(const void * const dataPtr, const size_t size)
 {
 	return static_cast<ConnectionBase*>(m_cntPtr)->SendPack(dataPtr, size);
 }
 
-size_t EnclaveCntTranslator::ReceiveRaw(void * const bufPtr, const size_t size)
+size_t EnclaveCntTranslator::RecvPack(uint8_t*& dest)
 {
-	return static_cast<ConnectionBase*>(m_cntPtr)->ReceiveRaw(bufPtr, size);
+	return static_cast<ConnectionBase*>(m_cntPtr)->RecvPack(dest);
 }
 
-void EnclaveCntTranslator::ReceivePack(std::string & outMsg)
+std::vector<uint8_t> EnclaveCntTranslator::SendAndRecvPack(const void * const inData, const size_t inDataLen)
 {
-	return static_cast<ConnectionBase*>(m_cntPtr)->ReceivePack(outMsg);
-}
-
-void EnclaveCntTranslator::ReceivePack(std::vector<uint8_t>& outMsg)
-{
-	return static_cast<ConnectionBase*>(m_cntPtr)->ReceivePack(outMsg);
-}
-
-void EnclaveCntTranslator::SendAndReceivePack(const void * const inData, const size_t inDataLen, std::string & outMsg)
-{
-	return static_cast<ConnectionBase*>(m_cntPtr)->SendAndReceivePack(inData, inDataLen, outMsg);
+	return static_cast<ConnectionBase*>(m_cntPtr)->SendAndRecvPack(inData, inDataLen);
 }
 
 void EnclaveCntTranslator::Terminate() noexcept

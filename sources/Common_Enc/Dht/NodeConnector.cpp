@@ -24,7 +24,7 @@ namespace
 
 	static NodeConnector::NodeBasePtr ReturnedNode(SecureCommLayer & comm)
 	{
-		RpcParser rpcReturned(comm.ReceiveBinary());
+		RpcParser rpcReturned(comm.RecvContainer<std::vector<uint8_t> >());
 		
 		const auto& keyBin = rpcReturned.GetPrimitiveArg<uint8_t[DhtStates::sk_keySizeByte]>();
 		const auto& addr = rpcReturned.GetPrimitiveArg<uint64_t>();
@@ -37,7 +37,7 @@ void NodeConnector::SendNode(SecureCommLayer & comm, NodeBasePtr node)
 {
 	std::array<uint8_t, DhtStates::sk_keySizeByte> keyBin{};
 	node->GetNodeId().ToBinary(keyBin);
-	comm.SendRaw(keyBin.data(), keyBin.size()); //1. Sent resultant ID
+	comm.SendRawAll(keyBin.data(), keyBin.size()); //1. Sent resultant ID
 
 	uint64_t addr = node->GetAddress();
 	comm.SendStruct(addr); //2. Sent Address - Done!
@@ -68,8 +68,8 @@ NodeConnector::NodeBasePtr NodeConnector::ReceiveNode(SecureCommLayer & comm)
 	std::array<uint8_t, DhtStates::sk_keySizeByte> keyBin{};
 	uint64_t addr;
 
-	comm.ReceiveRaw(keyBin.data(), keyBin.size()); //1. Receive ID
-	comm.ReceiveStruct(addr); //2. Receive Address.
+	comm.RecvRawAll(keyBin.data(), keyBin.size()); //1. Receive ID
+	comm.RecvStruct(addr); //2. Receive Address.
 
 	//LOGI("Recv result ID: %s.", BigNumber(keyBin).ToBigEndianHexStr().c_str());
 	
@@ -188,7 +188,7 @@ void NodeConnector::SetImmediatePredecessor(NodeBasePtr pred)
 
 	cntPair.GetCommLayer().SendRpc(rpc);
 
-	RpcParser rpcReturned(cntPair.GetCommLayer().ReceiveBinary());
+	RpcParser rpcReturned(cntPair.GetCommLayer().RecvContainer<std::vector<uint8_t> >());
 }
 
 void NodeConnector::UpdateFingerTable(NodeBasePtr & s, uint64_t i)
@@ -215,7 +215,7 @@ void NodeConnector::UpdateFingerTable(NodeBasePtr & s, uint64_t i)
 
 	cntPair.GetCommLayer().SendRpc(rpc);
 
-	RpcParser rpcReturned(cntPair.GetCommLayer().ReceiveBinary());
+	RpcParser rpcReturned(cntPair.GetCommLayer().RecvContainer<std::vector<uint8_t> >());
 }
 
 void NodeConnector::DeUpdateFingerTable(const MbedTlsObj::BigNumber & oldId, NodeBasePtr & succ, uint64_t i)
@@ -245,7 +245,7 @@ void NodeConnector::DeUpdateFingerTable(const MbedTlsObj::BigNumber & oldId, Nod
 
 	cntPair.GetCommLayer().SendRpc(rpc);
 
-	RpcParser rpcReturned(cntPair.GetCommLayer().ReceiveBinary());
+	RpcParser rpcReturned(cntPair.GetCommLayer().RecvContainer<std::vector<uint8_t> >());
 }
 
 const BigNumber & NodeConnector::GetNodeId()
@@ -274,7 +274,7 @@ const BigNumber & NodeConnector::GetNodeId()
 	}
 	
 	//RPC return:
-	RpcParser rpcReturn(cntPair.GetCommLayer().ReceiveBinary());
+	RpcParser rpcReturn(cntPair.GetCommLayer().RecvContainer<std::vector<uint8_t> >());
 
 	const auto& keyBin = rpcReturn.GetPrimitiveArg<uint8_t[DhtStates::sk_keySizeByte]>();
 

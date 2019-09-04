@@ -220,19 +220,19 @@ namespace
 
 		start.ToBinary(keyBin);
 
-		tls.SendRaw(keyBin.data(), keyBin.size()); //2. Send start key.
+		tls.SendRawAll(keyBin.data(), keyBin.size()); //2. Send start key.
 		end.ToBinary(keyBin);
-		tls.SendRaw(keyBin.data(), keyBin.size()); //3. Send end key.
+		tls.SendRawAll(keyBin.data(), keyBin.size()); //3. Send end key.
 
 		dhtStore.RecvMigratingData(
 			[&tls](void* buffer, const size_t size) -> void
 		{
-			tls.ReceiveRaw(buffer, size);
+			tls.RecvRawAll(buffer, size);
 		},
 			[&tls]() -> BigNumber
 		{
 			std::array<uint8_t, DhtStates::sk_keySizeByte> keyBuf{};
-			tls.ReceiveRaw(keyBuf.data(), keyBuf.size());
+			tls.RecvRawAll(keyBuf.data(), keyBuf.size());
 			return BigNumber(keyBuf);
 		}); //4. Receive data.
 	}
@@ -250,13 +250,13 @@ namespace
 		dhtStore.SendMigratingDataAll(
 			[&tls](const void* buffer, const size_t size) -> void
 		{
-			tls.SendRaw(buffer, size);
+			tls.SendRawAll(buffer, size);
 		},
 			[&tls](const BigNumber& key) -> void
 		{
 			std::array<uint8_t, DhtStates::sk_keySizeByte> keyBuf{};
 			key.ToBinary(keyBuf);
-			tls.SendRaw(keyBuf.data(), keyBuf.size());
+			tls.SendRawAll(keyBuf.data(), keyBuf.size());
 		}); //2. Send data.
 	}
 }
@@ -594,7 +594,7 @@ void Dht::ProcessDhtQuery(Decent::Net::SecureCommLayer & secComm, void*& heldCnt
 
 	//LOGI("DHT Server: Processing DHT queries...");
 
-	RpcParser rpc(secComm.ReceiveBinary());
+	RpcParser rpc(secComm.RecvContainer<std::vector<uint8_t> >());
 	const NumType& funcNum = rpc.GetPrimitiveArg<NumType>();
 
 	switch (funcNum)
@@ -745,7 +745,7 @@ void Dht::ProcessStoreRequest(Decent::Net::SecureCommLayer & secComm)
 	using namespace EncFunc::Store;
 
 	NumType funcNum;
-	secComm.ReceiveStruct(funcNum); //1. Received function type.
+	secComm.RecvStruct(funcNum); //1. Received function type.
 
 	switch (funcNum)
 	{
@@ -765,23 +765,23 @@ void Dht::ProcessStoreRequest(Decent::Net::SecureCommLayer & secComm)
 void Dht::GetMigrateData(Decent::Net::SecureCommLayer & secComm)
 {
 	std::array<uint8_t, DhtStates::sk_keySizeByte> startKeyBin{};
-	secComm.ReceiveRaw(startKeyBin.data(), startKeyBin.size());
+	secComm.RecvRawAll(startKeyBin.data(), startKeyBin.size());
 	ConstBigNumber start(startKeyBin);
 
 	std::array<uint8_t, DhtStates::sk_keySizeByte> endKeyBin{};
-	secComm.ReceiveRaw(endKeyBin.data(), endKeyBin.size());
+	secComm.RecvRawAll(endKeyBin.data(), endKeyBin.size());
 	ConstBigNumber end(endKeyBin);
 
 	gs_state.GetDhtStore().SendMigratingData(
 		[&secComm](const void* buffer, const size_t size) -> void
 	{
-		secComm.SendRaw(buffer, size);
+		secComm.SendRawAll(buffer, size);
 	},
 		[&secComm](const BigNumber& key) -> void
 	{
 		std::array<uint8_t, DhtStates::sk_keySizeByte> keyBuf{};
 		key.ToBinary(keyBuf);
-		secComm.SendRaw(keyBuf.data(), keyBuf.size());
+		secComm.SendRawAll(keyBuf.data(), keyBuf.size());
 	},
 		start, end);
 }
@@ -791,12 +791,12 @@ void Dht::SetMigrateData(Decent::Net::SecureCommLayer & secComm)
 	gs_state.GetDhtStore().RecvMigratingData(
 		[&secComm](void* buffer, const size_t size) -> void
 	{
-		secComm.ReceiveRaw(buffer, size);
+		secComm.RecvRawAll(buffer, size);
 	},
 		[&secComm]() -> BigNumber
 	{
 		std::array<uint8_t, DhtStates::sk_keySizeByte> keyBuf{};
-		secComm.ReceiveRaw(keyBuf.data(), keyBuf.size());
+		secComm.RecvRawAll(keyBuf.data(), keyBuf.size());
 		return BigNumber(keyBuf);
 	});
 }
@@ -1012,7 +1012,7 @@ bool Dht::ProcessAppRequest(std::unique_ptr<SecureCommLayer> & secCnt, Net::Encl
 
 	using namespace EncFunc::App;
 
-	RpcParser rpc(secCnt->ReceiveBinary());
+	RpcParser rpc(secCnt->RecvContainer<std::vector<uint8_t> >());
 
 	const auto& funcNum = rpc.GetPrimitiveArg<NumType>(); //Arg 1.
 
@@ -1619,7 +1619,7 @@ bool Dht::ProcessUserRequest(std::unique_ptr<TlsCommLayer> & tls, Net::EnclaveCn
 
 	using namespace EncFunc::User;
 
-	RpcParser rpc(tls->ReceiveBinary());
+	RpcParser rpc(tls->RecvContainer<std::vector<uint8_t> >());
 
 	const auto& funcNum = rpc.GetPrimitiveArg<NumType>(); //Arg 1.
 
