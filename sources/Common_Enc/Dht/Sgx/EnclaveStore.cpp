@@ -72,7 +72,7 @@ Decent::General128Tag EnclaveStore::SaveDataFile(const MbedTlsObj::BigNumber& ke
 	//LOGI("DHT store: writing value: %s", std::string(reinterpret_cast<const char*>(data.data()), data.size()).c_str());
 	
 	General128Tag tag;
-	std::vector<uint8_t> sealedData = DataSealer::SealData(DataSealer::KeyPolicy::ByMrEnclave, gs_state, gsk_sealKeyLabel, meta, data, tag);
+	std::vector<uint8_t> sealedData = DataSealer::SealData(DataSealer::KeyPolicy::ByMrEnclave, gs_state, gsk_sealKeyLabel, meta, data, &tag);
 	
 	{
 		int memStoreRet = true;

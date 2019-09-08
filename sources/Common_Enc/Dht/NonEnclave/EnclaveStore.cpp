@@ -35,7 +35,7 @@ namespace
 		std::copy(meta.begin(), meta.end(), metaBin.begin());
 		std::copy(data.begin(), data.end(), dataBin.begin());
 
-		const auto& fnBin = rpc.GetBinaryArray();
+		const auto& fnBin = rpc.GetFullBinary();
 
 		MemKeyValueStore::ValueType val;
 		val.first = fnBin.size();

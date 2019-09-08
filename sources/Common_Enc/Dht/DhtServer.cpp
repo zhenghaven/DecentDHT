@@ -1024,7 +1024,7 @@ bool Dht::ProcessAppRequest(std::unique_ptr<SecureCommLayer> & secCnt, Net::Encl
 			const auto& keyId = rpc.GetPrimitiveArg<uint8_t[DhtStates::sk_keySizeByte]>(); //Arg 2.
 
 			uint8_t appKeyId[DhtStates::sk_keySizeByte] = { 0 };
-			Hasher::ArrayBatchedCalc<HashType::SHA256>(appKeyId, gsk_appKeyIdPrefix, keyId);
+			Hasher<HashType::SHA256>().Calc(appKeyId, gsk_appKeyIdPrefix, keyId);
 
 			return AppFindSuccessor(secCnt, cnt, appKeyId);
 		}
@@ -1039,7 +1039,7 @@ bool Dht::ProcessAppRequest(std::unique_ptr<SecureCommLayer> & secCnt, Net::Encl
 			const auto& keyId = rpc.GetPrimitiveArg<uint8_t[DhtStates::sk_keySizeByte]>(); //Arg 2.
 
 			uint8_t appKeyId[DhtStates::sk_keySizeByte] = { 0 };
-			Hasher::ArrayBatchedCalc<HashType::SHA256>(appKeyId, gsk_appKeyIdPrefix, keyId);
+			Hasher<HashType::SHA256>().Calc(appKeyId, gsk_appKeyIdPrefix, keyId);
 
 			if (encHash.size() != sizeof(general_256bit_hash))
 			{
@@ -1097,7 +1097,7 @@ bool Dht::ProcessAppRequest(std::unique_ptr<SecureCommLayer> & secCnt, Net::Encl
 			verifiedPolicy.Serialize(verifiedPolicyBin.begin(), verifiedPolicyBin.end());
 
 			uint8_t appKeyId[DhtStates::sk_keySizeByte] = { 0 };
-			Hasher::ArrayBatchedCalc<HashType::SHA256>(appKeyId, gsk_appKeyIdPrefix, keyId);
+			Hasher<HashType::SHA256>().Calc(appKeyId, gsk_appKeyIdPrefix, keyId);
 
 			uint8_t retVal = InsertData(appKeyId, verifiedPolicyBin.begin(), verifiedPolicyBin.end(), data.first, data.second);
 
@@ -1122,7 +1122,7 @@ bool Dht::ProcessAppRequest(std::unique_ptr<SecureCommLayer> & secCnt, Net::Encl
 			const auto data = rpc.GetBinaryArg(); //Arg 3.
 
 			uint8_t appKeyId[DhtStates::sk_keySizeByte] = { 0 };
-			Hasher::ArrayBatchedCalc<HashType::SHA256>(appKeyId, gsk_appKeyIdPrefix, keyId);
+			Hasher<HashType::SHA256>().Calc(appKeyId, gsk_appKeyIdPrefix, keyId);
 
 			if (encHash.size() != sizeof(general_256bit_hash))
 			{
@@ -1156,7 +1156,7 @@ bool Dht::ProcessAppRequest(std::unique_ptr<SecureCommLayer> & secCnt, Net::Encl
 			const auto& keyId = rpc.GetPrimitiveArg<uint8_t[DhtStates::sk_keySizeByte]>(); //Arg 2.
 
 			uint8_t appKeyId[DhtStates::sk_keySizeByte] = { 0 };
-			Hasher::ArrayBatchedCalc<HashType::SHA256>(appKeyId, gsk_appKeyIdPrefix, keyId);
+			Hasher<HashType::SHA256>().Calc(appKeyId, gsk_appKeyIdPrefix, keyId);
 
 			if (encHash.size() != sizeof(general_256bit_hash))
 			{
@@ -1339,7 +1339,7 @@ static void LocalAttrListCollecter(const general_256bit_hash& reqUserId, const s
 	for (const auto& neededItem : neededList)
 	{
 		std::array<uint8_t, DhtStates::sk_keySizeByte> attrListId;
-		Hasher::ArrayBatchedCalc<HashType::SHA256>(attrListId, gsk_atListKeyIdPrefix, neededItem.GetUserHash(), neededItem.GetAttrHash());
+		Hasher<HashType::SHA256>().Calc(attrListId, gsk_atListKeyIdPrefix, neededItem.GetUserHash(), neededItem.GetAttrHash());
 		ConstBigNumber attrListIdNum(attrListId);
 
 		auto nextHop = GetAttrListQueryNextHop(*localNode, attrListIdNum);
@@ -1446,9 +1446,7 @@ static void UserReadReturnWithCache(Decent::Net::TlsCommLayer & tls, const uint8
 	unsealedList.resize(listForCache.GetSerializedSize());
 	listForCache.Serialize(unsealedList.begin());
 
-	General128Tag mac;
-	std::vector<uint8_t> meta;
-	sealedList = Tools::DataSealer::SealData(Tools::DataSealer::KeyPolicy::ByMrEnclave, gs_state, gsk_attrListSealKeyLabel, meta, unsealedList, mac);
+	sealedList = Tools::DataSealer::SealData(Tools::DataSealer::KeyPolicy::ByMrEnclave, gs_state, gsk_attrListSealKeyLabel, std::array<uint8_t, 0>(), unsealedList);
 #endif
 
 	RpcWriter rpcReturned(RpcWriter::CalcSizePrim<decltype(retVal)>() +
@@ -1514,9 +1512,7 @@ static void UserUpdateReturnWithCache(Decent::Net::TlsCommLayer & tls, const uin
 	unsealedList.resize(listForCache.GetSerializedSize());
 	listForCache.Serialize(unsealedList.begin());
 
-	General128Tag mac;
-	std::vector<uint8_t> meta;
-	sealedList = Tools::DataSealer::SealData(Tools::DataSealer::KeyPolicy::ByMrEnclave, gs_state, gsk_attrListSealKeyLabel, meta, unsealedList, mac);
+	sealedList = Tools::DataSealer::SealData(Tools::DataSealer::KeyPolicy::ByMrEnclave, gs_state, gsk_attrListSealKeyLabel, std::array<uint8_t, 0>(), unsealedList);
 #endif
 
 	RpcWriter rpcReturned(RpcWriter::CalcSizePrim<decltype(retVal)>() +
@@ -1568,9 +1564,7 @@ static void UserDeleteReturnWithCache(Decent::Net::TlsCommLayer & tls, const uin
 	unsealedList.resize(listForCache.GetSerializedSize());
 	listForCache.Serialize(unsealedList.begin());
 
-	General128Tag mac;
-	std::vector<uint8_t> meta;
-	sealedList = Tools::DataSealer::SealData(Tools::DataSealer::KeyPolicy::ByMrEnclave, gs_state, gsk_attrListSealKeyLabel, meta, unsealedList, mac);
+	sealedList = Tools::DataSealer::SealData(Tools::DataSealer::KeyPolicy::ByMrEnclave, gs_state, gsk_attrListSealKeyLabel, std::array<uint8_t, 0>(), unsealedList);
 #endif
 
 	RpcWriter rpcReturned(RpcWriter::CalcSizePrim<decltype(retVal)>() +
@@ -1631,7 +1625,7 @@ bool Dht::ProcessUserRequest(std::unique_ptr<TlsCommLayer> & tls, Net::EnclaveCn
 			const auto& keyId = rpc.GetPrimitiveArg<uint8_t[DhtStates::sk_keySizeByte]>(); //Arg 2
 
 			uint8_t appKeyId[DhtStates::sk_keySizeByte] = { 0 };
-			Hasher::ArrayBatchedCalc<HashType::SHA256>(appKeyId, gsk_appKeyIdPrefix, keyId);
+			Hasher<HashType::SHA256>().Calc(appKeyId, gsk_appKeyIdPrefix, keyId);
 
 			return AppFindSuccessor(tls, cnt, appKeyId);
 		}
@@ -1650,13 +1644,13 @@ bool Dht::ProcessUserRequest(std::unique_ptr<TlsCommLayer> & tls, Net::EnclaveCn
 			//User ID:
 			std::string userKeyPem = tls->GetPublicKeyPem();
 			general_256bit_hash userId = { 0 };
-			Hasher::Calc<HashType::SHA256>(userKeyPem, userId);
+			Hasher<HashType::SHA256>().Calc(userId, userKeyPem);
 
 			std::unique_ptr<AccessCtrl::AbAttributeList> exListCachePtr = ParseCachedAttList(validCache, cacheBin);
 			std::unique_ptr<AccessCtrl::AbAttributeList> neededAttrListPtr = Tools::make_unique<AccessCtrl::AbAttributeList>();
 
 			uint8_t dataKeyId[DhtStates::sk_keySizeByte] = { 0 };
-			Hasher::ArrayBatchedCalc<HashType::SHA256>(dataKeyId, gsk_appKeyIdPrefix, keyId);
+			Hasher<HashType::SHA256>().Calc(dataKeyId, gsk_appKeyIdPrefix, keyId);
 
 			std::vector<uint8_t> data;
 			uint8_t retVal = ReadData(dataKeyId, *exListCachePtr, *neededAttrListPtr, data);
@@ -1744,7 +1738,7 @@ bool Dht::ProcessUserRequest(std::unique_ptr<TlsCommLayer> & tls, Net::EnclaveCn
 			verifiedPolicy.Serialize(verifiedPolicyBin.begin(), verifiedPolicyBin.end());
 
 			uint8_t dataKeyId[DhtStates::sk_keySizeByte] = { 0 };
-			Hasher::ArrayBatchedCalc<HashType::SHA256>(dataKeyId, gsk_appKeyIdPrefix, keyId);
+			Hasher<HashType::SHA256>().Calc(dataKeyId, gsk_appKeyIdPrefix, keyId);
 
 			uint8_t retVal = InsertData(dataKeyId, verifiedPolicyBin.begin(), verifiedPolicyBin.end(), dataBin.first, dataBin.second);
 
@@ -1773,13 +1767,13 @@ bool Dht::ProcessUserRequest(std::unique_ptr<TlsCommLayer> & tls, Net::EnclaveCn
 			//User ID:
 			std::string userKeyPem = tls->GetPublicKeyPem();
 			general_256bit_hash userId = { 0 };
-			Hasher::Calc<HashType::SHA256>(userKeyPem, userId);
+			Hasher<HashType::SHA256>().Calc(userId, userKeyPem);
 
 			std::unique_ptr<AccessCtrl::AbAttributeList> exListCachePtr = ParseCachedAttList(validCache, cacheBin);
 			std::unique_ptr<AccessCtrl::AbAttributeList> neededAttrListPtr = Tools::make_unique<AccessCtrl::AbAttributeList>();
 
 			uint8_t dataKeyId[DhtStates::sk_keySizeByte] = { 0 };
-			Hasher::ArrayBatchedCalc<HashType::SHA256>(dataKeyId, gsk_appKeyIdPrefix, keyId);
+			Hasher<HashType::SHA256>().Calc(dataKeyId, gsk_appKeyIdPrefix, keyId);
 
 			uint8_t retVal = UpdateData(dataKeyId, *exListCachePtr, *neededAttrListPtr, dataIn.first, dataIn.second);
 
@@ -1865,13 +1859,13 @@ bool Dht::ProcessUserRequest(std::unique_ptr<TlsCommLayer> & tls, Net::EnclaveCn
 			//User ID:
 			std::string userKeyPem = tls->GetPublicKeyPem();
 			general_256bit_hash userId = { 0 };
-			Hasher::Calc<HashType::SHA256>(userKeyPem, userId);
+			Hasher<HashType::SHA256>().Calc(userId, userKeyPem);
 
 			std::unique_ptr<AccessCtrl::AbAttributeList> exListCachePtr = ParseCachedAttList(validCache, cacheBin);
 			std::unique_ptr<AccessCtrl::AbAttributeList> neededAttrListPtr = Tools::make_unique<AccessCtrl::AbAttributeList>();
 
 			uint8_t dataKeyId[DhtStates::sk_keySizeByte] = { 0 };
-			Hasher::ArrayBatchedCalc<HashType::SHA256>(dataKeyId, gsk_appKeyIdPrefix, keyId);
+			Hasher<HashType::SHA256>().Calc(dataKeyId, gsk_appKeyIdPrefix, keyId);
 
 			uint8_t retVal = DelData(dataKeyId, *exListCachePtr, *neededAttrListPtr);
 
@@ -1953,14 +1947,14 @@ bool Dht::ProcessUserRequest(std::unique_ptr<TlsCommLayer> & tls, Net::EnclaveCn
 			//Calc User ID:
 			std::string userKeyPem = tls->GetPublicKeyPem();
 			general_256bit_hash userId = { 0 };
-			Hasher::Calc<HashType::SHA256>(userKeyPem, userId);
+			Hasher<HashType::SHA256>().Calc(userId, userKeyPem);
 
 			//Calc ListName ID:
 			general_256bit_hash listId = { 0 };
-			Hasher::Calc<HashType::SHA256>(listName, listId);
+			Hasher<HashType::SHA256>().Calc(listId, listName);
 
 			uint8_t attrListId[DhtStates::sk_keySizeByte] = { 0 };
-			Hasher::ArrayBatchedCalc<HashType::SHA256>(attrListId, gsk_atListKeyIdPrefix, userId, listId);
+			Hasher<HashType::SHA256>().Calc(attrListId, gsk_atListKeyIdPrefix, userId, listId);
 
 			return AppFindSuccessor(tls, cnt, attrListId);
 		}
@@ -1978,17 +1972,17 @@ bool Dht::ProcessUserRequest(std::unique_ptr<TlsCommLayer> & tls, Net::EnclaveCn
 			//Calc User ID:
 			std::string userKeyPem = tls->GetPublicKeyPem();
 			general_256bit_hash userId = { 0 };
-			Hasher::Calc<HashType::SHA256>(userKeyPem, userId);
+			Hasher<HashType::SHA256>().Calc(userId, userKeyPem);
 			//std::string userIdStr = cppcodec::base64_rfc4648::encode(userId);
 			//PRINT_I("User, %s, is adding new attribute list.", userIdStr.c_str());
 
 			//Calc ListName ID:
 			general_256bit_hash listId = { 0 };
-			Hasher::Calc<HashType::SHA256>(listName, listId);
+			Hasher<HashType::SHA256>().Calc(listId, listName);
 
 			//Calc Attribute list ID:
 			uint8_t attrListId[DhtStates::sk_keySizeByte] = { 0 };
-			Hasher::ArrayBatchedCalc<HashType::SHA256>(attrListId, gsk_atListKeyIdPrefix, userId, listId);
+			Hasher<HashType::SHA256>().Calc(attrListId, gsk_atListKeyIdPrefix, userId, listId);
 
 			//Validate the given attribute list:
 			AccessCtrl::EntityList attrListObj(listBin.first, listBin.second);
