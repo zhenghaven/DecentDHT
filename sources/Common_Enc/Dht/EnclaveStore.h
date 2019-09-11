@@ -5,6 +5,7 @@
 #include <DecentApi/Common/MbedTls/BigNumber.h>
 
 #include "DhtStates.h"
+#include "UntrustedKeyValueStore.h"
 
 namespace Decent
 {
@@ -29,7 +30,7 @@ namespace Decent
 			virtual std::vector<uint8_t> MigrateOneDataFile(const MbedTlsObj::BigNumber& key, const General128Tag& tag, std::vector<uint8_t>& meta) override;
 
 		private:
-			void* m_memStore;
+			UntrustedKeyValueStore m_memStore;
 		};
 	}
 }
