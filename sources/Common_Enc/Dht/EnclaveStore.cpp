@@ -1,7 +1,17 @@
 #include "EnclaveStore.h"
 
 #include <DecentApi/Common/Common.h>
+
+#ifdef ENCLAVE_PLATFORM_NON_ENCLAVE
+
+#include <DecentApi/Common/Net/RpcParser.h>
+#include <DecentApi/Common/Net/RpcWriter.h>
+
+#else
+
 #include <DecentApi/CommonEnclave/Tools/DataSealer.h>
+
+#endif //ENCLAVE_PLATFORM_NON_ENCLAVE
 
 #include "../../Common/Dht/LocalNode.h"
 
@@ -40,9 +50,28 @@ Decent::General128Tag EnclaveStore::SaveDataFile(const MbedTlsObj::BigNumber& ke
 	const std::string keyStr = key.ToBigEndianHexStr();
 	LOGI("DHT store: adding key to the index. %s", keyStr.c_str());
 	//LOGI("DHT store: writing value: %s", std::string(reinterpret_cast<const char*>(data.data()), data.size()).c_str());
-	
+
+#ifdef ENCLAVE_PLATFORM_NON_ENCLAVE
+
+	using namespace Decent::Net;
+
+	RpcWriter packedData(
+		RpcWriter::CalcSizeBin(meta.size()) +
+		RpcWriter::CalcSizeBin(data.size()),
+		2, false);
+
+	packedData.AddBinaryArg(meta.size()).Set(meta);
+	packedData.AddBinaryArg(data.size()).Set(data);
+
+	General128Tag tag{ 0 };
+	const std::vector<uint8_t>& sealedData = packedData.GetFullBinary();
+
+#else
+
 	General128Tag tag;
 	std::vector<uint8_t> sealedData = DataSealer::SealData(DataSealer::KeyPolicy::ByMrEnclave, gs_state, gsk_sealKeyLabel, meta, data, &tag);
+
+#endif //ENCLAVE_PLATFORM_NON_ENCLAVE
 	
 	m_memStore.Save(keyStr, sealedData);
 
@@ -62,8 +91,24 @@ std::vector<uint8_t> EnclaveStore::ReadDataFile(const MbedTlsObj::BigNumber& key
 	
 	std::vector<uint8_t> sealedData = m_memStore.Read(keyStr);
 
+#ifdef ENCLAVE_PLATFORM_NON_ENCLAVE
+
+	using namespace Net;
+
+	RpcParser packedData(sealedData);
+
+	auto metaBin = packedData.GetBinaryArg();
+	auto dataBin = packedData.GetBinaryArg();
+
+	meta = std::vector<uint8_t>(metaBin.first, metaBin.second);
+	std::vector<uint8_t> data = std::vector<uint8_t>(dataBin.first, dataBin.second);
+
+#else
+
 	std::vector<uint8_t> data;
 	DataSealer::UnsealData(DataSealer::KeyPolicy::ByMrEnclave, gs_state, gsk_sealKeyLabel, sealedData, meta, data, &tag);
+
+#endif //ENCLAVE_PLATFORM_NON_ENCLAVE
 
 	return data;
 }
@@ -74,8 +119,24 @@ std::vector<uint8_t> EnclaveStore::MigrateOneDataFile(const MbedTlsObj::BigNumbe
 
 	std::vector<uint8_t> sealedData = m_memStore.MigrateOne(keyStr);
 
+#ifdef ENCLAVE_PLATFORM_NON_ENCLAVE
+
+	using namespace Net;
+
+	RpcParser packedData(sealedData);
+
+	auto metaBin = packedData.GetBinaryArg();
+	auto dataBin = packedData.GetBinaryArg();
+
+	meta = std::vector<uint8_t>(metaBin.first, metaBin.second);
+	std::vector<uint8_t> data = std::vector<uint8_t>(dataBin.first, dataBin.second);
+
+#else
+
 	std::vector<uint8_t> data;
 	DataSealer::UnsealData(DataSealer::KeyPolicy::ByMrEnclave, gs_state, gsk_sealKeyLabel, sealedData, meta, data, &tag);
+
+#endif //ENCLAVE_PLATFORM_NON_ENCLAVE
 
 	return data;
 }
