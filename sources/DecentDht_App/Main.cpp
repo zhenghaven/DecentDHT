@@ -39,13 +39,41 @@
 #	include<DecentApi/CommonApp/SGX/IasConnector.h>
 #endif // DECENT_DHT_NAIVE_RA_VER
 
-
 using namespace Decent;
 using namespace Decent::Tools;
 using namespace Decent::Dht;
 using namespace Decent::Net;
 using namespace Decent::Threading;
 using namespace Decent::AppConfig;
+
+static constexpr size_t gsk_totalNumThread = 44;
+
+template<typename T>
+static constexpr double SignedIncrease(double num, T n)
+{
+	return num >= 0 ? num + n : num - n;
+}
+
+template<typename T>
+static constexpr T RoundNearest(double num)
+{
+	return (num - static_cast<long long>(num)) >= 0.5 ? static_cast<T>(SignedIncrease(num, 1)) : static_cast<T>(num);
+}
+
+static constexpr size_t GetNumListenThread(double nodeNum, size_t totalNumThread)
+{
+	return RoundNearest<size_t>(((3 * nodeNum - 4) * totalNumThread) / (8 * nodeNum - 12));
+}
+
+static constexpr size_t GetNumForwardThread(double nodeNum, size_t totalNumThread)
+{
+	return RoundNearest<size_t>(((nodeNum - 2) * totalNumThread) / (8 * nodeNum - 12));
+}
+
+static constexpr size_t GetNumReplyThread(double nodeNum, size_t totalNumThread)
+{
+	return GetNumForwardThread(nodeNum, totalNumThread);
+}
 
 static std::shared_ptr<DhtConnectionPool> GetTcpConnectionPool()
 {
@@ -124,6 +152,10 @@ int main(int argc, char ** argv)
 	cmd.add(nodeIdx);
 
 	cmd.parse(argc, argv);
+
+	const size_t numListenThread = 18; //GetNumListenThread(totalNode.getValue(), gsk_totalNumThread);
+	const size_t numForwardThread = 6; //GetNumForwardThread(totalNode.getValue(), gsk_totalNumThread);
+	const size_t numReplyThread = 2; //GetNumReplyThread(totalNode.getValue(), gsk_totalNumThread);
 
 	//------- Read configuration file:
 	std::unique_ptr<DecentAppConfig> configMgr;
@@ -229,7 +261,7 @@ int main(int argc, char ** argv)
 		enclave = std::make_shared<DecentDhtApp>(
 			ENCLAVE_FILENAME, tokenPath, wlKeyArg.getValue(), *serverCon);
 
-		smartServer.AddServer(server, enclave, GetTcpConnectionPool(), 18, 1002);
+		smartServer.AddServer(server, enclave, GetTcpConnectionPool(), numListenThread, 1002);
 
 #ifdef DECENT_DHT_NAIVE_RA_VER
 		enclave->InitDhtNode(selfFullAddr, exNodeFullAddr, totalNode.getValue(), nodeIdx.getValue(), iasConnector.get(), spid);
@@ -237,7 +269,7 @@ int main(int argc, char ** argv)
 		enclave->InitDhtNode(selfFullAddr, exNodeFullAddr, totalNode.getValue(), nodeIdx.getValue(), nullptr, spid);
 #endif // DECENT_DHT_NAIVE_RA_VER
 
-		enclave->InitQueryWorkers(6, 2);
+		enclave->InitQueryWorkers(numForwardThread, numReplyThread);
 	}
 	catch (const std::exception& e)
 	{
