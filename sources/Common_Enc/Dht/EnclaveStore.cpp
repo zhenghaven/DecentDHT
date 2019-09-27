@@ -2,7 +2,7 @@
 
 #include <DecentApi/Common/Common.h>
 
-#ifdef ENCLAVE_PLATFORM_NON_ENCLAVE
+#if defined(ENCLAVE_PLATFORM_NON_ENCLAVE) && !defined(ENCLAVE_PLATFORM_NON_ENCLAVE_EXACT_COMPARE)
 
 #include <DecentApi/Common/Net/RpcParser.h>
 #include <DecentApi/Common/Net/RpcWriter.h>
@@ -11,7 +11,7 @@
 
 #include <DecentApi/CommonEnclave/Tools/DataSealer.h>
 
-#endif //ENCLAVE_PLATFORM_NON_ENCLAVE
+#endif //defined(ENCLAVE_PLATFORM_NON_ENCLAVE) && !defined(ENCLAVE_PLATFORM_NON_ENCLAVE_EXACT_COMPARE)
 
 #include "../../Common/Dht/LocalNode.h"
 
@@ -51,7 +51,7 @@ Decent::General128Tag EnclaveStore::SaveDataFile(const MbedTlsObj::BigNumber& ke
 	LOGI("DHT store: adding key to the index. %s", keyStr.c_str());
 	//LOGI("DHT store: writing value: %s", std::string(reinterpret_cast<const char*>(data.data()), data.size()).c_str());
 
-#ifdef ENCLAVE_PLATFORM_NON_ENCLAVE
+#if defined(ENCLAVE_PLATFORM_NON_ENCLAVE) && !defined(ENCLAVE_PLATFORM_NON_ENCLAVE_EXACT_COMPARE)
 
 	using namespace Decent::Net;
 
@@ -71,7 +71,7 @@ Decent::General128Tag EnclaveStore::SaveDataFile(const MbedTlsObj::BigNumber& ke
 	General128Tag tag;
 	std::vector<uint8_t> sealedData = DataSealer::SealData(DataSealer::KeyPolicy::ByMrEnclave, gs_state, gsk_sealKeyLabel, meta, data, &tag);
 
-#endif //ENCLAVE_PLATFORM_NON_ENCLAVE
+#endif //defined(ENCLAVE_PLATFORM_NON_ENCLAVE) && !defined(ENCLAVE_PLATFORM_NON_ENCLAVE_EXACT_COMPARE)
 	
 	m_memStore.Save(keyStr, sealedData);
 
@@ -91,7 +91,7 @@ std::vector<uint8_t> EnclaveStore::ReadDataFile(const MbedTlsObj::BigNumber& key
 	
 	std::vector<uint8_t> sealedData = m_memStore.Read(keyStr);
 
-#ifdef ENCLAVE_PLATFORM_NON_ENCLAVE
+#if defined(ENCLAVE_PLATFORM_NON_ENCLAVE) && !defined(ENCLAVE_PLATFORM_NON_ENCLAVE_EXACT_COMPARE)
 
 	using namespace Net;
 
@@ -108,7 +108,7 @@ std::vector<uint8_t> EnclaveStore::ReadDataFile(const MbedTlsObj::BigNumber& key
 	std::vector<uint8_t> data;
 	DataSealer::UnsealData(DataSealer::KeyPolicy::ByMrEnclave, gs_state, gsk_sealKeyLabel, sealedData, meta, data, &tag);
 
-#endif //ENCLAVE_PLATFORM_NON_ENCLAVE
+#endif //defined(ENCLAVE_PLATFORM_NON_ENCLAVE) && !defined(ENCLAVE_PLATFORM_NON_ENCLAVE_EXACT_COMPARE)
 
 	return data;
 }
@@ -119,7 +119,7 @@ std::vector<uint8_t> EnclaveStore::MigrateOneDataFile(const MbedTlsObj::BigNumbe
 
 	std::vector<uint8_t> sealedData = m_memStore.MigrateOne(keyStr);
 
-#ifdef ENCLAVE_PLATFORM_NON_ENCLAVE
+#if defined(ENCLAVE_PLATFORM_NON_ENCLAVE) && !defined(ENCLAVE_PLATFORM_NON_ENCLAVE_EXACT_COMPARE)
 
 	using namespace Net;
 
@@ -136,7 +136,7 @@ std::vector<uint8_t> EnclaveStore::MigrateOneDataFile(const MbedTlsObj::BigNumbe
 	std::vector<uint8_t> data;
 	DataSealer::UnsealData(DataSealer::KeyPolicy::ByMrEnclave, gs_state, gsk_sealKeyLabel, sealedData, meta, data, &tag);
 
-#endif //ENCLAVE_PLATFORM_NON_ENCLAVE
+#endif //defined(ENCLAVE_PLATFORM_NON_ENCLAVE) && !defined(ENCLAVE_PLATFORM_NON_ENCLAVE_EXACT_COMPARE)
 
 	return data;
 }
