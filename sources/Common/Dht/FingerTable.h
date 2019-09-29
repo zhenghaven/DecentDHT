@@ -103,7 +103,7 @@ namespace Decent
 			 *
 			 * \return	The pointer to the closet predcessor node.
 			 */
-			NodeBasePtr GetClosetPrecFinger(IdType id) const
+			NodeBasePtr GetClosetPrecFinger(const IdType& id) const
 			{
 				for (auto rit = m_tableRecords.crbegin(); rit != m_tableRecords.crend(); ++rit)
 				{

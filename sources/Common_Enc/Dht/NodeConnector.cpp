@@ -73,7 +73,7 @@ NodeConnector::NodeBasePtr NodeConnector::ReceiveNode(SecureCommLayer & comm)
 
 	//LOGI("Recv result ID: %s.", BigNumber(keyBin).ToBigEndianHexStr().c_str());
 	
-	return std::make_shared<NodeConnector>(addr, BigNumber(keyBin));
+	return std::make_shared<NodeConnector>(addr, BigNumber(keyBin, true));
 }
 
 NodeConnector::NodeBasePtr NodeConnector::ReceiveNode(ConnectionBase& connection, SecureCommLayer & comm)
@@ -116,7 +116,7 @@ NodeConnector::NodeBasePtr NodeConnector::LookupTypeFunc(const MbedTlsObj::BigNu
 	auto keyBin = rpc.AddPrimitiveArg<uint8_t[DhtStates::sk_keySizeByte]>();
 
 	funcNum.Get() = type;
-	key.ToBinary(keyBin.Get(), sk_struct);
+	key.ToBinary(keyBin.Get());
 
 	cntPair.GetCommLayer().SendRpc(rpc);
 
@@ -183,7 +183,7 @@ void NodeConnector::SetImmediatePredecessor(NodeBasePtr pred)
 	auto addr = rpc.AddPrimitiveArg<uint64_t>();
 
 	funcNum = k_setImmediatePre;
-	pred->GetNodeId().ToBinary(keyBin.Get(), sk_struct);
+	pred->GetNodeId().ToBinary(keyBin.Get());
 	addr = pred->GetAddress();
 
 	cntPair.GetCommLayer().SendRpc(rpc);
@@ -209,7 +209,7 @@ void NodeConnector::UpdateFingerTable(NodeBasePtr & s, uint64_t i)
 	auto i2BeSend = rpc.AddPrimitiveArg<uint64_t>();
 
 	funcNum = k_updFingerTable;
-	s->GetNodeId().ToBinary(keyBin.Get(), sk_struct);
+	s->GetNodeId().ToBinary(keyBin.Get());
 	addr = s->GetAddress();
 	i2BeSend = i;
 
@@ -238,8 +238,8 @@ void NodeConnector::DeUpdateFingerTable(const MbedTlsObj::BigNumber & oldId, Nod
 	auto i2BeSend = rpc.AddPrimitiveArg<uint64_t>();
 
 	funcNum = k_dUpdFingerTable;
-	oldId.ToBinary(oldKeyBin.Get(), sk_struct);
-	succ->GetNodeId().ToBinary(keyBin.Get(), sk_struct);
+	oldId.ToBinary(oldKeyBin.Get());
+	succ->GetNodeId().ToBinary(keyBin.Get());
 	addr = succ->GetAddress();
 	i2BeSend = i;
 

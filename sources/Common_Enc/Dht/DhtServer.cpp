@@ -59,7 +59,7 @@ namespace
 		RpcWriter rpc(rpcSize, 2);
 
 		auto keyBin = rpc.AddPrimitiveArg<uint8_t[DhtStates::sk_keySizeByte]>();
-		node->GetNodeId().ToBinary(keyBin.Get(), sk_struct);
+		node->GetNodeId().ToBinary(keyBin.Get());
 
 		rpc.AddPrimitiveArg<uint64_t>().Get() = node->GetAddress();
 
@@ -233,7 +233,7 @@ namespace
 		{
 			std::array<uint8_t, DhtStates::sk_keySizeByte> keyBuf{};
 			tls.RecvRawAll(keyBuf.data(), keyBuf.size());
-			return BigNumber(keyBuf);
+			return BigNumber(keyBuf, true);
 		}); //4. Receive data.
 	}
 
@@ -273,7 +273,7 @@ void Dht::Init(uint64_t selfAddr, int isFirstNode, uint64_t exAddr, size_t total
 	memset(filledArray.data(), 0xFF, filledArray.size());
 	MbedTlsObj::ConstBigNumber largest(filledArray);
 
-	BigNumber step = largest / totalNode;
+	BigNumber step = largest / static_cast<int64_t>(totalNode);
 
 	BigNumber selfId = step * idx;
 
@@ -415,7 +415,7 @@ void Dht::GetNodeId(Decent::Net::SecureCommLayer & secComm)
 	RpcWriter rpc(rpcSize, 1);
 
 	auto keyBin = rpc.AddPrimitiveArg<uint8_t[DhtStates::sk_keySizeByte]>();
-	localNode->GetNodeId().ToBinary(keyBin.Get(), sk_struct);
+	localNode->GetNodeId().ToBinary(keyBin.Get());
 
 	secComm.SendRpc(rpc);
 }
@@ -797,7 +797,7 @@ void Dht::SetMigrateData(Decent::Net::SecureCommLayer & secComm)
 	{
 		std::array<uint8_t, DhtStates::sk_keySizeByte> keyBuf{};
 		secComm.RecvRawAll(keyBuf.data(), keyBuf.size());
-		return BigNumber(keyBuf);
+		return BigNumber(keyBuf, true);
 	});
 }
 
