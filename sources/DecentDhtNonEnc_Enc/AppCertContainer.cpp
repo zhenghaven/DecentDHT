@@ -1,5 +1,6 @@
 #ifdef ENCLAVE_PLATFORM_NON_ENCLAVE
 
+#include <DecentApi/Common/Ra/AppX509Cert.h>
 #include <DecentApi/DecentAppEnclave/AppCertContainer.h>
 
 #ifdef DECENT_THREAD_SAFETY_HIGH
@@ -18,7 +19,7 @@ AppCertContainer::~AppCertContainer() noexcept
 {
 }
 
-std::shared_ptr<const AppX509> AppCertContainer::GetAppCert() const noexcept
+std::shared_ptr<const AppX509Cert> AppCertContainer::GetAppCert() const noexcept
 {
 #ifdef DECENT_THREAD_SAFETY_HIGH
 	return std::atomic_load(&m_cert);
@@ -27,7 +28,7 @@ std::shared_ptr<const AppX509> AppCertContainer::GetAppCert() const noexcept
 #endif // DECENT_THREAD_SAFETY_HIGH
 }
 
-bool AppCertContainer::SetAppCert(std::shared_ptr<const AppX509> cert) noexcept
+bool AppCertContainer::SetAppCert(std::shared_ptr<const AppX509Cert> cert) noexcept
 {
 	if (!CertContainer::SetCert(cert))
 	{

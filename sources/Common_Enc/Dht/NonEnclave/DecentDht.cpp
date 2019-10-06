@@ -5,9 +5,12 @@
 #include <DecentApi/Common/Common.h>
 #include <DecentApi/Common/make_unique.h>
 #include <DecentApi/Common/Net/TlsCommLayer.h>
+
+#include <DecentApi/Common/MbedTls/EcKey.h>
+#include <DecentApi/Common/MbedTls/Drbg.h>
 #include <DecentApi/Common/MbedTls/SessionTicketMgr.h>
 
-#include <DecentApi/Common/Ra/Crypto.h>
+#include <DecentApi/Common/Ra/ServerX509Cert.h>
 #include <DecentApi/Common/Ra/KeyContainer.h>
 #include <DecentApi/Common/Ra/TlsConfigAnyWhiteListed.h>
 
@@ -49,9 +52,12 @@ extern "C" int ecall_decent_dht_init(uint64_t self_addr, int is_first_node, uint
 	{
 		AppCertContainer& certContainer = gs_state.GetAppCertContainer();
 
-		if (!certContainer.GetCert() || !*certContainer.GetCert())
+		if (!certContainer.GetCert())
 		{
-			std::shared_ptr<MbedTlsObj::X509Cert> cert = std::make_shared<ServerX509>(*gs_state.GetKeyContainer().GetSignKeyPair(), "N/A", "N/A", "N/A");
+			EcKeyPair<EcKeyType::SECP256R1> tmpPrvKey(*gs_state.GetKeyContainer().GetSignKeyPair());
+			ServerX509CertWriter certWrt(tmpPrvKey, "N/A", "N/A", "N/A");
+			Drbg drbg;
+			std::shared_ptr<X509Cert> cert = std::make_shared<ServerX509Cert>(certWrt.GenerateDer(drbg));
 			certContainer.SetCert(cert);
 		}
 
@@ -92,7 +98,7 @@ extern "C" int ecall_decent_dht_proc_msg_from_dht(void* connection, void** prev_
 
 	try
 	{
-		std::shared_ptr<Ra::TlsConfigSameEnclave> tlsCfg = std::make_shared<Ra::TlsConfigSameEnclave>(gs_state, Ra::TlsConfig::Mode::ServerVerifyPeer, GetDhtSessionTicketMgr());
+		std::shared_ptr<Ra::TlsConfigSameEnclave> tlsCfg = std::make_shared<Ra::TlsConfigSameEnclave>(gs_state, TlsConfig::Mode::ServerVerifyPeer, GetDhtSessionTicketMgr());
 		Decent::Net::TlsCommLayer secComm(cnt, tlsCfg, true, nullptr);
 
 		ProcessDhtQuery(secComm, *prev_held_cnt);
@@ -121,7 +127,7 @@ extern "C" int ecall_decent_dht_proc_msg_from_store(void* connection)
 
 	try
 	{
-		std::shared_ptr<Ra::TlsConfigSameEnclave> tlsCfg = std::make_shared<Ra::TlsConfigSameEnclave>(gs_state, Ra::TlsConfig::Mode::ServerVerifyPeer, GetDhtSessionTicketMgr());
+		std::shared_ptr<Ra::TlsConfigSameEnclave> tlsCfg = std::make_shared<Ra::TlsConfigSameEnclave>(gs_state, TlsConfig::Mode::ServerVerifyPeer, GetDhtSessionTicketMgr());
 		Decent::Net::TlsCommLayer tls(cnt, tlsCfg, true, nullptr);
 
 		ProcessStoreRequest(tls);
@@ -150,7 +156,7 @@ extern "C" int ecall_decent_dht_proc_msg_from_app(void* connection)
 
 	try
 	{
-		std::shared_ptr<Ra::TlsConfigAnyWhiteListed> tlsCfg = std::make_shared<Ra::TlsConfigAnyWhiteListed>(gs_state, Ra::TlsConfig::Mode::ServerNoVerifyPeer, GetAppSessionTicketMgr());
+		std::shared_ptr<Ra::TlsConfigAnyWhiteListed> tlsCfg = std::make_shared<Ra::TlsConfigAnyWhiteListed>(gs_state, TlsConfig::Mode::ServerNoVerifyPeer, GetAppSessionTicketMgr());
 		std::unique_ptr<SecureCommLayer> tls = Tools::make_unique<TlsCommLayer>(cnt, tlsCfg, false, nullptr);
 
 		std::vector<uint8_t> appHash(sizeof(general_256bit_hash), 0);

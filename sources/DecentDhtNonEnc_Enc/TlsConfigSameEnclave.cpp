@@ -14,7 +14,7 @@ int TlsConfigSameEnclave::VerifyCert(mbedtls_x509_crt & cert, int depth, uint32_
 	return MbedTlsObj::MBEDTLS_SUCCESS_RET;
 }
 
-int TlsConfigSameEnclave::VerifyDecentAppCert(const AppX509 & cert, int depth, uint32_t & flag) const
+int TlsConfigSameEnclave::VerifyDecentAppCert(const AppX509Cert & cert, int depth, uint32_t & flag) const
 {
 	flag = MbedTlsObj::MBEDTLS_SUCCESS_RET;
 	return MbedTlsObj::MBEDTLS_SUCCESS_RET;

@@ -8,12 +8,16 @@
 #include <DecentApi/Common/Common.h>
 #include <DecentApi/Common/make_unique.h>
 #include <DecentApi/Common/GeneralKeyTypes.h>
+
 #include <DecentApi/Common/MbedTls/Hasher.h>
+#include <DecentApi/Common/MbedTls/X509Cert.h>
 #include <DecentApi/Common/MbedTls/BigNumber.h>
+
 #include <DecentApi/Common/Net/TlsCommLayer.h>
 #include <DecentApi/Common/Net/ConnectionBase.h>
 #include <DecentApi/Common/Net/RpcParser.h>
 #include <DecentApi/Common/Net/RpcWriter.h>
+
 #include <DecentApi/Common/Ra/Crypto.h>
 #include <DecentApi/Common/Ra/KeyContainer.h>
 
@@ -202,7 +206,7 @@ namespace
 {
 	static std::shared_ptr<Ra::TlsConfigSameEnclave> GetClientTlsConfigDhtNode()
 	{
-		static std::shared_ptr<Ra::TlsConfigSameEnclave> tlsCfg = std::make_shared<Ra::TlsConfigSameEnclave>(gs_state, Ra::TlsConfig::Mode::ClientHasCert, nullptr);
+		static std::shared_ptr<Ra::TlsConfigSameEnclave> tlsCfg = std::make_shared<Ra::TlsConfigSameEnclave>(gs_state, TlsConfig::Mode::ClientHasCert, nullptr);
 		return tlsCfg;
 	}
 
@@ -1433,7 +1437,7 @@ static void RemoteAttrListCollecter(const general_256bit_hash& reqUserId,
 
 static void UserReadReturnWithCache(Decent::Net::TlsCommLayer & tls, const uint8_t (&dataId)[DhtStates::sk_keySizeByte], const AccessCtrl::AbAttributeList& listForCache)
 {
-	std::string certPem = gs_state.GetCertContainer().GetCert()->ToPemString();
+	std::string certPem = gs_state.GetCertContainer().GetCert()->GetPemChain();
 
 	AccessCtrl::AbAttributeList tmpList;
 	std::vector<uint8_t> data;
@@ -1500,7 +1504,7 @@ static void UserReadReturnWithoutCache(Decent::Net::TlsCommLayer & tls, uint8_t 
 
 static void UserUpdateReturnWithCache(Decent::Net::TlsCommLayer & tls, const uint8_t(&dataId)[DhtStates::sk_keySizeByte], const AccessCtrl::AbAttributeList& listForCache, const std::vector<uint8_t>& data)
 {
-	std::string certPem = gs_state.GetCertContainer().GetCert()->ToPemString();
+	std::string certPem = gs_state.GetCertContainer().GetCert()->GetPemChain();
 
 	AccessCtrl::AbAttributeList tmpList;
 	uint8_t retVal = UpdateData(dataId, listForCache, tmpList, data.begin(), data.end());
@@ -1552,7 +1556,7 @@ static void UserUpdateReturnWithoutCache(Decent::Net::TlsCommLayer & tls, uint8_
 
 static void UserDeleteReturnWithCache(Decent::Net::TlsCommLayer & tls, const uint8_t(&dataId)[DhtStates::sk_keySizeByte], const AccessCtrl::AbAttributeList& listForCache)
 {
-	std::string certPem = gs_state.GetCertContainer().GetCert()->ToPemString();
+	std::string certPem = gs_state.GetCertContainer().GetCert()->GetPemChain();
 
 	AccessCtrl::AbAttributeList tmpList;
 	uint8_t retVal = DelData(dataId, listForCache, tmpList);

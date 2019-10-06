@@ -8,6 +8,7 @@
 #include <DecentApi/Common/make_unique.h>
 #include <DecentApi/Common/Net/TlsCommLayer.h>
 #include <DecentApi/Common/Ra/Crypto.h>
+#include <DecentApi/Common/Ra/AppX509Cert.h>
 #include <DecentApi/Common/Ra/TlsConfigAnyWhiteListed.h>
 #include <DecentApi/Common/MbedTls/SessionTicketMgr.h>
 
@@ -32,7 +33,7 @@
 #include <DecentApi/CommonEnclave/SGX/RaMutualCommLayer.h>
 #endif // DECENT_DHT_NAIVE_RA_VER
 
-using namespace Decent;
+using namespace Decent::Ra;
 using namespace Decent::Dht;
 using namespace Decent::Net;
 using namespace Decent::Tools;
@@ -40,7 +41,7 @@ using namespace Decent::MbedTlsObj;
 
 namespace
 {
-	DhtStates& gs_state = Dht::GetDhtStatesSingleton();
+	DhtStates& gs_state = GetDhtStatesSingleton();
 
 	static constexpr char gsk_ticketLabel[] = "TicketLabel";
 
@@ -57,7 +58,7 @@ namespace
 	}
 
 #ifdef DECENT_DHT_NAIVE_RA_VER
-	static Sgx::RaProcessorSp::SgxQuoteVerifier quoteVrfy = [](const sgx_quote_t&)
+	static RaProcessorSp::SgxQuoteVerifier quoteVrfy = [](const sgx_quote_t&)
 	{
 		return true;
 	};
@@ -111,12 +112,12 @@ extern "C" int ecall_decent_dht_proc_msg_from_dht(void* connection, void** prev_
 	{
 #ifdef DECENT_DHT_NAIVE_RA_VER
 
-		Sgx::RaMutualCommLayer secComm(cnt,
-			Tools::make_unique<Sgx::RaProcessorClient>(gs_state.GetEnclaveId(),
-				Sgx::RaProcessorClient::sk_acceptAnyPubKey, Sgx::RaProcessorClient::sk_acceptAnyRaConfig),
-			Tools::make_unique<Sgx::RaProcessorSp>(gs_state.GetIasConnector(),
+		RaMutualCommLayer secComm(cnt,
+			Tools::make_unique<RaProcessorClient>(gs_state.GetEnclaveId(),
+				RaProcessorClient::sk_acceptAnyPubKey, RaProcessorClient::sk_acceptAnyRaConfig),
+			Tools::make_unique<RaProcessorSp>(gs_state.GetIasConnector(),
 				gs_state.GetKeyContainer().GetSignKeyPair(), gs_state.GetSpid(),
-				Sgx::RaProcessorSp::sk_defaultRpDataVrfy, quoteVrfy),
+				RaProcessorSp::sk_defaultRpDataVrfy, quoteVrfy),
 			[](const std::vector<uint8_t>& sessionBin) -> std::vector<uint8_t> //seal
 		{
 			return Tools::DataSealer::SealData(DataSealer::KeyPolicy::ByMrEnclave, gs_state, gsk_ticketLabel, std::vector<uint8_t>(), sessionBin, nullptr, 1024);
@@ -132,7 +133,7 @@ extern "C" int ecall_decent_dht_proc_msg_from_dht(void* connection, void** prev_
 		});
 
 #else
-		std::shared_ptr<Ra::TlsConfigSameEnclave> tlsCfg = std::make_shared<Ra::TlsConfigSameEnclave>(gs_state, Ra::TlsConfig::Mode::ServerVerifyPeer, GetDhtSessionTicketMgr());
+		std::shared_ptr<TlsConfigSameEnclave> tlsCfg = std::make_shared<TlsConfigSameEnclave>(gs_state, TlsConfig::Mode::ServerVerifyPeer, GetDhtSessionTicketMgr());
 		Decent::Net::TlsCommLayer secComm(cnt, tlsCfg, true, nullptr);
 #endif // DECENT_DHT_NAIVE_RA_VER
 
@@ -162,7 +163,7 @@ extern "C" int ecall_decent_dht_proc_msg_from_store(void* connection)
 
 	try
 	{
-		std::shared_ptr<Ra::TlsConfigSameEnclave> tlsCfg = std::make_shared<Ra::TlsConfigSameEnclave>(gs_state, Ra::TlsConfig::Mode::ServerVerifyPeer, GetDhtSessionTicketMgr());
+		std::shared_ptr<TlsConfigSameEnclave> tlsCfg = std::make_shared<TlsConfigSameEnclave>(gs_state, TlsConfig::Mode::ServerVerifyPeer, GetDhtSessionTicketMgr());
 		Decent::Net::TlsCommLayer tls(cnt, tlsCfg, true, nullptr);
 
 		ProcessStoreRequest(tls);
@@ -195,12 +196,12 @@ extern "C" int ecall_decent_dht_proc_msg_from_app(void* connection)
 
 #ifdef DECENT_DHT_NAIVE_RA_VER
 
-		std::unique_ptr<Sgx::RaMutualCommLayer> tmpSecComm = Tools::make_unique<Sgx::RaMutualCommLayer>(cnt,
-			Tools::make_unique<Sgx::RaProcessorClient>(gs_state.GetEnclaveId(),
-				Sgx::RaProcessorClient::sk_acceptAnyPubKey, Sgx::RaProcessorClient::sk_acceptAnyRaConfig),
-			Tools::make_unique<Sgx::RaProcessorSp>(gs_state.GetIasConnector(),
+		std::unique_ptr<RaMutualCommLayer> tmpSecComm = Tools::make_unique<RaMutualCommLayer>(cnt,
+			Tools::make_unique<RaProcessorClient>(gs_state.GetEnclaveId(),
+				RaProcessorClient::sk_acceptAnyPubKey, RaProcessorClient::sk_acceptAnyRaConfig),
+			Tools::make_unique<RaProcessorSp>(gs_state.GetIasConnector(),
 				gs_state.GetKeyContainer().GetSignKeyPair(), gs_state.GetSpid(),
-				Sgx::RaProcessorSp::sk_defaultRpDataVrfy, quoteVrfy),
+				RaProcessorSp::sk_defaultRpDataVrfy, quoteVrfy),
 			[](const std::vector<uint8_t>& sessionBin) -> std::vector<uint8_t> //seal
 		{
 			return Tools::DataSealer::SealData(DataSealer::KeyPolicy::ByMrEnclave, gs_state, gsk_ticketLabel, std::vector<uint8_t>(), sessionBin, nullptr, 1024);
@@ -220,11 +221,11 @@ extern "C" int ecall_decent_dht_proc_msg_from_app(void* connection)
 
 #else
 
-		std::shared_ptr<Ra::TlsConfigAnyWhiteListed> tlsCfg = std::make_shared<Ra::TlsConfigAnyWhiteListed>(gs_state, Ra::TlsConfig::Mode::ServerVerifyPeer, GetAppSessionTicketMgr());
-		std::unique_ptr<TlsCommLayer> tmpSecComm = Tools::make_unique<TlsCommLayer>(cnt, tlsCfg, true, nullptr);
+		std::shared_ptr<TlsConfigAnyWhiteListed> tlsCfg = std::make_shared<TlsConfigAnyWhiteListed>(gs_state, TlsConfig::Mode::ServerVerifyPeer, GetAppSessionTicketMgr());
+		std::unique_ptr<TlsCommLayer> tmpSecComm = make_unique<TlsCommLayer>(cnt, tlsCfg, true, nullptr);
 
-		Ra::AppX509 appCert(tmpSecComm->GetPeerCertPem());
-		std::string appHashStr = Ra::GetHashFromAppId(appCert.GetPlatformType(), appCert.GetAppId());
+		AppX509Cert appCert(tmpSecComm->GetPeerCertPem());
+		std::string appHashStr = GetHashFromAppId(appCert.GetPlatformType(), appCert.GetAppId());
 		appHash = cppcodec::base64_rfc4648::decode(appHashStr);
 
 #endif
@@ -256,10 +257,10 @@ extern "C" int ecall_decent_dht_proc_msg_from_user(void* connection)
 
 	try
 	{
-		std::shared_ptr<Dht::TlsConfigAnyUser> tlsCfg = std::make_shared<Dht::TlsConfigAnyUser>(gs_state, Ra::TlsConfig::Mode::ServerVerifyPeer, GetAppSessionTicketMgr());
-		std::unique_ptr<TlsCommLayer> tls = Tools::make_unique<TlsCommLayer>(cnt, tlsCfg, true, nullptr);
+		std::shared_ptr<TlsConfigAnyUser> tlsCfg = std::make_shared<TlsConfigAnyUser>(gs_state, TlsConfig::Mode::ServerVerifyPeer, GetAppSessionTicketMgr());
+		std::unique_ptr<TlsCommLayer> tls = make_unique<TlsCommLayer>(cnt, tlsCfg, true, nullptr);
 
-		return ProcessUserRequest(tls, cnt, Tools::GetSelfHash());
+		return ProcessUserRequest(tls, cnt, GetSelfHash());
 	}
 	catch (const std::exception& e)
 	{
