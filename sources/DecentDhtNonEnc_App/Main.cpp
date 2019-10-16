@@ -138,9 +138,17 @@ int main(int argc, char ** argv)
 
 	cmd.parse(argc, argv);
 
+#ifdef ENCLAVE_PLATFORM_NON_ENCLAVE_EXACT_COMPARE
 	const size_t numListenThread = 18; //GetNumListenThread(totalNode.getValue(), gsk_totalNumThread);
 	const size_t numForwardThread = 6; //GetNumForwardThread(totalNode.getValue(), gsk_totalNumThread);
 	const size_t numReplyThread = 2; //GetNumReplyThread(totalNode.getValue(), gsk_totalNumThread);
+	const size_t numHeldCntPool = 1002;
+#else
+	const size_t numListenThread = std::numeric_limits<size_t>::max();
+	const size_t numForwardThread = 100;
+	const size_t numReplyThread = 100;
+	const size_t numHeldCntPool = std::numeric_limits<size_t>::max();
+#endif
 
 	//------- Read configuration file:
 	std::unique_ptr<DecentAppConfig> configMgr;
@@ -198,7 +206,7 @@ int main(int argc, char ** argv)
 	{
 		enclave = std::make_shared<DecentDhtApp>();
 
-		smartServer.AddServer(server, enclave, GetTcpConnectionPool(), numListenThread, 1002);
+		smartServer.AddServer(server, enclave, GetTcpConnectionPool(), numListenThread, numHeldCntPool);
 
 		enclave->InitDhtNode(selfFullAddr, exNodeFullAddr, totalNode.getValue(), nodeIdx.getValue());
 

@@ -22,15 +22,13 @@
 
 #include "../DhtStatesSingleton.h"
 
-#ifndef DECENT_DHT_NAIVE_RA_VER
-#	define DECENT_DHT_NAIVE_RA_VER
-#endif // !DECENT_DHT_NAIVE_RA_VER
-
 #ifdef DECENT_DHT_NAIVE_RA_VER
 #include <DecentApi/Common/Ra/KeyContainer.h>
 #include <DecentApi/Common/SGX/RaProcessorSp.h>
 #include <DecentApi/CommonEnclave/SGX/RaProcessorClient.h>
 #include <DecentApi/CommonEnclave/SGX/RaMutualCommLayer.h>
+
+using namespace Decent::Sgx;
 #endif // DECENT_DHT_NAIVE_RA_VER
 
 using namespace Decent::Ra;
@@ -113,14 +111,14 @@ extern "C" int ecall_decent_dht_proc_msg_from_dht(void* connection, void** prev_
 #ifdef DECENT_DHT_NAIVE_RA_VER
 
 		RaMutualCommLayer secComm(cnt,
-			Tools::make_unique<RaProcessorClient>(gs_state.GetEnclaveId(),
+			make_unique<RaProcessorClient>(gs_state.GetEnclaveId(),
 				RaProcessorClient::sk_acceptAnyPubKey, RaProcessorClient::sk_acceptAnyRaConfig),
-			Tools::make_unique<RaProcessorSp>(gs_state.GetIasConnector(),
+			make_unique<RaProcessorSp>(gs_state.GetIasConnector(),
 				gs_state.GetKeyContainer().GetSignKeyPair(), gs_state.GetSpid(),
 				RaProcessorSp::sk_defaultRpDataVrfy, quoteVrfy),
 			[](const std::vector<uint8_t>& sessionBin) -> std::vector<uint8_t> //seal
 		{
-			return Tools::DataSealer::SealData(DataSealer::KeyPolicy::ByMrEnclave, gs_state, gsk_ticketLabel, std::vector<uint8_t>(), sessionBin, nullptr, 1024);
+			return DataSealer::SealData(DataSealer::KeyPolicy::ByMrEnclave, gs_state, gsk_ticketLabel, std::vector<uint8_t>(), sessionBin, nullptr, 1024);
 		},
 			[](const std::vector<uint8_t>& ticket) -> std::vector<uint8_t> //unseal
 		{
@@ -196,15 +194,15 @@ extern "C" int ecall_decent_dht_proc_msg_from_app(void* connection)
 
 #ifdef DECENT_DHT_NAIVE_RA_VER
 
-		std::unique_ptr<RaMutualCommLayer> tmpSecComm = Tools::make_unique<RaMutualCommLayer>(cnt,
-			Tools::make_unique<RaProcessorClient>(gs_state.GetEnclaveId(),
+		std::unique_ptr<RaMutualCommLayer> tmpSecComm = make_unique<RaMutualCommLayer>(cnt,
+			make_unique<RaProcessorClient>(gs_state.GetEnclaveId(),
 				RaProcessorClient::sk_acceptAnyPubKey, RaProcessorClient::sk_acceptAnyRaConfig),
-			Tools::make_unique<RaProcessorSp>(gs_state.GetIasConnector(),
+			make_unique<RaProcessorSp>(gs_state.GetIasConnector(),
 				gs_state.GetKeyContainer().GetSignKeyPair(), gs_state.GetSpid(),
 				RaProcessorSp::sk_defaultRpDataVrfy, quoteVrfy),
 			[](const std::vector<uint8_t>& sessionBin) -> std::vector<uint8_t> //seal
 		{
-			return Tools::DataSealer::SealData(DataSealer::KeyPolicy::ByMrEnclave, gs_state, gsk_ticketLabel, std::vector<uint8_t>(), sessionBin, nullptr, 1024);
+			return DataSealer::SealData(DataSealer::KeyPolicy::ByMrEnclave, gs_state, gsk_ticketLabel, std::vector<uint8_t>(), sessionBin, nullptr, 1024);
 		},
 			[](const std::vector<uint8_t>& ticket) -> std::vector<uint8_t> //unseal
 		{

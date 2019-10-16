@@ -295,6 +295,11 @@ foreach(Proj_Name IN ITEMS ${ENCLAVE_PROJECT_LIST})
 
 endforeach()
 
+#target_compile_definitions(DecentDht_Enclave PRIVATE DECENT_DHT_NAIVE_RA_VER)
+#target_compile_definitions(DecentDht_App PRIVATE DECENT_DHT_NAIVE_RA_VER)
+
+target_compile_definitions(DecentDhtNonEnc_Enclave PRIVATE ENCLAVE_PLATFORM_NON_ENCLAVE_EXACT_COMPARE)
+target_compile_definitions(DecentDhtNonEnc_App PRIVATE ENCLAVE_PLATFORM_NON_ENCLAVE_EXACT_COMPARE)
 
 #==========================================================
 #   Client Apps

@@ -30,10 +30,6 @@
 #include "../Common_App/Dht/SGX/DecentDhtApp.h"
 #include "../Common_App/Dht/DhtConnectionPool.h"
 
-#ifndef DECENT_DHT_NAIVE_RA_VER
-#	define DECENT_DHT_NAIVE_RA_VER
-#endif // !DECENT_DHT_NAIVE_RA_VER
-
 #ifdef DECENT_DHT_NAIVE_RA_VER
 #	include<cppcodec/hex_upper.hpp>
 #	include<DecentApi/CommonApp/SGX/IasConnector.h>
