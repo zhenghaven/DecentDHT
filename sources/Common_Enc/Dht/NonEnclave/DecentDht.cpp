@@ -98,8 +98,8 @@ extern "C" int ecall_decent_dht_proc_msg_from_dht(void* connection, void** prev_
 
 	try
 	{
-		std::shared_ptr<Ra::TlsConfigSameEnclave> tlsCfg = std::make_shared<Ra::TlsConfigSameEnclave>(gs_state, TlsConfig::Mode::ServerVerifyPeer, GetDhtSessionTicketMgr());
-		Decent::Net::TlsCommLayer secComm(cnt, tlsCfg, true, nullptr);
+		std::shared_ptr<Ra::TlsConfigSameEnclave> tlsCfg = std::make_shared<Ra::TlsConfigSameEnclave>(gs_state, TlsConfig::Mode::ServerNoVerifyPeer, GetDhtSessionTicketMgr());
+		Decent::Net::TlsCommLayer secComm(cnt, tlsCfg, false, nullptr);
 
 		ProcessDhtQuery(secComm, *prev_held_cnt);
 	}
@@ -127,8 +127,8 @@ extern "C" int ecall_decent_dht_proc_msg_from_store(void* connection)
 
 	try
 	{
-		std::shared_ptr<Ra::TlsConfigSameEnclave> tlsCfg = std::make_shared<Ra::TlsConfigSameEnclave>(gs_state, TlsConfig::Mode::ServerVerifyPeer, GetDhtSessionTicketMgr());
-		Decent::Net::TlsCommLayer tls(cnt, tlsCfg, true, nullptr);
+		std::shared_ptr<Ra::TlsConfigSameEnclave> tlsCfg = std::make_shared<Ra::TlsConfigSameEnclave>(gs_state, TlsConfig::Mode::ServerNoVerifyPeer, GetDhtSessionTicketMgr());
+		Decent::Net::TlsCommLayer tls(cnt, tlsCfg, false, nullptr);
 
 		ProcessStoreRequest(tls);
 	}

@@ -113,7 +113,11 @@ int main(int argc, char ** argv)
 	//------- Construct main thread worker at very first:
 	std::shared_ptr<MainThreadAsynWorker> mainThreadWorker = std::make_shared<MainThreadAsynWorker>();
 
+#ifdef ENCLAVE_PLATFORM_NON_ENCLAVE_EXACT_COMPARE
 	std::cout << "================ Decent DHT (Non-Enclave Version) ================" << std::endl;
+#else
+	std::cout << "================ Decent DHT (TLS-Only Version) ================" << std::endl;
+#endif
 
 	//------- Setup Smart Server:
 	Net::SmartServer smartServer(mainThreadWorker);
@@ -144,10 +148,10 @@ int main(int argc, char ** argv)
 	const size_t numReplyThread = 2; //GetNumReplyThread(totalNode.getValue(), gsk_totalNumThread);
 	const size_t numHeldCntPool = 1002;
 #else
-	const size_t numListenThread = std::numeric_limits<size_t>::max();
-	const size_t numForwardThread = 100;
-	const size_t numReplyThread = 100;
-	const size_t numHeldCntPool = std::numeric_limits<size_t>::max();
+	const size_t numListenThread = 3000;
+	const size_t numForwardThread = 300;
+	const size_t numReplyThread = 1500;
+	const size_t numHeldCntPool = 3000;
 #endif
 
 	//------- Read configuration file:
