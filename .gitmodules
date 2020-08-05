@@ -1,7 +1,3 @@
-[submodule "hunter"]
-	path = hunter
-	url = https://github.com/zhenghaven/hunter.git
-	branch = master
 [submodule "libs/tclap"]
 	path = libs/tclap
 	url = https://git.code.sf.net/p/tclap/code

@@ -20,6 +20,7 @@
 #include <DecentApi/Common/Ra/RequestCategory.h>
 #include <DecentApi/Common/Ra/WhiteList/WhiteList.h>
 #include <DecentApi/Common/Net/CntPoolConnection.h>
+#include <DecentApi/Common/MbedTls/Initializer.h>
 #include <DecentApi/Common/MbedTls/BigNumber.h>
 
 #include <DecentApi/DecentAppApp/DecentAppConfig.h>
@@ -117,6 +118,8 @@ extern "C" void* ocall_decent_dht_cnt_mgr_get_store(uint64_t address)
  */
 int main(int argc, char ** argv)
 {
+	auto mbedInit = Decent::MbedTlsObj::Initializer::Init();
+
 	//------- Construct main thread worker at very first:
 	std::shared_ptr<MainThreadAsynWorker> mainThreadWorker = std::make_shared<MainThreadAsynWorker>();
 

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include <DecentApi/Common/Net/ConnectionHandler.h>
 
 namespace Decent
