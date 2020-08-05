@@ -16,6 +16,13 @@
 			"Port" : 57756,
 			"LoadedWhiteList" : true,
 			"Hash" : "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+		},
+		"DecentDHTTestingClient" :
+		{
+			"Address" : "127.0.0.1",
+			"Port" : 0,
+			"LoadedWhiteList" : true,
+			"Hash" : "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
 		}
 	}
 }
